@@ -1,0 +1,24 @@
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Entorno
+.env
+.env.*
+
+# Logs
+*.log
+
+# Artefactos comunes
+build/
+dist/
+out/
+target/
+coverage/
+reports/
