@@ -1,21 +1,25 @@
-# Nombre provisional del proyecto
+# ROYEXA
 
-Breve descripcion del problema y del proposito general del proyecto, en un
-maximo de tres lineas.
+Sistema de registro de cobranza para financieras pequeñas que prestan cantidades reducidas y las cobran a diario, puerta a puerta.
+Cada movimiento de dinero deja evidencia que puede verificar alguien distinto de quien lo registró.
+El propósito es impedir el fraude interno y detectar los descuadres de caja el mismo día.
 
 ## Integrantes
 
-- Nombre completo del integrante 1 - @usuario-github
-- Nombre completo del integrante 2 - @usuario-github
+- Julian Andres Restrepo Castaño
+- Jeison David Tibaduiza Sanchez
+
+Grupo: 10
 
 ## Documentacion
 
-- docs/00-propuesta/propuesta.md
+- [docs/00-propuesta/propuesta.md](docs/00-propuesta/propuesta.md)
+- [docs/01-requisitos/requisitos.md](docs/01-requisitos/requisitos.md)
 
 ## Estado actual
 
-- Entrega actual: Entrega 0
-- Estado: En preparacion
+- Entrega actual: Entrega 1
+- Estado: Documentación de la ficha de propuesta y de los requisitos diligenciada
 
 ## Instruccion oficial de entrega
 
