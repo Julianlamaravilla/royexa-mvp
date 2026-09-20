@@ -4,8 +4,7 @@
 
 - **Proyecto:** ROYEXA
 - **Integrantes:**
-  - Julian Andres Restrepo Castaño
-  - Jeison David Tibaduiza Sanchez
+  - Julian Andres Restrepo
 - **Grupo:** 10
 - **Fecha:** 2026-08-22
 - **Commit o etiqueta de entrega:** entrega-1-requisitos

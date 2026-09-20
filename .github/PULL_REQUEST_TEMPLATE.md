@@ -2,8 +2,7 @@
 
 ## Integrantes
 
-- 
-- 
+- Julian Andres Restrepo
 
 ## Documento para revisar
 

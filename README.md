@@ -6,8 +6,7 @@ El propósito es impedir el fraude interno y detectar los descuadres de caja el 
 
 ## Integrantes
 
-- Julian Andres Restrepo Castaño
-- Jeison David Tibaduiza Sanchez
+- Julian Andres Restrepo
 
 Grupo: 10
 
@@ -15,11 +14,13 @@ Grupo: 10
 
 - [docs/00-propuesta/propuesta.md](docs/00-propuesta/propuesta.md)
 - [docs/01-requisitos/requisitos.md](docs/01-requisitos/requisitos.md)
+- [docs/02-arquitectura/arquitectura.md](docs/02-arquitectura/arquitectura.md)
+- [docs/02-arquitectura/trazabilidad-arquitectonica.md](docs/02-arquitectura/trazabilidad-arquitectonica.md)
 
 ## Estado actual
 
-- Entrega actual: Entrega 1
-- Estado: Documentación de la ficha de propuesta y de los requisitos diligenciada
+- Entrega actual: Entrega 2
+- Estado: Documentación de la propuesta, los requisitos y la arquitectura candidata diligenciada, sincronizada con el estado del producto en TRACKEA a 2026-09-20. Las divergencias con la Entrega 1 están en la sección 7.1 de [docs/02-arquitectura/arquitectura.md](docs/02-arquitectura/arquitectura.md)
 
 ## Instruccion oficial de entrega
 
