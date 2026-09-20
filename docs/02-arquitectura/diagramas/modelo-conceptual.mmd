@@ -1,0 +1,48 @@
+classDiagram
+    direction LR
+
+    class Financiera
+    class Ruta
+    class Usuario
+    class Dispositivo
+    class Cliente
+    class Venta
+    class Llave
+    class Prestamo
+    class CondicionesDelPrestamo
+    class Cuota
+    class Pago
+    class Imputacion
+    class NoPagoOPromesa
+    class Caja
+    class CierreDeCaja
+    class Asiento
+    class SolicitudDeReversa
+    class Gasto
+    class OperacionDeSincronizacion
+    class Aviso
+    class IntentoDeEnvio
+
+    Financiera "1" --> "1..*" Ruta : contiene
+    Financiera "1" --> "1..*" Usuario : contiene
+    Ruta "1" --> "1" Usuario : cobrador asignado
+    Ruta "1" --> "0..1" Dispositivo : dispositivo activo
+    Ruta "1" --> "1..*" Cliente : atiende
+    Ruta "1" --> "0..*" Caja : una por dia
+    Cliente "1" --> "0..*" Venta : recibe
+    Venta "1" --> "0..1" Prestamo : origina al aprobarse
+    Venta "1" --> "0..*" Llave : habilita
+    Cliente "1" --> "0..*" Prestamo : debe
+    Prestamo "1" --> "1..*" Cuota : se paga en
+    Prestamo "1" --> "1..*" CondicionesDelPrestamo : versiona
+    Prestamo "1" --> "0..*" Pago : recibe
+    Prestamo "1" --> "0..*" NoPagoOPromesa : registra
+    Pago "1" --> "1..*" Imputacion : se reparte en
+    Imputacion "*" --> "1" Cuota : reduce
+    Pago "1" --> "1" Asiento : queda asentado en
+    Gasto "1" --> "1" Asiento : queda asentado en
+    Asiento "*" --> "1" Caja : pertenece a
+    SolicitudDeReversa "0..*" --> "1" Asiento : pide compensar
+    Caja "1" --> "0..1" CierreDeCaja : termina en
+    OperacionDeSincronizacion "1" --> "0..1" Pago : produce
+    Aviso "1" --> "1..*" IntentoDeEnvio : se intenta con
