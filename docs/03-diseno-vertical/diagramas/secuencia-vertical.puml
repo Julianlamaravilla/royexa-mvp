@@ -1,0 +1,31 @@
+@startuml
+' Reemplace el contenido por el recorrido real.
+title UC-01 — [Nombre del recorrido] — Escenario principal
+
+actor "[INT-XX: Actor]" as Actor
+boundary "[CMP-01: Entrada]" as Entrada
+control "[CMP-02: Caso de uso]" as CasoUso
+entity "[CMP-03: Dominio]" as Dominio
+collections "[CTR-01: Puerto]" as Puerto
+database "[CMP-04: Adaptador]" as Adaptador
+
+note over Actor, Adaptador
+Referencias: RF-XX, CA-XX, RN-XX, ADR-XXX
+end note
+
+Actor -> Entrada: [Solicitud]
+Entrada -> CasoUso: ejecutar([comando])
+CasoUso -> Puerto: obtener([id])
+Puerto -> Adaptador: obtener([id])
+Adaptador --> Puerto: [datos]
+Puerto --> CasoUso: [objeto de dominio]
+CasoUso -> Dominio: [comportamiento de negocio]
+Dominio --> CasoUso: [resultado]
+CasoUso -> Puerto: guardar([entidad])
+Puerto -> Adaptador: guardar([entidad])
+Adaptador --> Puerto: [confirmación]
+Puerto --> CasoUso: [confirmación]
+CasoUso --> Entrada: [resultado]
+Entrada --> Actor: [resultado observable]
+
+@enduml
