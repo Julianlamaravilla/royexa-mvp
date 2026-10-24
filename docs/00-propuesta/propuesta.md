@@ -1,13 +1,12 @@
 # Ficha de propuesta del proyecto
 
 Asignatura: Arquitectura de Software, Universidad Ean
-Integrantes: Julian Andres Restrepo Castaño y Jeison David Tibaduiza Sanchez
+Integrantes: Julian Andres Restrepo
 
 ## A. Identificacion
 
 - Nombre provisional: ROYEXA
-- Integrante 1: Julian Andres Restrepo Castaño
-- Integrante 2: Jeison David Tibaduiza Sanchez
+- Integrante 1: Julian Andres Restrepo
 - Dominio o sector: tecnología financiera aplicada a la gestión de cobranza en calle. El sistema se dirige a financieras pequeñas que prestan cantidades reducidas y las cobran a diario, puerta a puerta.
 - Contexto: una financiera pequeña presta cantidades reducidas a muchas personas y las cobra de lunes a sábado en la calle. El cobrador recorre su ruta solo, sin supervisión y buena parte de la jornada sin señal de móvil. El control se lleva hoy con un producto de terceros apoyado en hojas de cálculo.
 

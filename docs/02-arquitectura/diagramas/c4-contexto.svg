@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 640" width="1240" height="640" font-family="Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">C4 de Contexto de ROYEXA</title><desc id="d">Cobrador, administrador y socio usan ROYEXA; el sistema envía alertas por correo, push y Telegram y errores a un servicio de captura.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#555"/></marker></defs>
+<rect width="1240" height="640" fill="#ffffff"/>
+<circle cx="150.0" cy="82" r="16" fill="#08427b"/>
+<rect x="40" y="98" width="220" height="92" rx="12" fill="#08427b"/>
+<text x="150.0" y="120" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">Cobrador</text>
+<text x="150.0" y="138" font-size="10.5" fill="#fff" fill-opacity=".9" text-anchor="middle">[Persona · INT-01]</text>
+<text x="150.0" y="154" font-size="11" fill="#fff" text-anchor="middle">Registra cobros y cierra su caja,</text>
+<text x="150.0" y="168" font-size="11" fill="#fff" text-anchor="middle">con o sin señal.</text>
+<circle cx="150.0" cy="272" r="16" fill="#08427b"/>
+<rect x="40" y="288" width="220" height="92" rx="12" fill="#08427b"/>
+<text x="150.0" y="310" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">Administrador</text>
+<text x="150.0" y="328" font-size="10.5" fill="#fff" fill-opacity=".9" text-anchor="middle">[Persona · INT-02]</text>
+<text x="150.0" y="344" font-size="11" fill="#fff" text-anchor="middle">Aprueba ventas, llaves y gastos;</text>
+<text x="150.0" y="358" font-size="11" fill="#fff" text-anchor="middle">verifica descuadres.</text>
+<circle cx="150.0" cy="462" r="16" fill="#08427b"/>
+<rect x="40" y="478" width="220" height="92" rx="12" fill="#08427b"/>
+<text x="150.0" y="500" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">Socio</text>
+<text x="150.0" y="518" font-size="10.5" fill="#fff" fill-opacity=".9" text-anchor="middle">[Persona · sin INT (DIV-04)]</text>
+<text x="150.0" y="534" font-size="11" fill="#fff" text-anchor="middle">Consulta reportes en solo lectura</text>
+<text x="150.0" y="548" font-size="11" fill="#fff" text-anchor="middle">(hito 2).</text>
+<rect x="470" y="230" width="300" height="170" rx="8" fill="#1168bd"/>
+<text x="620.0" y="254" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">ROYEXA</text>
+<text x="620.0" y="272" font-size="10.5" fill="#fff" fill-opacity=".9" text-anchor="middle">[Sistema de software]</text>
+<text x="620.0" y="288" font-size="11" fill="#fff" text-anchor="middle">Registro de cobranza en calle con libro</text>
+<text x="620.0" y="302" font-size="11" fill="#fff" text-anchor="middle">mayor inalterable y cierre de caja diario</text>
+<text x="620.0" y="316" font-size="11" fill="#fff" text-anchor="middle">para detectar descuadres el mismo día.</text>
+<rect x="980" y="40" width="220" height="110" rx="8" fill="#999999"/>
+<text x="1090.0" y="64" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">Amazon SES</text>
+<text x="1090.0" y="82" font-size="10.5" fill="#fff" fill-opacity=".9" text-anchor="middle">[EXT-01 · Sistema externo]</text>
+<text x="1090.0" y="98" font-size="11" fill="#fff" text-anchor="middle">Entrega el correo de alertas.</text>
+<rect x="980" y="190" width="220" height="110" rx="8" fill="#999999"/>
+<text x="1090.0" y="214" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">Firebase Cloud Messaging</text>
+<text x="1090.0" y="232" font-size="10.5" fill="#fff" fill-opacity=".9" text-anchor="middle">[EXT-02 · Sistema externo]</text>
+<text x="1090.0" y="248" font-size="11" fill="#fff" text-anchor="middle">Entrega los avisos push.</text>
+<rect x="980" y="340" width="220" height="110" rx="8" fill="#999999"/>
+<text x="1090.0" y="364" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">Telegram Bot API</text>
+<text x="1090.0" y="382" font-size="10.5" fill="#fff" fill-opacity=".9" text-anchor="middle">[EXT-03 · Sistema externo]</text>
+<text x="1090.0" y="398" font-size="11" fill="#fff" text-anchor="middle">Entrega reportes y alertas.</text>
+<rect x="980" y="490" width="220" height="110" rx="8" fill="#999999"/>
+<text x="1090.0" y="514" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">Captura de errores</text>
+<text x="1090.0" y="532" font-size="10.5" fill="#fff" fill-opacity=".9" text-anchor="middle">[EXT-04 · Sistema externo]</text>
+<text x="1090.0" y="548" font-size="11" fill="#fff" text-anchor="middle">Recibe errores sin datos</text>
+<text x="1090.0" y="562" font-size="11" fill="#fff" text-anchor="middle">personales.</text>
+<path d="M260 130 L470 280" fill="none" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="270.0" y="167.0" width="160" height="46" fill="#fff" fill-opacity=".92" rx="3"/>
+<text x="350" y="180.0" font-size="10.5" fill="#333" text-anchor="middle">Registra cobros, no pagos</text>
+<text x="350" y="194.0" font-size="10.5" fill="#333" text-anchor="middle">y gastos, y cierra su</text>
+<text x="350" y="208.0" font-size="10.5" fill="#333" text-anchor="middle">caja</text>
+<path d="M260 315 L470 315" fill="none" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="288.0" y="277.0" width="154" height="46" fill="#fff" fill-opacity=".92" rx="3"/>
+<text x="365" y="290.0" font-size="10.5" fill="#333" text-anchor="middle">Aprueba ventas, llaves y</text>
+<text x="365" y="304.0" font-size="10.5" fill="#333" text-anchor="middle">gastos; verifica</text>
+<text x="365" y="318.0" font-size="10.5" fill="#333" text-anchor="middle">descuadres</text>
+<path d="M260 505 L470 360" fill="none" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="270.0" y="454.0" width="160" height="32" fill="#fff" fill-opacity=".92" rx="3"/>
+<text x="350" y="467.0" font-size="10.5" fill="#333" text-anchor="middle">Consulta reportes en solo</text>
+<text x="350" y="481.0" font-size="10.5" fill="#333" text-anchor="middle">lectura</text>
+<path d="M770 260 L980 95" fill="none" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="814.0" y="142.0" width="112" height="46" fill="#fff" fill-opacity=".92" rx="3"/>
+<text x="870" y="155.0" font-size="10.5" fill="#333" text-anchor="middle">Envía alertas por</text>
+<text x="870" y="169.0" font-size="10.5" fill="#333" text-anchor="middle">correo</text>
+<text x="870" y="183.0" font-size="10.5" fill="#333" text-anchor="middle">[HTTPS]</text>
+<path d="M770 300 L980 245" fill="none" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="824.0" y="246.0" width="112" height="32" fill="#fff" fill-opacity=".92" rx="3"/>
+<text x="880" y="259.0" font-size="10.5" fill="#333" text-anchor="middle">Envía avisos push</text>
+<text x="880" y="273.0" font-size="10.5" fill="#333" text-anchor="middle">[HTTPS]</text>
+<path d="M770 345 L980 395" fill="none" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="827.0" y="362.0" width="106" height="46" fill="#fff" fill-opacity=".92" rx="3"/>
+<text x="880" y="375.0" font-size="10.5" fill="#333" text-anchor="middle">Envía reportes y</text>
+<text x="880" y="389.0" font-size="10.5" fill="#333" text-anchor="middle">alertas</text>
+<text x="880" y="403.0" font-size="10.5" fill="#333" text-anchor="middle">[HTTPS]</text>
+<path d="M770 385 L980 545" fill="none" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="814.0" y="472.0" width="112" height="46" fill="#fff" fill-opacity=".92" rx="3"/>
+<text x="870" y="485.0" font-size="10.5" fill="#333" text-anchor="middle">Envía errores sin</text>
+<text x="870" y="499.0" font-size="10.5" fill="#333" text-anchor="middle">datos personales</text>
+<text x="870" y="513.0" font-size="10.5" fill="#333" text-anchor="middle">[HTTPS]</text>
+<text x="40" y="615" font-size="11" fill="#555">Fuente: diagramas/workspace.dsl (vista c4-contexto). INT-03 (cliente final) no aparece: en v1 no opera el sistema ni recibe mensajes (DIV-01).</text>
+</svg>
