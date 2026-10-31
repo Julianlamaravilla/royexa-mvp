@@ -75,8 +75,9 @@
 - **Contenedor descompuesto:** CON-03 — API del servidor. Es el único contenedor que se descompone.
 - **Fuente:** [`../02-arquitectura/diagramas/workspace.dsl`](../02-arquitectura/diagramas/workspace.dsl)
 - **Vista:** `c4-componentes`
+- **Exportación:** [`diagramas/c4-componentes.svg`](diagramas/c4-componentes.svg), generada desde ese DSL con el comando de la sección 7.7.
 
-**Exportación pendiente.** La vista está escrita en el mismo modelo de la Entrega 2, pero `workspace.dsl` todavía no se ha validado con Structurizr y `diagramas/c4-componentes.svg` no existe. La fuente anterior es hoy la única representación de esta vista. Ver sección 10.
+![C4 de Componentes de la API del servidor](diagramas/c4-componentes.svg)
 
 ### 2.1 Catálogo de componentes
 
@@ -153,7 +154,7 @@ Las decisiones se reconocen en la estructura: CMP-05 es el único escritor del l
 
 Hay dos diferencias con lo descrito en la Entrega 2, y ambas se registran como hallazgos:
 
-- **CON-04 contiene menos de lo previsto.** El contenedor describe el libro, préstamos, cajas y bandeja de salida; hoy solo guarda el libro (HV-07).
+- **CON-04 contiene menos de lo previsto.** La Entrega 2 preveía en el contenedor el libro, préstamos, cajas y bandeja de salida; hoy solo guarda el libro, y el modelo ya lo describe así (HV-07).
 - **El rol de quien aprueba se comprueba en el agregado.** ALT-06B pone el rol en la entrada, pero `POST .../approve` deja pasar a cualquier actor conocido para que un rechazo quede registrado (HV-09).
 
 CMP-11 y EXT-05 coinciden en el mismo proceso: `SimulatedNotifier` implementa el puerto y además hace de canal, porque escribe en la salida estándar. El C4 los mantiene separados porque esa es la frontera que se sustituirá por un proveedor real.
@@ -326,7 +327,10 @@ Los contratos `CTR-04` a `CTR-12` son protocolos de Python: el código que los c
 
 ### 4.1 Escenario principal
 
-- **Fuente:** [`diagramas/secuencia-vertical.puml`](diagramas/secuencia-vertical.puml). La exportación a SVG está pendiente (sección 10).
+- **Fuente:** [`diagramas/secuencia-vertical.puml`](diagramas/secuencia-vertical.puml)
+- **Exportación:** [`diagramas/secuencia-vertical.svg`](diagramas/secuencia-vertical.svg), con el comando de la sección 7.7.
+
+![Secuencia del escenario principal](diagramas/secuencia-vertical.svg)
 
 - **Una transacción por paso.** Cada caso de uso abre su propia unidad de trabajo. El dinero se mueve solo en UC-03; aprobar únicamente guarda el resumen del código y encola el aviso (RN-03).
 - **El cobrador nunca ve el código.** El aviso sale por `CTR-08` y `CTR-10`, y ninguna respuesta de la API lo incluye. Por eso el código sirve como comprobación independiente de la palabra del cobrador (RES-05).
@@ -336,7 +340,10 @@ Los contratos `CTR-04` a `CTR-12` son protocolos de Python: el código que los c
 
 ### 4.2 Escenario alternativo
 
-- **Fuente:** [`diagramas/secuencia-alternativa.puml`](diagramas/secuencia-alternativa.puml). La exportación a SVG está pendiente (sección 10).
+- **Fuente:** [`diagramas/secuencia-alternativa.puml`](diagramas/secuencia-alternativa.puml)
+- **Exportación:** [`diagramas/secuencia-alternativa.svg`](diagramas/secuencia-alternativa.svg), con el comando de la sección 7.7.
+
+![Secuencia del escenario alternativo](diagramas/secuencia-alternativa.svg)
 
 **Código caducado.** La condición la detecta `Disbursement.confirm`, que protege RN-03 y usa el reloj del servidor, no `device_time`. Comprueba primero que el código sea correcto, de modo que un código errado no revela si el desembolso caducó. El resultado `EXPIRED` no es una excepción dentro de la transacción: el caso de uso asienta el intento, hace `commit` y solo entonces lanza `ConfirmationCodeExpired`, que CMP-01 traduce a 409. Si fuera una excepción en el dominio, la salida del bloque descartaría el asiento que CA-06 exige.
 
@@ -468,7 +475,7 @@ Los comandos completos para un clon limpio están también en [`../../backend/RE
 
 - Python 3.14. `backend/.python-version` lo fija y `uv` lo descarga si falta. Se probó con 3.14.6.
 - `uv` 0.11 para dependencias y ejecución. Se probó con 0.11.7.
-- Docker con Compose, solo para PostgreSQL 17. Se probó con la imagen `postgres:17`, versión 17.11.
+- Docker con Compose, solo para PostgreSQL 17 y para regenerar los diagramas (sección 7.7). Se probó con la imagen `postgres:17`, versión 17.11.
 - Sin archivos de configuración. Las variables son opcionales:
 
 | Variable | Valor por defecto | Efecto |
@@ -575,6 +582,16 @@ Resultado observado el 2026-10-31 con el libro en PostgreSQL:
 
 El registro completo está en [`evidencias/resultado-pruebas.txt`](evidencias/resultado-pruebas.txt).
 
+### 7.7 Regenerar los diagramas
+
+Desde la raíz del repositorio, con Docker en ejecución:
+
+```bash
+docs/03-diseno-vertical/diagramas/exportar-diagramas.sh
+```
+
+El script usa las imágenes fijadas `structurizr/cli:2024.03.03` y `plantuml/plantuml:1.2024.8`. Valida `workspace.dsl`, exporta sus vistas y genera los cinco SVG: `c4-contexto.svg` y `c4-contenedores.svg` en `docs/02-arquitectura/diagramas/`, y `c4-componentes.svg`, `secuencia-vertical.svg` y `secuencia-alternativa.svg` en `docs/03-diseno-vertical/diagramas/`. Si un paso falla, se detiene.
+
 ---
 
 ## 8. Validación de decisiones y evidencia
@@ -651,12 +668,12 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 
 ### HV-07 — Solo el libro vive en PostgreSQL
 
-- **Evidencia de origen:** PR-07 y ejecución del recorrido del 2026-10-31.
+- **Evidencia de origen:** PR-07, ejecución del recorrido del 2026-10-31 y revisión de `workspace.dsl` al exportar los diagramas.
 - **Qué se observó:** desembolsos, préstamos, cajas y bandeja de salida están en memoria también en ejecución. Tras reiniciar el servidor, el libro conservó el asiento de −100 000 centavos, la caja volvió a 100 000 000 y el desembolso respondió 404. PR-07 comprueba que un `StaleWrite` o una caída de la conexión no dejan cambios a medias, pero `commit` confirma PostgreSQL y publica la memoria en dos pasos.
 - **Interpretación:** la Entrega 3 demuestra la inmutabilidad del libro, no la persistencia del sistema. ADR-002 pedía una sola transacción y una bandeja en PostgreSQL. Tampoco se cumple aún que el saldo sea la suma de los asientos: `CashBox.balance` es un campo.
 - **Decisión afectada:** ADR-001, ADR-002, ADR-004.
-- **Acción tomada:** registrar RA-10, declarar el estado real en los tres ADR y en `arquitectura.md`, sección 4.2, y añadir una condición de revisión a ADR-002.
-- **Archivos actualizados:** `docs/02-arquitectura/adr/ADR-001-libro-de-movimientos-de-solo-insercion.md`, `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`, `docs/02-arquitectura/adr/ADR-004-operacion-en-linea-con-confirmacion-idempotente.md`, `docs/02-arquitectura/arquitectura.md`
+- **Acción tomada:** registrar RA-10, declarar el estado real en los tres ADR y en `arquitectura.md`, secciones 4.2 y 5.3, y añadir una condición de revisión a ADR-002. Antes de exportar los diagramas, la descripción de CON-04 y la relación entre la API y la base de datos en `workspace.dsl` se alinearon con este hallazgo, para que los SVG no mostraran como vigente lo que el código no hace.
+- **Archivos actualizados:** `docs/02-arquitectura/adr/ADR-001-libro-de-movimientos-de-solo-insercion.md`, `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`, `docs/02-arquitectura/adr/ADR-004-operacion-en-linea-con-confirmacion-idempotente.md`, `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/diagramas/workspace.dsl`
 
 ### HV-08 — Un código vencido sin intento no caduca por sí solo
 
@@ -693,6 +710,7 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 | 2026-10-31 | Resultado de las evidencias registrado en el rastro de la realineación. | Cerrar el estado de la matriz de identificadores. | `docs/02-arquitectura/realineacion-entrega-1.md` | HV-01 a HV-09 |
 | 2026-10-31 | EV-03 pasa a `Validada` con una prueba sobre el aviso del código. La cobertura de ASR muestra el resultado de las evidencias. | Cerrar el vacío de HV-05 y el estado que seguía pendiente en la matriz. | `backend/tests/vertical/test_pr06_notifier_failure.py`, `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`, `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/realineacion-entrega-1.md`, `docs/02-arquitectura/trazabilidad-arquitectonica.md` | HV-05 |
 | 2026-10-31 | DIV-08 queda resuelta. | El docente autorizó el trabajo individual; lo confirmó el autor. | `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/realineacion-entrega-1.md` | DIV-08 |
+| 2026-10-31 | `workspace.dsl` validado con Structurizr. Los SVG de C4 y de secuencia se exportan desde sus fuentes; los dos SVG de la Entrega 2 dibujados a mano quedan sustituidos. CON-04 y su relación con la API se alinean con HV-07. | La exportación estaba pendiente y la Entrega 3 exige SVG reproducibles. | `docs/02-arquitectura/diagramas/workspace.dsl`, `docs/02-arquitectura/diagramas/c4-contexto.svg`, `docs/02-arquitectura/diagramas/c4-contenedores.svg`, `docs/02-arquitectura/arquitectura.md`, `docs/03-diseno-vertical/diagramas/exportar-diagramas.sh`, `docs/03-diseno-vertical/diagramas/c4-componentes.svg`, `docs/03-diseno-vertical/diagramas/secuencia-vertical.svg`, `docs/03-diseno-vertical/diagramas/secuencia-alternativa.svg` | HV-07 |
 
 ---
 
@@ -716,12 +734,10 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 - La retroalimentación de Canvas sobre la Entrega 2 está pendiente de incorporar. Si contradice este documento, prevalece.
 - El repositorio no guarda la constancia de la autorización docente de DIV-08.
 
-**Diagramas pendientes**
+**Alcance de la validación de los diagramas**
 
-- `workspace.dsl` no se ha validado con Structurizr, incluida la vista `c4-componentes`. Solo se comprobó por lectura que sus llaves, comillas e identificadores cuadran.
-- Las secuencias no se han procesado con PlantUML. Solo se compararon por lectura con el código.
-- `c4-componentes.svg`, `secuencia-vertical.svg` y `secuencia-alternativa.svg` están pendientes de exportación.
-- `c4-contexto.svg` y `c4-contenedores.svg` todavía muestran el modelo de la Entrega 2.
+- La validación de `workspace.dsl`, incluida la vista `c4-componentes`, comprueba su sintaxis y sus referencias. No demuestra que el modelo sea correcto.
+- PlantUML procesa las secuencias, pero no las compara con el código. Esa comparación se hizo por lectura.
 
 **Escenarios todavía no comprobados**
 
