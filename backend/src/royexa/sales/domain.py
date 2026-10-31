@@ -213,7 +213,7 @@ class Disbursement:
         and no code exists unless every guard passed (EC-02)."""
         self._ensure_may_approve(actor, now)
         self._ensure_awaiting_decision()
-        if self.status is DisbursementStatus.PENDING_AUTHORIZATION and not reason:
+        if self.status is DisbursementStatus.PENDING_AUTHORIZATION and not (reason or "").strip():
             raise ReasonRequired("authorizing an amount over the collector limit needs a reason")
         self.status = DisbursementStatus.APPROVED
         self.approved_by = actor.id

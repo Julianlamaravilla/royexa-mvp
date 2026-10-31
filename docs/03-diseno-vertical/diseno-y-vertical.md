@@ -441,6 +441,11 @@ El comando por defecto no necesita Docker. Las pruebas marcadas `postgres` se ej
 | PR-06 | Componente sobre la API, 5 pruebas | Fallo del notificador | UC-05; CA-12; RN-03; EC-04; RF-06; EV-03; ADR-002 | El dinero se conserva, el aviso reintenta y termina visible | `backend/tests/vertical/test_pr06_notifier_failure.py` |
 | PR-07 | Integración con PostgreSQL 17, 18 pruebas | Privilegios reales y flujo sobre el libro real | RN-04; RN-03; CA-05, CA-06; CA-08 en parte; EV-01, EV-02, EV-12; ADR-001, ADR-002, ADR-004 | El rol no altera el libro y el catálogo lo confirma; sin conexiones abiertas | `backend/tests/postgres/test_pr07_ledger_privileges.py` |
 | PR-08 | Estática, 4 pruebas | Dependencias entre módulos | EV-09; ADR-002; AD-02 | Sin ciclos ni imports prohibidos; el detector de ciclos falla si debe | `backend/tests/architecture/test_pr08_dependencies.py` |
+| PR-09 | Componente sobre la API, 8 pruebas | Alternativo: rechazo de la solicitud | UC-02; RF-03; RN-03; paso 4 del flujo | `RECHAZADO` con motivo obligatorio y solo por un administrador, sin código ni dinero; confirmar o aprobar después da 409 | `backend/tests/vertical/test_pr09_rejection.py` |
+| PR-10 | Componente sobre la API, 13 pruebas | Límites de la solicitud | UC-01, UC-02; RF-03; RN-06; CA-05, CA-06; pasos 1 a 4 del flujo; HV-10 | 422 sobre el límite de ruta y 403 fuera de la ruta; sobre el límite del cobrador espera, y aprobar exige un motivo que no esté en blanco | `backend/tests/vertical/test_pr10_request_limits.py` |
+| PR-11 | Componente sobre la API, 6 pruebas | Guardas del código de confirmación | UC-03; CA-05, CA-06; RN-03; INV-02 | Código errado o de otra operación: 422 sin efectos, y el válido sigue sirviendo. Otro validador: 403. Repetir tras caducar: el mismo 409, sin segundo asiento | `backend/tests/vertical/test_pr11_code_guards.py` |
+
+PR-09 a PR-11 cubren comportamiento que ya existía, y sus pruebas pasaron en la primera ejecución, salvo el caso del motivo en blanco de PR-10, que falló y reveló un defecto (HV-10). Para comprobar que esas pruebas pueden fallar, se invirtió de forma temporal una aserción en PR-09 y otra en PR-11: ambas fallaron, y el cambio no se conservó.
 
 ### 6.2 Dobles o implementaciones controladas
 
@@ -450,7 +455,7 @@ El comando por defecto no necesita Docker. Las pruebas marcadas `postgres` se ej
 | Notificador (CTR-10) | Implementación simulada, con fallo activable | `SimulatedNotifier` | Leer el código entregado y reproducir EC-04 |
 | Notificador que nunca responde (CTR-10) | Stub local de la prueba | `UnreachableChannel` en `backend/tests/vertical/test_pr06_notifier_failure.py` | Sustituir el adaptador, como pide EV-03 (HV-05) |
 | Persistencia (CTR-04, CTR-06 a CTR-09) | Implementación en memoria | `InMemoryUnitOfWork` | Es la implementación de ejecución de la Entrega 3 |
-| Libro (CTR-05) en PR-01 a PR-06 | Implementación en memoria | `InMemoryLedgerRepository` | Ejecutar sin Docker. No demuestra la inmutabilidad |
+| Libro (CTR-05) en PR-01 a PR-06 y PR-09 a PR-11 | Implementación en memoria | `InMemoryLedgerRepository` | Ejecutar sin Docker. No demuestra la inmutabilidad |
 | Libro (CTR-05) en PR-07 | No aplica: PostgreSQL 17 real | `PostgresLedgerRepository` | EV-01 y EV-02 no pueden obtenerse con un doble (ALT-01A descartada) |
 | Unidad de trabajo que pierde la carrera | Stub local de la prueba | `LosesTheRace` en `backend/tests/vertical/test_pr05_idempotent_confirmation.py` | Forzar de forma determinista la carrera del `commit` |
 
@@ -458,12 +463,12 @@ El comando por defecto no necesita Docker. Las pruebas marcadas `postgres` se ej
 
 - **Fecha de ejecución:** 2026-10-31
 - **Comando:** `uv run pytest -m ""`, desde `backend/`, con PostgreSQL 17.11 en ejecución.
-- **Pruebas ejecutadas:** 43
-- **Pruebas exitosas:** 43
+- **Pruebas ejecutadas:** 70
+- **Pruebas exitosas:** 70
 - **Pruebas fallidas:** 0
 - **Evidencia:** [`evidencias/resultado-pruebas.txt`](evidencias/resultado-pruebas.txt)
 
-Por separado, `uv run pytest` da 25 aprobadas y 18 sin seleccionar; `uv run pytest tests/vertical` da 21 aprobadas; y `uv run pytest -m postgres` da 18 aprobadas y 25 sin seleccionar. Cada ejecución muestra un aviso de obsolescencia de Starlette sobre `httpx`, ajeno al código del proyecto. Estos comandos se repitieron desde un clon limpio y con una base de datos nueva, con el mismo resultado.
+Por separado, `uv run pytest` da 52 aprobadas y 18 sin seleccionar; `uv run pytest tests/vertical` da 48 aprobadas; y `uv run pytest -m postgres` da 18 aprobadas y 52 sin seleccionar. Cada ejecución muestra un aviso de obsolescencia de Starlette sobre `httpx`, ajeno al código del proyecto. El comando por defecto se repitió 5 veces seguidas con el mismo resultado. Estos comandos se repitieron desde un clon limpio y con una base de datos nueva, con el mismo resultado.
 
 ---
 
@@ -533,7 +538,7 @@ Con PostgreSQL en ejecución, solo PR-07:
 uv run pytest -m postgres
 ```
 
-Con PostgreSQL en ejecución, las 43 pruebas:
+Con PostgreSQL en ejecución, las 70 pruebas:
 
 ```bash
 uv run pytest -m ""
@@ -693,6 +698,15 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 - **Acción tomada:** confirmar ambas decisiones. La desviación se explica en la sección 5.1.
 - **Archivos actualizados:** `docs/03-diseno-vertical/diseno-y-vertical.md`
 
+### HV-10 — Un motivo en blanco autorizaba un monto sobre el límite del cobrador
+
+- **Evidencia de origen:** PR-10 y revisión de `Disbursement.approve`.
+- **Qué se observó:** `approve` comprobaba el motivo con `not reason`, mientras que `reject` y `RenewalException.grant` usan `strip()`. Una solicitud `EN_ESPERA_AUTORIZACION` de 50 000 001 centavos, aprobada con el motivo `"   "`, quedó `APROBADO`, encoló el código y, al confirmarse, descontó la caja. La prueba de PR-10 falló con `assert 200 == 422`.
+- **Interpretación:** es un defecto de la implementación, no de una decisión. El paso 4 del flujo pide indicar el motivo, y un motivo en blanco dejaba sin justificación la autorización de un monto que supera el límite del cobrador. Las demás pruebas de PR-09 a PR-11 pasaron en su primera ejecución y no aportan evidencia de este tipo.
+- **Decisión afectada:** ninguna.
+- **Acción tomada:** corregir la comprobación en `Disbursement.approve`, que ahora rechaza un motivo en blanco con `422 motivo-requerido`, y añadir ese caso a PR-10, que también comprueba que no se encola el código ni se mueve dinero. La prueba pasó después de la corrección. El motivo sigue sin exigirse dentro del límite: esa lectura queda abierta en la sección 10.
+- **Archivos actualizados:** `backend/src/royexa/sales/domain.py`, `backend/tests/vertical/test_pr10_request_limits.py`, `docs/03-diseno-vertical/diseno-y-vertical.md`, `docs/03-diseno-vertical/trazabilidad-implementacion.md`
+
 ---
 
 ## 9. Cambios respecto de la Entrega 2
@@ -711,6 +725,7 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 | 2026-10-31 | EV-03 pasa a `Validada` con una prueba sobre el aviso del código. La cobertura de ASR muestra el resultado de las evidencias. | Cerrar el vacío de HV-05 y el estado que seguía pendiente en la matriz. | `backend/tests/vertical/test_pr06_notifier_failure.py`, `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`, `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/realineacion-entrega-1.md`, `docs/02-arquitectura/trazabilidad-arquitectonica.md` | HV-05 |
 | 2026-10-31 | DIV-08 queda resuelta. | El docente autorizó el trabajo individual; lo confirmó el autor. | `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/realineacion-entrega-1.md` | DIV-08 |
 | 2026-10-31 | `workspace.dsl` validado con Structurizr. Los SVG de C4 y de secuencia se exportan desde sus fuentes; los dos SVG de la Entrega 2 dibujados a mano quedan sustituidos. CON-04 y su relación con la API se alinean con HV-07. | La exportación estaba pendiente y la Entrega 3 exige SVG reproducibles. | `docs/02-arquitectura/diagramas/workspace.dsl`, `docs/02-arquitectura/diagramas/c4-contexto.svg`, `docs/02-arquitectura/diagramas/c4-contenedores.svg`, `docs/02-arquitectura/arquitectura.md`, `docs/03-diseno-vertical/diagramas/exportar-diagramas.sh`, `docs/03-diseno-vertical/diagramas/c4-componentes.svg`, `docs/03-diseno-vertical/diagramas/secuencia-vertical.svg`, `docs/03-diseno-vertical/diagramas/secuencia-alternativa.svg` | HV-07 |
+| 2026-10-31 | PR-09 a PR-11 cubren el rechazo, los límites de la solicitud y las guardas del código, que estaban implementados sin prueba. `Disbursement.approve` deja de aceptar un motivo en blanco para un monto sobre el límite del cobrador. | La trazabilidad los declaraba sin cobertura, y una de las pruebas nuevas reveló el defecto. | `backend/src/royexa/sales/domain.py`, `backend/tests/vertical/test_pr09_rejection.py`, `backend/tests/vertical/test_pr10_request_limits.py`, `backend/tests/vertical/test_pr11_code_guards.py`, `backend/README.md`, `docs/03-diseno-vertical/trazabilidad-implementacion.md`, `docs/03-diseno-vertical/evidencias/resultado-pruebas.txt` | HV-10 |
 
 ---
 
@@ -733,6 +748,7 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 - La confirmación docente de la realineación, de DIV-01 a DIV-07, de ADR-003 y de ADR-004 está pendiente.
 - La retroalimentación de Canvas sobre la Entrega 2 está pendiente de incorporar. Si contradice este documento, prevalece.
 - El repositorio no guarda la constancia de la autorización docente de DIV-08.
+- El paso 4 del flujo («aprueba o rechaza indicando el motivo») admite dos lecturas: que el motivo acompañe solo al rechazo o también a toda aprobación. El código lo exige al rechazar y al autorizar un monto sobre el límite del cobrador, pero no al aprobar dentro de ese límite. La pregunta sigue abierta y HV-10 no la resuelve.
 
 **Alcance de la validación de los diagramas**
 
@@ -741,7 +757,9 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 
 **Escenarios todavía no comprobados**
 
-- Rechazo de una solicitud, límites de ruta y de cobrador, código errado, validador no autorizado y repetición tras caducar. Están implementados, sin prueba automatizada. La lista completa está en `trazabilidad-implementacion.md`, sección 6.
+- `CashBoxClosed` (RN-02): está implementado, sin prueba automatizada, porque la Entrega 3 no puede cerrar cajas.
+- El despachador ante otra excepción o ante un fallo del `commit` (HV-06).
+- La lista completa está en `trazabilidad-implementacion.md`, sección 6.
 
 **Siguiente incremento razonable**
 

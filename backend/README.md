@@ -22,8 +22,8 @@ uv sync
 Desde `backend/`. El comando por defecto no necesita Docker:
 
 ```bash
-uv run pytest                # 25 pruebas, sin PostgreSQL
-uv run pytest tests/vertical # solo las 21 pruebas del recorrido
+uv run pytest                # 52 pruebas, sin PostgreSQL
+uv run pytest tests/vertical # solo las 48 pruebas del recorrido
 ```
 
 Las pruebas de privilegios del libro necesitan PostgreSQL. Levántelo desde la raíz del repositorio:
@@ -36,7 +36,7 @@ Después, desde `backend/`:
 
 ```bash
 uv run pytest -m postgres    # las 18 pruebas de PR-07
-uv run pytest -m ""          # las 43 pruebas
+uv run pytest -m ""          # las 70 pruebas
 ```
 
 Las pruebas aplican la migración por sí mismas.
