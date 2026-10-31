@@ -148,7 +148,7 @@ Esta tabla conserva la clasificación de la realineación. Las evidencias se res
 
 ## 5. Resolución de divergencias
 
-Todas las resoluciones están pendientes de confirmación docente. El detalle original sigue en `arquitectura.md`, sección 7.1.
+Las resoluciones de `DIV-01` a `DIV-07` están pendientes de confirmación docente. El detalle original sigue en `arquitectura.md`, sección 7.1.
 
 | ID | Resolución | Consecuencia |
 |---|---|---|
@@ -159,7 +159,7 @@ Todas las resoluciones están pendientes de confirmación docente. El detalle or
 | `DIV-05` | A favor de la Entrega 1 | Demostración local (`RES-02`, `RES-06`). |
 | `DIV-06` | A favor de la Entrega 1 | El recorrido es el desembolso. El del Bolt B1 se difiere. |
 | `DIV-07` | A favor de la Entrega 1 | Sin excepción para el administrador (`RN-06`, `EC-02`). |
-| `DIV-08` | Abierta | Ver sección 8. |
+| `DIV-08` | Resuelta | El docente autorizó el trabajo individual. Ver sección 8. |
 
 ## 6. Identificadores nuevos
 
@@ -189,7 +189,7 @@ La Entrega 0 y la Entrega 1 no se editan en esta realineación. Después de la e
 |---|---|---|
 | Resolución de `DIV-01` a `DIV-07` | Pendiente | La línea base se usa como propuesta de trabajo. Si el docente la rechaza, esta realineación se revisa antes de continuar. |
 | `ADR-004` y `ADR-003` | Pendiente | `ADR-004` sigue `Propuesto` y `ADR-003` no cambia de estado. |
-| `DIV-08`, un integrante | Pendiente | Autorización docente: pendiente. Motivo: por aportar por el autor. |
+| `DIV-08`, un integrante | Confirmada | El autor confirmó el 2026-10-31 que el docente autorizó el trabajo individual. El repositorio no guarda la constancia. |
 | Retroalimentación de Canvas sobre la Entrega 2 | Pendiente de incorporar | Si contradice este documento, prevalece la retroalimentación. |
 
 ## 9. Resultado en la Entrega 3

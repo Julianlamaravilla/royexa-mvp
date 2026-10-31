@@ -3,7 +3,7 @@
 ## 0. Identificación
 
 - **Proyecto:** ROYEXA
-- **Integrantes:** Julian Andres Restrepo. La autorización docente para trabajar con un solo integrante está pendiente (`DIV-08`).
+- **Integrantes:** Julian Andres Restrepo. El docente autorizó el trabajo individual (`DIV-08`).
 - **Grupo:** 10
 - **Fecha:** 2026-10-31
 - **Commit o etiqueta:** rama `entrega-3-linea-base`. Código del recorrido en `f07f7ae` y `8aa1104`. La etiqueta de entrega aún no se ha creado.
@@ -692,6 +692,7 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 | 2026-10-31 | ADR-002 declara el estado real de la bandeja y de la transacción. Se añaden RA-10 y RA-11. | La implementación no cumple aún dos enunciados de la decisión. | `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`, `docs/02-arquitectura/arquitectura.md` | HV-05, HV-06, HV-07 |
 | 2026-10-31 | Resultado de las evidencias registrado en el rastro de la realineación. | Cerrar el estado de la matriz de identificadores. | `docs/02-arquitectura/realineacion-entrega-1.md` | HV-01 a HV-09 |
 | 2026-10-31 | EV-03 pasa a `Validada` con una prueba sobre el aviso del código. La cobertura de ASR muestra el resultado de las evidencias. | Cerrar el vacío de HV-05 y el estado que seguía pendiente en la matriz. | `backend/tests/vertical/test_pr06_notifier_failure.py`, `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`, `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/realineacion-entrega-1.md`, `docs/02-arquitectura/trazabilidad-arquitectonica.md` | HV-05 |
+| 2026-10-31 | DIV-08 queda resuelta. | El docente autorizó el trabajo individual; lo confirmó el autor. | `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/realineacion-entrega-1.md` | DIV-08 |
 
 ---
 
@@ -713,7 +714,7 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 
 - La confirmación docente de la realineación, de DIV-01 a DIV-07, de ADR-003 y de ADR-004 está pendiente.
 - La retroalimentación de Canvas sobre la Entrega 2 está pendiente de incorporar. Si contradice este documento, prevalece.
-- El motivo de DIV-08 y su autorización docente están pendientes.
+- El repositorio no guarda la constancia de la autorización docente de DIV-08.
 
 **Diagramas pendientes**
 

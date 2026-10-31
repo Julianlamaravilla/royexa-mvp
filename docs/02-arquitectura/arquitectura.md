@@ -286,7 +286,7 @@ Se usa el flujo de la Entrega 1 (desembolso de un préstamo).
 - Resuelta, pendiente de confirmación docente: el cliente final (`INT-03`) se mantiene como destinatario, con notificador simulado (`DIV-01`).
 - Resuelta, pendiente de confirmación docente: `RN-06` no admite excepción (`DIV-07`).
 - Diferida: los umbrales de mora de 3 días y de divergencia de reloj de 24 horas seguían sin confirmar y quedan fuera de la línea base.
-- Abierta: ¿se autoriza el trabajo individual? Autorización docente: pendiente (`DIV-08`).
+- Resuelta: el docente autorizó el trabajo individual (`DIV-08`).
 
 ---
 
@@ -906,12 +906,13 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 | 2026-10-31 | `EV-02` deja de citar el registro de cambios, que no existe en el esquema, y nombra el comando que la ejecuta | El recorrido vertical no lo implementa y la evidencia no podía comprobarse como estaba escrita (`HV-02`) | `arquitectura.md`, `adr/ADR-001` | Julian Andres Restrepo |
 | 2026-10-31 | `ADR-001` pasa a `Aceptado`; `ADR-002` y `ADR-004` se ajustan y siguen `Propuesto`; `SUP-01` confirmado; `RA-10` y `RA-11` nuevos; vista `c4-componentes` añadida al DSL | Resultado de la Entrega 3 (`HV-01` a `HV-09`) | `arquitectura.md`, `adr/ADR-001`, `adr/ADR-002`, `adr/ADR-004`, `diagramas/workspace.dsl`, `realineacion-entrega-1.md` | Julian Andres Restrepo |
 | 2026-10-31 | `EV-03` pasa a `Validada`; la cobertura de ASR y las columnas de evidencia de la trazabilidad muestran el resultado de la Entrega 3 | Se añadió la prueba que faltaba (`HV-05`) y la matriz seguía indicando evidencia pendiente | `arquitectura.md`, `trazabilidad-arquitectonica.md`, `realineacion-entrega-1.md`, `adr/ADR-002` | Julian Andres Restrepo |
+| 2026-10-31 | `DIV-08` queda resuelta: el docente autorizó el trabajo individual | Confirmación del autor; el repositorio no guarda la constancia de esa autorización | `arquitectura.md`, `realineacion-entrega-1.md`, `docs/03-diseno-vertical/diseno-y-vertical.md` | Julian Andres Restrepo |
 
 **Pendiente antes de entregar:** validar `workspace.dsl` con Structurizr, que tampoco ha procesado la vista `c4-componentes`, y sustituir los SVG por su exportación oficial; los SVG actuales todavía muestran el modelo de la Entrega 2. El archivo [`adr/ADR-00X-titulo-de-la-decision.md`](adr/ADR-00X-titulo-de-la-decision.md) es la plantilla y se conserva sin cambios.
 
 ### 7.1 Divergencias entre la Entrega 1 y TRACKEA
 
-El significado de la Entrega 1 no cambió, pero su texto sí: el commit `5077046` editó los integrantes en `propuesta.md` y `requisitos.md`, lo que se registra en `DIV-08`. Cada divergencia se registró para discutirla con el docente, como pide el enunciado de esta entrega. En la Entrega 2 la arquitectura seguía a TRACKEA; la columna «Resolución» indica el criterio vigente desde el 2026-10-30. Todas las resoluciones están pendientes de confirmación docente.
+El significado de la Entrega 1 no cambió, pero su texto sí: el commit `5077046` editó los integrantes en `propuesta.md` y `requisitos.md`, lo que se registra en `DIV-08`. Cada divergencia se registró para discutirla con el docente, como pide el enunciado de esta entrega. En la Entrega 2 la arquitectura seguía a TRACKEA; la columna «Resolución» indica el criterio vigente desde el 2026-10-30. Las resoluciones de `DIV-01` a `DIV-07` están pendientes de confirmación docente.
 
 | ID | Entrega 1 | TRACKEA (2026-09-20) | Efecto en esta entrega | Resolución |
 |---|---|---|---|---|
@@ -922,4 +923,4 @@ El significado de la Entrega 1 no cambió, pero su texto sí: el commit `5077046
 | DIV-05 | `RES-02`: la demostración debe poder hacerse en un entorno local; despliegue en nube pública excluido. | Infraestructura en AWS (`sa-east-1`) con staging permanente; la puerta rápida de integración corre con una pila local. | La demostración local sigue siendo posible con los contenedores efímeros; el despliegue en nube es del producto, no de esta entrega. | A favor de la Entrega 1: demostración local (`RES-02`, `RES-06`). |
 | DIV-06 | Recorrido vertical: desembolso de un préstamo (`RF-03`, `RF-04`, `RF-06`). | El Bolt B1 ejercita un cobro sin señal que llega al libro una sola vez (`RF-01`, `RF-04`). | Se documentan ambos recorridos en 4.3. | A favor de la Entrega 1: el recorrido es el desembolso. El del Bolt B1 se difiere. |
 | DIV-07 | `RN-06` y `EC-02`: el 100 % de las autoaprobaciones se rechaza. | Solo el administrador principal puede aprobar su propia llave, y queda registrado quién, con qué rol y cuándo; los secundarios no. | `RN-06` se aplica con esta excepción; queda como pregunta abierta en 1.10. | A favor de la Entrega 1: sin excepción para el administrador (`RN-06`, `EC-02`). |
-| DIV-08 | `RES-02` y la regla del curso: el trabajo se realiza en pareja. | No aplica: el commit `5077046` dejó un solo integrante en `README.md`, `propuesta.md` y `requisitos.md`. | Esta arquitectura figura con un integrante. | Abierta. Autorización docente: pendiente. Motivo: por aportar por el autor. |
+| DIV-08 | `RES-02` y la regla del curso: el trabajo se realiza en pareja. | No aplica: el commit `5077046` dejó un solo integrante en `README.md`, `propuesta.md` y `requisitos.md`. | Esta arquitectura figura con un integrante. | Resuelta: el docente autorizó el trabajo individual (confirmado por el autor el 2026-10-31). |
