@@ -166,6 +166,7 @@ class InMemoryUnitOfWork:
         self._committed = False
 
     def __enter__(self) -> Self:
+        self._committed = False
         with self._store.lock:
             self._base = deepcopy(self._store.tables)
         self._work = deepcopy(self._base)

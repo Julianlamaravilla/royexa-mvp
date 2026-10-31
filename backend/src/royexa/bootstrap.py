@@ -31,6 +31,7 @@ DEFAULT_CODE_TTL_MINUTES = 60
 class Settings:
     code_ttl: timedelta = timedelta(minutes=DEFAULT_CODE_TTL_MINUTES)
     notifier_failing: bool = False
+    ledger_url: str | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -38,6 +39,7 @@ class Settings:
         return cls(
             code_ttl=timedelta(minutes=minutes),
             notifier_failing=os.environ.get("ROYEXA_NOTIFIER_FAILING") == "1",
+            ledger_url=os.environ.get("ROYEXA_LEDGER_URL"),
         )
 
 
@@ -72,8 +74,14 @@ def build_container(
     directory = seed_directory()
     clients = seed_clients()
 
+    def ledger_session():
+        # Imported here so the in-memory demo and its tests need no database driver.
+        from royexa.adapters.postgres_ledger import PostgresLedgerSession
+
+        return PostgresLedgerSession(settings.ledger_url)
+
     def unit_of_work() -> InMemoryUnitOfWork:
-        return InMemoryUnitOfWork(store)
+        return InMemoryUnitOfWork(store, ledger_session if settings.ledger_url else None)
 
     context = SalesContext(unit_of_work, clock, directory, clients, settings.code_ttl)
     return Container(

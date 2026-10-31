@@ -8,7 +8,7 @@ import royexa
 ROOT = Path(royexa.__file__).parent
 BUSINESS_MODULES = {"cash_box", "clients", "identity_access", "ledger", "loans", "sales"}
 FRAMEWORKS = {"fastapi", "starlette", "pydantic", "uvicorn", "psycopg", "httpx"}
-OUTER_LAYER = {"adapters", "api", "bootstrap", "main", "seed"}
+OUTER_LAYER = {"adapters", "api", "bootstrap", "main", "migrate", "seed"}
 
 
 def _imports(path: Path) -> set[str]:

@@ -1,0 +1,16 @@
+# Local demo database (RES-02, RES-06). The credentials are local-only demo values.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: royexa
+      POSTGRES_USER: royexa_migrator
+      POSTGRES_PASSWORD: royexa_migrator
+    ports:
+      - "55432:5432"
+    healthcheck:
+      # TCP, not the socket: the image's temporary init server only listens on the socket.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U royexa_migrator -d royexa"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
