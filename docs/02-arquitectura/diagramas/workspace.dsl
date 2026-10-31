@@ -180,7 +180,7 @@ workspace "ROYEXA" "Arquitectura candidata realineada con la Entrega 1" {
                 }
             }
 
-            baseDatos = container "Base de datos" "Conserva el libro mayor de solo inserción, préstamos, cajas y la bandeja de salida de eventos." "PostgreSQL 17 local" {
+            baseDatos = container "Base de datos" "Conserva el libro mayor de solo inserción. En la Entrega 3 los demás datos del recorrido siguen en memoria (HV-07)." "PostgreSQL 17 local" {
                 tags "Database"
                 properties {
                     "Identificador" "CON-04"
@@ -262,7 +262,7 @@ workspace "ROYEXA" "Arquitectura candidata realineada con la Entrega 1" {
         socio -> sistema.web "Consulta reportes en solo lectura" "HTTPS"
         sistema.movil -> sistema.api "Envía operaciones por lote con identificador único y descarga cambios por cursor" "HTTPS/JSON"
         sistema.web -> sistema.api "Realiza operaciones y consultas" "HTTP/JSON local, REST con OpenAPI"
-        sistema.api -> sistema.baseDatos "Lee y escribe el dominio; inserta asientos con un rol que no puede modificarlos" "SQL local"
+        sistema.api -> sistema.baseDatos "Inserta y lee asientos con un rol que no puede modificarlos" "SQL local"
         sistema.api -> sistema.almacenObjetos "Emite URL prefirmadas para subir y descargar fotos y registra su hash" "HTTPS"
         sistema.api -> notificador "Envía el código de confirmación y los comprobantes" "Llamada local a través de un puerto"
         sistema.api -> ses "Envía alertas por correo" "HTTPS"
