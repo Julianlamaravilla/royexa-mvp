@@ -187,7 +187,7 @@ confirm 200
    Resultado de docs/03-diseno-vertical/diagramas/exportar-diagramas.sh, ejecutado desde
    la raíz del repositorio con Docker en ejecución. A diferencia de las secciones
    anteriores, esto es un resumen de lo observado y no la salida literal del script.
-   Commit de los diagramas: d5e9c21.
+   Commits de los diagramas: 41046b4 (script y DSL) y ed0541c (SVG).
 -------------------------------------------------------------------
 $ docs/03-diseno-vertical/diagramas/exportar-diagramas.sh
 Imágenes:   structurizr/cli:2024.03.03, plantuml/plantuml:1.2024.8
@@ -206,3 +206,16 @@ Ningún SVG contiene texto de error de sintaxis. Se inspeccionaron a la vista y 
 
 Alcance: la validación comprueba la sintaxis y las referencias de workspace.dsl. No
 demuestra que el modelo sea correcto.
+
+
+9. Clon limpio con los diagramas, 2026-10-31
+   Resumen de lo observado, no salida literal. Clon nuevo de la rama, con el mismo árbol
+   de archivos que ed0541c más la documentación que registra la exportación.
+-------------------------------------------------------------------
+uv run pytest                 25 passed, 18 deselected
+uv run pytest tests/vertical  21 passed
+python -m royexa.migrate      001_ledger.sql
+uv run pytest -m postgres     18 passed, 25 deselected
+uv run pytest -m ""           43 passed
+exportar-diagramas.sh         código de salida 0
+git status --short            sin cambios: los cinco SVG se reprodujeron byte a byte
