@@ -97,7 +97,7 @@ El significado de estos identificadores no cambia. La matriz solo indica dónde 
 | `CON-01` | Diferir | Sigue en el modelo con la etiqueta `Diferido`, fuera de las vistas. |
 | `CON-02` | Reencuadrar | Web mínima renderizada en el servidor para cobrador y administrador, en la Entrega 4. |
 | `CON-03` | Reencuadrar | Python 3.14, FastAPI y Uvicorn en local. |
-| `CON-04` | Reencuadrar | PostgreSQL 17 local, con adaptadores en memoria para las pruebas. |
+| `CON-04` | Reencuadrar | PostgreSQL 17 local, con adaptadores en memoria para las pruebas. En la Entrega 3 solo guarda el libro; lo demás sigue en memoria también en ejecución (`HV-07`). |
 | `CON-05` | Diferir | Sigue en el modelo con la etiqueta `Diferido`, fuera de las vistas. |
 | `EXT-01`, `EXT-02`, `EXT-03`, `EXT-04` | Diferir | Siguen en el modelo con la etiqueta `Diferido`, fuera de las vistas. |
 

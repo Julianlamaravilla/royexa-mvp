@@ -79,9 +79,9 @@ Esta vista permite detectar ASR sin tratamiento arquitectónico o decisiones sin
 |---|---|---|---|---|---|
 | Entrada | RF-03, CA-05 | Desembolso, Cliente | CON-03 (Entrega 3), CON-02 (Entrega 4) | AD-03, ADR-004 | EV-12 |
 | Comportamiento principal | RF-03, RN-03, RN-05, RN-06, CA-06, CA-09, CA-10 | Desembolso, Código de confirmación, Préstamo, Cuota | CON-03 | AD-02, AD-03, AD-06, ADR-002, ADR-004 | EV-09, EV-11, EV-12 |
-| Persistencia | ASR-01, RF-04, CA-07, RES-04 | Asiento, Caja | CON-04 | AD-01, ADR-001 | EV-01, EV-02 |
+| Persistencia | ASR-01, RF-04, CA-07, RES-04 | Asiento, Caja | CON-04 (Asiento); CON-03, en memoria en la Entrega 3 (Caja, HV-07) | AD-01, ADR-001 | EV-01, EV-02 |
 | Integración externa | RF-06, CA-12, EC-04, ASR-05, RES-03, RES-05 | Aviso | CON-03, EXT-05 | AD-02, ADR-002 | EV-03, EV-08 |
-| Resultado observable | CA-05, CA-06 | Préstamo, Asiento | CON-03 | AD-01, AD-03, ADR-001, ADR-004 | EV-01, EV-12 |
+| Resultado observable | CA-05, CA-06 | Préstamo, Asiento | CON-03 (Préstamo, en memoria en la Entrega 3, HV-07); CON-04 (Asiento) | AD-01, AD-03, ADR-001, ADR-004 | EV-01, EV-12 |
 
 Nota: el recorrido del Bolt B1 de TRACKEA queda diferido (`DIV-06`), y con él `EV-05` y `EV-06`. `EV-10` y `CA-11` tratan de pagos, fuera de este recorrido, y pasan a la Entrega 4 (provisional). `CA-07` se redacta sobre un pago, pero sus campos se exigen al asiento del desembolso.
 

@@ -6,7 +6,7 @@
 - **Integrantes:** Julian Andres Restrepo. El docente autorizó el trabajo individual (`DIV-08`).
 - **Grupo:** 10
 - **Fecha:** 2026-10-31
-- **Commit o etiqueta:** rama `entrega-3-linea-base`. Código del recorrido en `f07f7ae` y `8aa1104`. La etiqueta de entrega aún no se ha creado.
+- **Commit o etiqueta:** rama `entrega-3-linea-base`. Código del recorrido en `f07f7ae` y `8aa1104`; PR-09 a PR-11 y la corrección de HV-10 en `a91aa43`. La etiqueta de entrega aún no se ha creado.
 - **Entrega 2 usada como línea base:** [`../02-arquitectura/arquitectura.md`](../02-arquitectura/arquitectura.md), realineada con la Entrega 1 en [`../02-arquitectura/realineacion-entrega-1.md`](../02-arquitectura/realineacion-entrega-1.md). Esa realineación está pendiente de confirmación docente.
 
 ---
@@ -726,6 +726,7 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 | 2026-10-31 | DIV-08 queda resuelta. | El docente autorizó el trabajo individual; lo confirmó el autor. | `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/realineacion-entrega-1.md` | DIV-08 |
 | 2026-10-31 | `workspace.dsl` validado con Structurizr. Los SVG de C4 y de secuencia se exportan desde sus fuentes; los dos SVG de la Entrega 2 dibujados a mano quedan sustituidos. CON-04 y su relación con la API se alinean con HV-07. | La exportación estaba pendiente y la Entrega 3 exige SVG reproducibles. | `docs/02-arquitectura/diagramas/workspace.dsl`, `docs/02-arquitectura/diagramas/c4-contexto.svg`, `docs/02-arquitectura/diagramas/c4-contenedores.svg`, `docs/02-arquitectura/arquitectura.md`, `docs/03-diseno-vertical/diagramas/exportar-diagramas.sh`, `docs/03-diseno-vertical/diagramas/c4-componentes.svg`, `docs/03-diseno-vertical/diagramas/secuencia-vertical.svg`, `docs/03-diseno-vertical/diagramas/secuencia-alternativa.svg` | HV-07 |
 | 2026-10-31 | PR-09 a PR-11 cubren el rechazo, los límites de la solicitud y las guardas del código, que estaban implementados sin prueba. `Disbursement.approve` deja de aceptar un motivo en blanco para un monto sobre el límite del cobrador. | La trazabilidad los declaraba sin cobertura, y una de las pruebas nuevas reveló el defecto. | `backend/src/royexa/sales/domain.py`, `backend/tests/vertical/test_pr09_rejection.py`, `backend/tests/vertical/test_pr10_request_limits.py`, `backend/tests/vertical/test_pr11_code_guards.py`, `backend/README.md`, `docs/03-diseno-vertical/trazabilidad-implementacion.md`, `docs/03-diseno-vertical/evidencias/resultado-pruebas.txt` | HV-10 |
+| 2026-10-31 | La cobertura del recorrido declara dónde está cada dato en la Entrega 3: el Asiento en `CON-04`, la Caja y el Préstamo en memoria en `CON-03`. La plantilla de pull request pasa a la Entrega 3. | La trazabilidad contradecía HV-07, y la plantilla seguía titulada para la Entrega 0. | `docs/02-arquitectura/trazabilidad-arquitectonica.md`, `docs/02-arquitectura/realineacion-entrega-1.md`, `docs/02-arquitectura/arquitectura.md`, `.github/PULL_REQUEST_TEMPLATE.md` | HV-07 |
 
 ---
 
