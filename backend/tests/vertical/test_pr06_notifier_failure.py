@@ -1,8 +1,27 @@
 """PR-06, external failure. CA-12, EC-04, RF-06, EV-03, ADR-002."""
 
+from fastapi.testclient import TestClient
+from support import Flow
+
+from royexa.api import create_app
+from royexa.bootstrap import build_container
+from royexa.notifications.ports import Notification, NotifierUnavailable
+
 CODE_NOTICE = "CODIGO_CONFIRMACION"
 RECEIPT = "COMPROBANTE_DESEMBOLSO"
 MAX_ATTEMPTS = 5
+CHANNEL_ERROR = "channel is down"
+
+
+class UnreachableChannel:
+    """Notifier port adapter whose channel never answers (EV-03)."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def send(self, notification: Notification) -> None:
+        self.calls += 1
+        raise NotifierUnavailable(CHANNEL_ERROR)
 
 
 def _notice(flow, disbursement_id, kind):
@@ -67,3 +86,26 @@ def test_pr06_undelivered_code_moves_no_money(flow, notifier):
     assert _notice(flow, disbursement["id"], CODE_NOTICE)["status"] == "PENDIENTE"
     assert flow.read(disbursement["id"])["status"] == "APROBADO"
     assert flow.cash_balance() == opening_balance
+
+
+def test_pr06_code_notice_fails_after_five_dispatches_through_a_replaced_adapter(clock):
+    """PR-06 / EV-03 / CA-12: another adapter behind the port, failing on the code notice."""
+    channel = UnreachableChannel()
+    container = build_container(clock=clock, notifier=channel)
+    flow = Flow(TestClient(create_app(container)), channel)
+    opening_balance = flow.cash_balance()
+    disbursement = flow.approved()
+
+    for dispatch in range(1, MAX_ATTEMPTS + 1):
+        assert flow.dispatch().json() == {"attempted": 1, "sent": 0}
+        notice = _notice(flow, disbursement["id"], CODE_NOTICE)
+        assert notice["attempts"] == dispatch, "each dispatch counts one attempt"
+        assert notice["status"] == ("FALLIDO" if dispatch == MAX_ATTEMPTS else "PENDIENTE")
+
+    assert channel.calls == MAX_ATTEMPTS
+    assert notice["last_error"] == CHANNEL_ERROR
+    assert notice["sent_at"] is None
+    assert flow.dispatch().json() == {"attempted": 0, "sent": 0}, "a failed notice leaves the queue"
+    assert flow.read(disbursement["id"])["status"] == "APROBADO"
+    assert flow.cash_balance() == opening_balance
+    assert flow.ledger(disbursement["id"]) == []

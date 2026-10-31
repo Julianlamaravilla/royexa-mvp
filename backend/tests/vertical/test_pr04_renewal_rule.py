@@ -1,4 +1,4 @@
-"""PR-04, business rule. UC-01 and UC-04. CA-10, RN-05, RF-03."""
+"""PR-04, business rule. UC-01 and UC-04. CA-10, RN-05, RF-03, RF-05."""
 
 from support import ADMIN, COLLECTOR
 

@@ -431,7 +431,7 @@ El comando por defecto no necesita Docker. Las pruebas marcadas `postgres` se ej
 | PR-03 | Componente sobre la API, 1 prueba | Alternativo: código caducado | UC-03; CA-06; RN-03, RN-04; RF-03 | 409, caja intacta, `CADUCADO`, asiento con motivo | `backend/tests/vertical/test_pr03_expired_code.py` |
 | PR-04 | Componente sobre la API, 6 pruebas | Regla: renovación | UC-01, UC-04; CA-10; RN-05; RF-03, RF-05 | 409 con saldo pendiente; excepción de un solo uso; RN-05 se repite al asentar | `backend/tests/vertical/test_pr04_renewal_rule.py` |
 | PR-05 | Componente, 3 pruebas | Invariante: confirmación idempotente | UC-03; RN-04; INV-02; EV-12; ADR-004 | Un asiento, un descuento y un comprobante, también con hilos reales | `backend/tests/vertical/test_pr05_idempotent_confirmation.py` |
-| PR-06 | Componente sobre la API, 4 pruebas | Fallo del notificador | UC-05; CA-12; RN-03; EC-04; RF-06; EV-03; ADR-002 | El dinero se conserva, el aviso reintenta y termina visible | `backend/tests/vertical/test_pr06_notifier_failure.py` |
+| PR-06 | Componente sobre la API, 5 pruebas | Fallo del notificador | UC-05; CA-12; RN-03; EC-04; RF-06; EV-03; ADR-002 | El dinero se conserva, el aviso reintenta y termina visible | `backend/tests/vertical/test_pr06_notifier_failure.py` |
 | PR-07 | Integración con PostgreSQL 17, 18 pruebas | Privilegios reales y flujo sobre el libro real | RN-04; RN-03; CA-05, CA-06; CA-08 en parte; EV-01, EV-02, EV-12; ADR-001, ADR-002, ADR-004 | El rol no altera el libro y el catálogo lo confirma; sin conexiones abiertas | `backend/tests/postgres/test_pr07_ledger_privileges.py` |
 | PR-08 | Estática, 4 pruebas | Dependencias entre módulos | EV-09; ADR-002; AD-02 | Sin ciclos ni imports prohibidos; el detector de ciclos falla si debe | `backend/tests/architecture/test_pr08_dependencies.py` |
 
@@ -440,7 +440,8 @@ El comando por defecto no necesita Docker. Las pruebas marcadas `postgres` se ej
 | Dependencia | Tipo usado | Implementación | Motivo |
 |---|---|---|---|
 | Reloj (CTR-11) | Fake | `FakeClock` en `backend/tests/support.py` | Hacer determinista la caducidad y las marcas de tiempo |
-| Notificador (CTR-10) | Implementación simulada, con fallo activable | `SimulatedNotifier` | Leer el código entregado y reproducir EC-04. No es un adaptador distinto (HV-05) |
+| Notificador (CTR-10) | Implementación simulada, con fallo activable | `SimulatedNotifier` | Leer el código entregado y reproducir EC-04 |
+| Notificador que nunca responde (CTR-10) | Stub local de la prueba | `UnreachableChannel` en `backend/tests/vertical/test_pr06_notifier_failure.py` | Sustituir el adaptador, como pide EV-03 (HV-05) |
 | Persistencia (CTR-04, CTR-06 a CTR-09) | Implementación en memoria | `InMemoryUnitOfWork` | Es la implementación de ejecución de la Entrega 3 |
 | Libro (CTR-05) en PR-01 a PR-06 | Implementación en memoria | `InMemoryLedgerRepository` | Ejecutar sin Docker. No demuestra la inmutabilidad |
 | Libro (CTR-05) en PR-07 | No aplica: PostgreSQL 17 real | `PostgresLedgerRepository` | EV-01 y EV-02 no pueden obtenerse con un doble (ALT-01A descartada) |
@@ -450,12 +451,12 @@ El comando por defecto no necesita Docker. Las pruebas marcadas `postgres` se ej
 
 - **Fecha de ejecución:** 2026-10-31
 - **Comando:** `uv run pytest -m ""`, desde `backend/`, con PostgreSQL 17.11 en ejecución.
-- **Pruebas ejecutadas:** 42
-- **Pruebas exitosas:** 42
+- **Pruebas ejecutadas:** 43
+- **Pruebas exitosas:** 43
 - **Pruebas fallidas:** 0
 - **Evidencia:** [`evidencias/resultado-pruebas.txt`](evidencias/resultado-pruebas.txt)
 
-Por separado, `uv run pytest` da 24 aprobadas y 18 sin seleccionar; `uv run pytest tests/vertical` da 20 aprobadas; y `uv run pytest -m postgres` da 18 aprobadas y 24 sin seleccionar. Cada ejecución muestra un aviso de obsolescencia de Starlette sobre `httpx`, ajeno al código del proyecto. Estos comandos se repitieron desde un clon limpio y con una base de datos nueva, con el mismo resultado.
+Por separado, `uv run pytest` da 25 aprobadas y 18 sin seleccionar; `uv run pytest tests/vertical` da 21 aprobadas; y `uv run pytest -m postgres` da 18 aprobadas y 25 sin seleccionar. Cada ejecución muestra un aviso de obsolescencia de Starlette sobre `httpx`, ajeno al código del proyecto. Estos comandos se repitieron desde un clon limpio y con una base de datos nueva, con el mismo resultado.
 
 ---
 
@@ -525,7 +526,7 @@ Con PostgreSQL en ejecución, solo PR-07:
 uv run pytest -m postgres
 ```
 
-Con PostgreSQL en ejecución, las 42 pruebas:
+Con PostgreSQL en ejecución, las 43 pruebas:
 
 ```bash
 uv run pytest -m ""
@@ -582,7 +583,7 @@ El registro completo está en [`evidencias/resultado-pruebas.txt`](evidencias/re
 |---|---|---|---|---|---|
 | EV-01 | ADR-001, RA-01, SUP-01 | PR-07 intenta `UPDATE`, `DELETE` y `TRUNCATE` con `royexa_app` sobre un asiento confirmado y relee la fila. | Los 3 intentos fallan con `InsufficientPrivilege` y la fila queda intacta. | Validada | HV-01 |
 | EV-02 | ADR-001, RA-01, SUP-01 | PR-07 consulta el catálogo tras migrar, por tabla, por columna y por `PUBLIC`, revisa los atributos del rol y migra dos veces. | Solo `SELECT` e `INSERT` sobre `ledger_entry`. El rol no es propietario ni superusuario ni miembro de otro rol. | Validada | HV-01, HV-02 |
-| EV-03 | ADR-002, RA-03 | PR-06 activa el fallo del notificador sobre el comprobante y sobre el código. | El dinero se conserva, cada invocación cuenta un intento y el estado es consultable. Los 5 fallos hasta `FALLIDO` solo se observaron sobre el comprobante. | Parcialmente validada | HV-05, HV-06 |
+| EV-03 | ADR-002, RA-03 | PR-06 sustituye el notificador por un adaptador que falla al notificar el código, e invoca el despachador. También activa el fallo del simulado sobre el comprobante. | El desembolso sigue `APROBADO`, la caja y el libro no cambian, cada invocación cuenta un intento y tras 5 el aviso queda `FALLIDO` y consultable, con el código y con el comprobante. | Validada | HV-05, HV-06 |
 | EV-04 | ADR-002, SUP-03 | No se realizó. | Medía dos tareas en la nube, fuera de la línea base. | Reprogramada, sin destino en el curso | No aplica |
 | EV-05 | ADR-003, SUP-04 | No se realizó. | Medía lotes de sincronización. EV-12 la sustituye en el recorrido. | Reprogramada, sin destino en el curso | No aplica |
 | EV-06 | ADR-003, SUP-05 | No se realizó. | Exigía un teléfono real, fuera de la línea base. | Reprogramada, sin destino en el curso | No aplica |
@@ -633,11 +634,11 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 ### HV-05 — EV-03 no comprobó todo lo que pide
 
 - **Evidencia de origen:** EV-03, PR-06.
-- **Qué se observó:** EV-03 pide que falle la notificación del código y que tras 5 intentos el envío quede fallido. PR-06 lleva a `FALLIDO` el comprobante, y sobre el código solo observa un fallo. Tampoco sustituye el adaptador: activa `failing` en el mismo `SimulatedNotifier`.
-- **Interpretación:** `record_failure` no distingue el tipo de aviso, así que el resultado debería ser el mismo, pero eso es una inferencia y no algo observado. El dinero se conserva y el estado es visible, que es lo esencial de CA-12 y EC-04.
+- **Qué se observó:** EV-03 pide que falle la notificación del código y que tras 5 intentos el envío quede fallido. PR-06 llevaba a `FALLIDO` el comprobante, y sobre el código solo observaba un fallo. Tampoco sustituía el adaptador: activaba `failing` en el mismo `SimulatedNotifier`.
+- **Interpretación:** `record_failure` no distingue el tipo de aviso, así que el resultado debía ser el mismo, pero eso era una inferencia y no algo observado. La prueba añadida lo observó: pasó en su primera ejecución, sin cambios en el código de producción. El dinero se conserva y el estado es visible, que es lo esencial de CA-12 y EC-04. Esa prueba no sustituye a EV-08, que pide registrar los módulos afectados por el cambio de adaptador.
 - **Decisión afectada:** ADR-002.
-- **Acción tomada:** registrar EV-03 como `Parcialmente validada`. Falta una prueba que lleve el aviso del código a `FALLIDO`.
-- **Archivos actualizados:** `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`
+- **Acción tomada:** añadir a PR-06 la prueba `test_pr06_code_notice_fails_after_five_dispatches_through_a_replaced_adapter`, que construye el sistema con otro adaptador del puerto `Notifier` y lleva el aviso del código a `FALLIDO` en 5 despachos. El vacío queda cerrado y EV-03 pasa a `Validada`.
+- **Archivos actualizados:** `backend/tests/vertical/test_pr06_notifier_failure.py`, `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`, `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/realineacion-entrega-1.md`, `docs/02-arquitectura/trazabilidad-arquitectonica.md`
 
 ### HV-06 — La entrega de avisos es de al menos una vez
 
@@ -690,6 +691,7 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 | 2026-10-31 | ADR-004 añade la relectura del perdedor y RN-05 al asentar. | La decisión no decía qué recibe quien pierde la carrera. | `docs/02-arquitectura/adr/ADR-004-operacion-en-linea-con-confirmacion-idempotente.md` | HV-04 |
 | 2026-10-31 | ADR-002 declara el estado real de la bandeja y de la transacción. Se añaden RA-10 y RA-11. | La implementación no cumple aún dos enunciados de la decisión. | `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`, `docs/02-arquitectura/arquitectura.md` | HV-05, HV-06, HV-07 |
 | 2026-10-31 | Resultado de las evidencias registrado en el rastro de la realineación. | Cerrar el estado de la matriz de identificadores. | `docs/02-arquitectura/realineacion-entrega-1.md` | HV-01 a HV-09 |
+| 2026-10-31 | EV-03 pasa a `Validada` con una prueba sobre el aviso del código. La cobertura de ASR muestra el resultado de las evidencias. | Cerrar el vacío de HV-05 y el estado que seguía pendiente en la matriz. | `backend/tests/vertical/test_pr06_notifier_failure.py`, `docs/02-arquitectura/adr/ADR-002-monolito-modular-con-eventos-para-avisos.md`, `docs/02-arquitectura/arquitectura.md`, `docs/02-arquitectura/realineacion-entrega-1.md`, `docs/02-arquitectura/trazabilidad-arquitectonica.md` | HV-05 |
 
 ---
 
@@ -722,7 +724,6 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 
 **Escenarios todavía no comprobados**
 
-- Los 5 fallos del aviso del código hasta `FALLIDO` (HV-05).
 - Rechazo de una solicitud, límites de ruta y de cobrador, código errado, validador no autorizado y repetición tras caducar. Están implementados, sin prueba automatizada. La lista completa está en `trazabilidad-implementacion.md`, sección 6.
 
 **Siguiente incremento razonable**

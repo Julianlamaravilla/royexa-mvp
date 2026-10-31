@@ -14,7 +14,7 @@ Esta matriz extiende la trazabilidad de las Entregas 1 y 2 hasta componentes, co
 | UC-02 | RF-03, CA-05, CA-06 | RN-03, RN-06 | EC-02, ASR-02, ASR-03, RES-05 | AD-06, ALT-06B, ADR-002 | CMP-01, CMP-02, CMP-03, CMP-09 | CTR-01, CTR-02, CTR-04, CTR-08 | `backend/src/royexa/sales/application.py` | PR-01, PR-02 | EV-11 | Completo |
 | UC-03 | RF-03, RF-04, RF-05, CA-05, CA-06, CA-07, CA-09 | RN-03, RN-04, RN-05 | EC-01, ASR-01, ASR-02 | AD-01, AD-03, ADR-001, ADR-004 | CMP-01, CMP-02, CMP-03, CMP-04, CMP-05, CMP-06, CMP-09, CMP-10 | CTR-01, CTR-02, CTR-04, CTR-05, CTR-06, CTR-07, CTR-08, CTR-11, CTR-12 | `backend/src/royexa/sales/application.py` | PR-01, PR-03, PR-04, PR-05, PR-07 | EV-01, EV-02, EV-12 | Parcial: CA-09 y EC-01 quedan en parte |
 | UC-04 | RF-05, CA-10 | RN-05 | RES-04 | ADR-002 | CMP-01, CMP-02, CMP-04, CMP-09 | CTR-01, CTR-02, CTR-04, CTR-06 | `backend/src/royexa/sales/application.py` | PR-04 | No aplica | Completo |
-| UC-05 | RF-06, CA-12 | RN-03 | EC-04, ASR-02, ASR-05, RES-03, RES-05 | AD-02, AD-07, ADR-002 | CMP-01, CMP-08, CMP-09, CMP-11 | CTR-01, CTR-03, CTR-08, CTR-09, CTR-10, CTR-11 | `backend/src/royexa/notifications/dispatcher.py` | PR-01, PR-06 | EV-03 | Parcial: EV-03 |
+| UC-05 | RF-06, CA-12 | RN-03 | EC-04, ASR-02, ASR-05, RES-03, RES-05 | AD-02, AD-07, ADR-002 | CMP-01, CMP-08, CMP-09, CMP-11 | CTR-01, CTR-03, CTR-08, CTR-09, CTR-10, CTR-11 | `backend/src/royexa/notifications/dispatcher.py` | PR-01, PR-06 | EV-03 | Completo |
 
 ## 3. Trazabilidad de componentes
 
@@ -44,7 +44,7 @@ Esta matriz extiende la trazabilidad de las Entregas 1 y 2 hasta componentes, co
 | CA-08 | El original no se altera y la corrección es visible | `backend/migrations/001_ledger.sql` | PR-07 | Parcial | Solo la prohibición de alterar. Sin asiento compensatorio (HV-03) |
 | CA-09 | 20 cuotas de 60 con vencimiento de lunes a sábado | `backend/src/royexa/loans/domain.py` | PR-01 | Parcial | El calendario pasa. No existe alta directa por el administrador ni estado activo del préstamo |
 | CA-10 | Bloqueo con saldo pendiente; excepción explícita | `backend/src/royexa/loans/domain.py` | PR-04 | Pasa | La excepción es de un solo uso |
-| CA-12 | Envío no confirmado visible como pendiente o fallido | `backend/src/royexa/shared/outbox.py` | PR-06 | Pasa | Cubre código y comprobante; `FALLIDO` solo sobre el comprobante (HV-05) |
+| CA-12 | Envío no confirmado visible como pendiente o fallido | `backend/src/royexa/shared/outbox.py` | PR-06 | Pasa | Cubre código y comprobante, y ambos llegan a `FALLIDO` (HV-05) |
 | RN-03 | Sin dinero hasta la confirmación; código ligado y con caducidad | `backend/src/royexa/sales/domain.py` | PR-01, PR-03, PR-06 | Pasa | La caducidad sin intento no cambia el estado (HV-08) |
 | RN-04 | Solo inserción; un error se compensa | `backend/migrations/001_ledger.sql` | PR-07 | Parcial | Solo inserción, sí. Compensación, no (HV-03) |
 | RN-05 | Bloqueo con saldo; excepción del administrador | `backend/src/royexa/loans/domain.py` | PR-04 | Pasa | Se evalúa al solicitar y al asentar (HV-04) |
@@ -59,7 +59,7 @@ Esta matriz extiende la trazabilidad de las Entregas 1 y 2 hasta componentes, co
 | Decisión | Evidencia prevista | Evidencia obtenida | Hallazgo | Efecto sobre el ADR | Estado actual |
 |---|---|---|---|---|---|
 | ADR-001 | EV-01, EV-02 | Ambas `Validada` sobre PostgreSQL 17.11 | HV-01, HV-02, HV-03, HV-07 | Ajustado: redacción de EV-02, límites de la aceptación y RA-10 | Aceptado |
-| ADR-002 | EV-03, EV-08, EV-09, EV-11 | EV-03 `Parcialmente validada`; EV-09 y EV-11 `Validada`; EV-08 prevista para la Entrega 4 | HV-05, HV-06, HV-07, HV-09 | Ajustado: estado real de la bandeja y de la transacción, RA-10 y RA-11 | Propuesto |
+| ADR-002 | EV-03, EV-08, EV-09, EV-11 | EV-03, EV-09 y EV-11 `Validada`; EV-08 prevista para la Entrega 4 | HV-05, HV-06, HV-07, HV-09 | Ajustado: estado real de la bandeja y de la transacción, RA-10 y RA-11 | Propuesto |
 | ADR-003 | EV-05, EV-06 | Reprogramadas, sin destino en el curso | No aplica | Sin cambio | Propuesto |
 | ADR-004 | EV-12 | `Validada` en memoria y en PostgreSQL | HV-04, HV-07 | Ajustado: relectura del perdedor y RN-05 al asentar | Propuesto, pendiente de confirmación docente |
 | AD-06 | EV-11 | `Validada` | HV-09 | Sin ADR propio; rol de aprobación en el agregado | ALT-06B seleccionada |
@@ -69,7 +69,6 @@ Esta matriz extiende la trazabilidad de las Entregas 1 y 2 hasta componentes, co
 | Elemento | Motivo de falta de cobertura | Riesgo | Acción prevista |
 |---|---|---|---|
 | CA-08, EC-01, RN-04: asiento compensatorio | No implementado; el modelo solo tiene dos tipos de asiento y montos positivos | No hay forma de corregir un asiento | Entrega 4, con migración (HV-03) |
-| EV-03: 5 fallos del aviso del código | PR-06 observa `FALLIDO` solo sobre el comprobante | Inferir un resultado no observado | Añadir la prueba (HV-05) |
 | Despachador ante otra excepción o fallo del `commit` | Sin prueba | Cola detenida o aviso repetido (RA-11) | Entrega 4 (HV-06) |
 | Caducidad sin intento | No hay barrido de códigos vencidos | Desembolsos abandonados que parecen vigentes | Entrega 4 (HV-08) |
 | `RejectDisbursement`, RF-03 | Implementado, sin prueba automatizada | Regresión no detectada | Añadir la prueba |

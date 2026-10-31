@@ -501,6 +501,8 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 
 #### Decisión provisional
 
+> **Anotación (2026-10-31).** `EV-03` y `EV-09` quedaron `Validada`. `EV-08` sigue prevista para la Entrega 4, así que `ADR-002` sigue `Propuesto` (`HV-05`, `HV-06`, `HV-07`).
+
 - **Alternativa seleccionada:** ALT-02A.
 - **Justificación:** Es la única que cumple a la vez la atomicidad del dinero (O1) y la independencia del aviso respecto del dinero (O2) con la capacidad de un equipo mínimo y costo cero (`RES-06`). TRACKEA queda como referencia.
 - **Alternativas descartadas:** ALT-02B por incumplir P2 y P3 y por poner en riesgo O1. ALT-02C por incumplir O2.
@@ -903,6 +905,7 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 | 2026-10-30 | Se corrigió la afirmación «La Entrega 1 no se modificó» | El commit `5077046` editó los integrantes en `propuesta.md` y `requisitos.md` | `arquitectura.md` | Julian Andres Restrepo |
 | 2026-10-31 | `EV-02` deja de citar el registro de cambios, que no existe en el esquema, y nombra el comando que la ejecuta | El recorrido vertical no lo implementa y la evidencia no podía comprobarse como estaba escrita (`HV-02`) | `arquitectura.md`, `adr/ADR-001` | Julian Andres Restrepo |
 | 2026-10-31 | `ADR-001` pasa a `Aceptado`; `ADR-002` y `ADR-004` se ajustan y siguen `Propuesto`; `SUP-01` confirmado; `RA-10` y `RA-11` nuevos; vista `c4-componentes` añadida al DSL | Resultado de la Entrega 3 (`HV-01` a `HV-09`) | `arquitectura.md`, `adr/ADR-001`, `adr/ADR-002`, `adr/ADR-004`, `diagramas/workspace.dsl`, `realineacion-entrega-1.md` | Julian Andres Restrepo |
+| 2026-10-31 | `EV-03` pasa a `Validada`; la cobertura de ASR y las columnas de evidencia de la trazabilidad muestran el resultado de la Entrega 3 | Se añadió la prueba que faltaba (`HV-05`) y la matriz seguía indicando evidencia pendiente | `arquitectura.md`, `trazabilidad-arquitectonica.md`, `realineacion-entrega-1.md`, `adr/ADR-002` | Julian Andres Restrepo |
 
 **Pendiente antes de entregar:** validar `workspace.dsl` con Structurizr, que tampoco ha procesado la vista `c4-componentes`, y sustituir los SVG por su exportación oficial; los SVG actuales todavía muestran el modelo de la Entrega 2. El archivo [`adr/ADR-00X-titulo-de-la-decision.md`](adr/ADR-00X-titulo-de-la-decision.md) es la plantilla y se conserva sin cambios.
 

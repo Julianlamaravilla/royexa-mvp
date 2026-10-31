@@ -2,7 +2,9 @@ ROYEXA, Entrega 3: resultado de pruebas y del recorrido
 =======================================================
 
 Fecha:    2026-10-31
-Código:   f07f7ae y 8aa1104, rama entrega-3-linea-base
+Código:   f07f7ae y 8aa1104, rama entrega-3-linea-base. Las secciones 1 a 4 y 7 se
+          repitieron con la prueba de PR-06 que completa EV-03, sin cambios en el
+          código de producción.
 Entorno:  macOS, Python 3.14.6, uv 0.11.7, pytest 9.2.0, PostgreSQL 17.11 (imagen postgres:17)
 Evidencias: EV-01, EV-02, EV-03, EV-09, EV-11, EV-12
 
@@ -17,32 +19,33 @@ El aviso de obsolescencia viene de la dependencia Starlette y no del código del
    Sin Docker. Las pruebas marcadas postgres quedan sin seleccionar.
 -------------------------------------------------------------------
 ============================= test session starts ==============================
-collecting ... collected 42 items / 18 deselected / 24 selected
+collecting ... collected 43 items / 18 deselected / 25 selected
 
 tests/architecture/test_pr08_dependencies.py::test_pr08_module_graph_is_acyclic PASSED [  4%]
 tests/architecture/test_pr08_dependencies.py::test_pr08_cycle_detector_reports_a_cycle PASSED [  8%]
 tests/architecture/test_pr08_dependencies.py::test_pr08_domain_code_imports_no_framework_or_adapter PASSED [ 12%]
 tests/architecture/test_pr08_dependencies.py::test_pr08_business_modules_never_call_notifications PASSED [ 16%]
 tests/vertical/test_pr01_valid_confirmation.py::test_pr01_valid_code_records_entry_schedule_and_cash_deduction PASSED [ 20%]
-tests/vertical/test_pr01_valid_confirmation.py::test_pr01_result_is_queryable_with_who_requested_and_who_approved PASSED [ 25%]
-tests/vertical/test_pr01_valid_confirmation.py::test_pr01_response_never_reveals_the_code_to_the_collector PASSED [ 29%]
-tests/vertical/test_pr02_self_approval_rejected.py::test_pr02_admin_cannot_approve_what_they_requested PASSED [ 33%]
-tests/vertical/test_pr02_self_approval_rejected.py::test_pr02_collector_cannot_approve_their_own_request PASSED [ 37%]
-tests/vertical/test_pr02_self_approval_rejected.py::test_pr02_a_different_admin_can_still_approve_after_the_rejection PASSED [ 41%]
-tests/vertical/test_pr03_expired_code.py::test_pr03_expired_code_rejects_without_deduction_and_leaves_reason_entry PASSED [ 45%]
-tests/vertical/test_pr04_renewal_rule.py::test_pr04_unpaid_prior_loan_blocks_the_request PASSED [ 50%]
-tests/vertical/test_pr04_renewal_rule.py::test_pr04_settled_prior_loan_does_not_block PASSED [ 54%]
-tests/vertical/test_pr04_renewal_rule.py::test_pr04_registered_exception_unblocks_once PASSED [ 58%]
-tests/vertical/test_pr04_renewal_rule.py::test_pr04_only_an_administrator_grants_the_exception PASSED [ 62%]
-tests/vertical/test_pr04_renewal_rule.py::test_pr04_exception_needs_an_unpaid_loan_and_a_reason PASSED [ 66%]
-tests/vertical/test_pr04_renewal_rule.py::test_pr04_rule_holds_again_when_the_money_moves PASSED [ 70%]
-tests/vertical/test_pr05_idempotent_confirmation.py::test_pr05_retry_returns_the_first_result_without_a_second_effect PASSED [ 75%]
-tests/vertical/test_pr05_idempotent_confirmation.py::test_pr05_loser_of_the_uniqueness_race_recovers_the_committed_result PASSED [ 79%]
-tests/vertical/test_pr05_idempotent_confirmation.py::test_pr05_two_simultaneous_confirmations_settle_once PASSED [ 83%]
-tests/vertical/test_pr06_notifier_failure.py::test_pr06_failed_receipt_keeps_the_money_confirmed_and_stays_visible PASSED [ 87%]
-tests/vertical/test_pr06_notifier_failure.py::test_pr06_fifth_failure_marks_the_notice_failed PASSED [ 91%]
-tests/vertical/test_pr06_notifier_failure.py::test_pr06_retry_delivers_once_the_channel_recovers PASSED [ 95%]
-tests/vertical/test_pr06_notifier_failure.py::test_pr06_undelivered_code_moves_no_money PASSED [100%]
+tests/vertical/test_pr01_valid_confirmation.py::test_pr01_result_is_queryable_with_who_requested_and_who_approved PASSED [ 24%]
+tests/vertical/test_pr01_valid_confirmation.py::test_pr01_response_never_reveals_the_code_to_the_collector PASSED [ 28%]
+tests/vertical/test_pr02_self_approval_rejected.py::test_pr02_admin_cannot_approve_what_they_requested PASSED [ 32%]
+tests/vertical/test_pr02_self_approval_rejected.py::test_pr02_collector_cannot_approve_their_own_request PASSED [ 36%]
+tests/vertical/test_pr02_self_approval_rejected.py::test_pr02_a_different_admin_can_still_approve_after_the_rejection PASSED [ 40%]
+tests/vertical/test_pr03_expired_code.py::test_pr03_expired_code_rejects_without_deduction_and_leaves_reason_entry PASSED [ 44%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_unpaid_prior_loan_blocks_the_request PASSED [ 48%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_settled_prior_loan_does_not_block PASSED [ 52%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_registered_exception_unblocks_once PASSED [ 56%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_only_an_administrator_grants_the_exception PASSED [ 60%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_exception_needs_an_unpaid_loan_and_a_reason PASSED [ 64%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_rule_holds_again_when_the_money_moves PASSED [ 68%]
+tests/vertical/test_pr05_idempotent_confirmation.py::test_pr05_retry_returns_the_first_result_without_a_second_effect PASSED [ 72%]
+tests/vertical/test_pr05_idempotent_confirmation.py::test_pr05_loser_of_the_uniqueness_race_recovers_the_committed_result PASSED [ 76%]
+tests/vertical/test_pr05_idempotent_confirmation.py::test_pr05_two_simultaneous_confirmations_settle_once PASSED [ 80%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_failed_receipt_keeps_the_money_confirmed_and_stays_visible PASSED [ 84%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_fifth_failure_marks_the_notice_failed PASSED [ 88%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_retry_delivers_once_the_channel_recovers PASSED [ 92%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_undelivered_code_moves_no_money PASSED [ 96%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_code_notice_fails_after_five_dispatches_through_a_replaced_adapter PASSED [100%]
 
 =============================== warnings summary ===============================
 .venv/lib/python3.14/site-packages/fastapi/testclient.py:1
@@ -50,27 +53,27 @@ tests/vertical/test_pr06_notifier_failure.py::test_pr06_undelivered_code_moves_n
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-================= 24 passed, 18 deselected, 1 warning in 0.47s =================
+================= 25 passed, 18 deselected, 1 warning in 0.51s =================
 
 
 2. uv run pytest tests/vertical --no-header -q
    Solo las pruebas del recorrido.
 -------------------------------------------------------------------
-....................                                                     [100%]
+.....................                                                    [100%]
 =============================== warnings summary ===============================
 .venv/lib/python3.14/site-packages/fastapi/testclient.py:1
   .venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-20 passed, 1 warning in 0.33s
+21 passed, 1 warning in 0.38s
 
 
 3. uv run pytest -m postgres -v --no-header
    PR-07 sobre PostgreSQL 17.11. EV-01, EV-02, EV-12.
 -------------------------------------------------------------------
 ============================= test session starts ==============================
-collecting ... collected 42 items / 24 deselected / 18 selected
+collecting ... collected 43 items / 25 deselected / 18 selected
 
 tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[UPDATE] PASSED [  5%]
 tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[DELETE] PASSED [ 11%]
@@ -97,20 +100,20 @@ tests/postgres/test_pr07_ledger_privileges.py::test_pr07_every_path_of_the_flow_
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-================= 18 passed, 24 deselected, 1 warning in 0.88s =================
+================= 18 passed, 25 deselected, 1 warning in 0.86s =================
 
 
 4. uv run pytest -m "" --no-header -q
-   Las 42 pruebas juntas.
+   Las 43 pruebas juntas.
 -------------------------------------------------------------------
-..........................................                               [100%]
+...........................................                              [100%]
 =============================== warnings summary ===============================
 .venv/lib/python3.14/site-packages/fastapi/testclient.py:1
   .venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-42 passed, 1 warning in 1.20s
+43 passed, 1 warning in 1.21s
 
 
 5. Recorrido por HTTP con el libro en PostgreSQL
@@ -155,22 +158,21 @@ asientos 1 [-100000]
 
 7. Clon limpio, 2026-10-31
    git clone del repositorio; git switch entrega-3-linea-base. Se ejecutó sobre esta
-   rama antes de añadir esta sección y una frase a la sección 6.3 del documento de
-   diseño, que son los únicos cambios posteriores. Sin .venv previo y con un contenedor
-   de PostgreSQL nuevo.
+   rama antes de añadir el resultado a esta sección, que es el único cambio posterior.
+   Sin .venv previo y con un contenedor de PostgreSQL nuevo.
    Comandos de backend/README.md, en ese orden.
 -------------------------------------------------------------------
 $ uv sync
 $ uv run pytest
-================= 24 passed, 18 deselected, 1 warning in 3.23s =================
+================= 25 passed, 18 deselected, 1 warning in 3.29s =================
 $ uv run pytest tests/vertical
-======================== 20 passed, 1 warning in 0.33s =========================
+======================== 21 passed, 1 warning in 0.37s =========================
 $ docker compose up -d --wait postgres
  Container clean-postgres-1 Healthy
 $ uv run pytest -m postgres
-================= 18 passed, 24 deselected, 1 warning in 0.85s =================
+================= 18 passed, 25 deselected, 1 warning in 0.86s =================
 $ uv run pytest -m ""
-======================== 42 passed, 1 warning in 1.21s =========================
+======================== 43 passed, 1 warning in 1.25s =========================
 $ uv run python -m royexa.migrate
 001_ledger.sql
 $ ROYEXA_LEDGER_URL=postgresql://royexa_app:...@localhost:55432/royexa uv run uvicorn royexa.main:app --port 8000

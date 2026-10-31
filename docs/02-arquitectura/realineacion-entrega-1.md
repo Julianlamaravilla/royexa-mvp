@@ -199,7 +199,7 @@ Corte del 2026-10-31. Los resultados, hallazgos y limitaciones completos están 
 | Evidencia | Estado |
 |---|---|
 | `EV-01`, `EV-02` | Validada |
-| `EV-03` | Parcialmente validada (`HV-05`) |
+| `EV-03` | Validada (`HV-05`) |
 | `EV-04`, `EV-05`, `EV-06`, `EV-07` | Reprogramada, sin destino en el curso |
 | `EV-08` | Prevista para la Entrega 4 |
 | `EV-09`, `EV-11`, `EV-12` | Validada |

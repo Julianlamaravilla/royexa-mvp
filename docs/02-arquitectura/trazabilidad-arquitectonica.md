@@ -6,7 +6,7 @@ Esta matriz continúa la trazabilidad iniciada en `../01-requisitos/requisitos.m
 
 No reemplaza ni copia la matriz funcional de la Entrega 1. Su propósito es mostrar cómo los requisitos, reglas, escenarios de calidad, ASR y restricciones originan asuntos arquitectónicos, alternativas, decisiones provisionales, ADR, elementos C4 y evidencias de validación.
 
-El 2026-10-30 esta matriz se actualizó con la realineación descrita en [`realineacion-entrega-1.md`](realineacion-entrega-1.md). Ese documento define los identificadores nuevos, y su resolución de divergencias está pendiente de confirmación docente.
+El 2026-10-30 esta matriz se actualizó con la realineación descrita en [`realineacion-entrega-1.md`](realineacion-entrega-1.md). Ese documento define los identificadores nuevos, y su resolución de divergencias está pendiente de confirmación docente. El 2026-10-31 se incorporó el resultado de las evidencias de la Entrega 3, registrado en `../03-diseno-vertical/diseno-y-vertical.md`, sección 8.
 
 ```text
 INT / RF / CA / RN / EC / ASR / RES
@@ -42,7 +42,7 @@ INT / RF / CA / RN / EC / ASR / RES
 
 ## 3. Matriz principal
 
-| Asunto | Origen | Interesados | Alternativas | Decisión provisional | ADR | Elementos C4 afectados | Riesgos y supuestos | Evidencia pendiente |
+| Asunto | Origen | Interesados | Alternativas | Decisión provisional | ADR | Elementos C4 afectados | Riesgos y supuestos | Evidencia |
 |---|---|---|---|---|---|---|---|---|
 | AD-01 | ASR-01, EC-01, RN-04, RF-04 | INT-01, INT-02 | ALT-01A, ALT-01B, ALT-01C | ALT-01B | ADR-001 | CON-03, CON-04 | RA-01, RA-02, SUP-01 | EV-01, EV-02 |
 | AD-02 | ASR-01, ASR-02, ASR-05, EC-04, RES-02, RES-03, RES-05, RES-06 | INT-01, INT-02 | ALT-02A, ALT-02B, ALT-02C | ALT-02A | ADR-002 | CON-02, CON-03, CON-04, EXT-05 | RA-03, RA-04 | EV-03, EV-08, EV-09 |
@@ -58,13 +58,13 @@ INT / RF / CA / RN / EC / ASR / RES
 
 Esta vista permite detectar ASR sin tratamiento arquitectónico o decisiones sin origen justificable.
 
-| ASR | Elemento de origen en Entrega 1 | Asuntos relacionados | Decisiones o ADR | Elementos C4 | Evidencia pendiente | Estado |
+| ASR | Elemento de origen en Entrega 1 | Asuntos relacionados | Decisiones o ADR | Elementos C4 | Evidencia | Estado |
 |---|---|---|---|---|---|---|
-| ASR-01 | RN-04, EC-01 | AD-01, AD-02, AD-03 | ADR-001, ADR-002, ADR-004 | CON-03, CON-04 | EV-01, EV-02, EV-12 | Cubierto en la decisión; pendiente de evidencia |
-| ASR-02 | RN-03, RF-03, RF-06 | AD-02, AD-03 | ADR-002, ADR-004 | CON-03, CON-04, EXT-05 | EV-03, EV-12 | Cubierto en la decisión; pendiente de evidencia y de la confirmación docente de DIV-01 |
-| ASR-03 | RN-06, EC-02 | AD-06 | ALT-06B, sin ADR propio | CON-03 | EV-11 | Cubierto en la decisión, sin excepción (DIV-07); usuarios sembrados como limitación declarada |
-| ASR-04 | RN-01, EC-03 | AD-05 | Decisión heredada, sin ADR | CON-03 | EV-10 | Cubierto en la decisión; EC-03 se valida en la Entrega 4 (provisional) |
-| ASR-05 | EC-04, RES-03 | AD-02, AD-07 | ADR-002 | CON-03, CON-04, EXT-05 | EV-03, EV-08 | Cubierto en la decisión con el notificador simulado; pendiente de evidencia |
+| ASR-01 | RN-04, EC-01 | AD-01, AD-02, AD-03 | ADR-001, ADR-002, ADR-004 | CON-03, CON-04 | EV-01, EV-02, EV-12 | Cubierto en la decisión; EV-01, EV-02 y EV-12 `Validada`. El asiento compensatorio queda para la Entrega 4 (HV-03) |
+| ASR-02 | RN-03, RF-03, RF-06 | AD-02, AD-03 | ADR-002, ADR-004 | CON-03, CON-04, EXT-05 | EV-03, EV-12 | Cubierto en la decisión; EV-03 y EV-12 `Validada`; pendiente de la confirmación docente de DIV-01 |
+| ASR-03 | RN-06, EC-02 | AD-06 | ALT-06B, sin ADR propio | CON-03 | EV-11 | Cubierto en la decisión, sin excepción (DIV-07); EV-11 `Validada`; usuarios sembrados como limitación declarada |
+| ASR-04 | RN-01, EC-03 | AD-05 | Decisión heredada, sin ADR | CON-03 | EV-10 | Cubierto en la decisión; EV-10 `Reprogramada a la Entrega 4`, donde se valida EC-03 (provisional) |
+| ASR-05 | EC-04, RES-03 | AD-02, AD-07 | ADR-002 | CON-03, CON-04, EXT-05 | EV-03, EV-08 | Cubierto en la decisión con el notificador simulado; EV-03 `Validada`; EV-08 prevista para la Entrega 4 |
 
 ### ASR sin decisión durante esta entrega
 
@@ -75,7 +75,7 @@ Esta vista permite detectar ASR sin tratamiento arquitectónico o decisiones sin
 
 ## 5. Cobertura del recorrido vertical
 
-| Elemento del recorrido | Referencias funcionales | Conceptos del dominio | Contenedores | Decisiones relacionadas | Evidencia futura |
+| Elemento del recorrido | Referencias funcionales | Conceptos del dominio | Contenedores | Decisiones relacionadas | Evidencia |
 |---|---|---|---|---|---|
 | Entrada | RF-03, CA-05 | Desembolso, Cliente | CON-03 (Entrega 3), CON-02 (Entrega 4) | AD-03, ADR-004 | EV-12 |
 | Comportamiento principal | RF-03, RN-03, RN-05, RN-06, CA-06, CA-09, CA-10 | Desembolso, Código de confirmación, Préstamo, Cuota | CON-03 | AD-02, AD-03, AD-06, ADR-002, ADR-004 | EV-09, EV-11, EV-12 |

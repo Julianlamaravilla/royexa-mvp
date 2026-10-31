@@ -130,7 +130,7 @@ EV-11 pertenece a AD-06, que no tiene ADR propio y se decide en `arquitectura.md
 
 | Evidencia | Estado | Resultado | Hallazgo |
 |---|---|---|---|
-| EV-03 | Parcialmente validada | El dinero se conserva, cada invocación cuenta un intento y el estado es consultable. Los 5 fallos hasta `FALLIDO` se observaron sobre el comprobante, no sobre el código que pide la evidencia, y el fallo se simula con una opción del mismo adaptador. | HV-05, HV-06 |
+| EV-03 | Validada | PR-06 sustituye el notificador simulado por otro adaptador que falla al notificar el código. El desembolso sigue `APROBADO`, la caja y el libro no cambian, cada invocación cuenta un intento y tras 5 el aviso queda `FALLIDO`, con su error y sin fecha de envío, consultable por el administrador. | HV-05, HV-06 |
 | EV-04 | Reprogramada | Sin destino en el curso. | No aplica |
 | EV-08 | Prevista para la Entrega 4 | Sin resultado todavía. | No aplica |
 | EV-09 | Validada | Grafo de módulos sin ciclos y ningún módulo de negocio importa `notifications` ni el marco web (PR-08). | HV-09 |
@@ -158,3 +158,4 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 | 2026-09-20 | Propuesto | Creación inicial | Sincronización con el estado de TRACKEA |
 | 2026-10-30 | Propuesto | Costo cero; cola detrás de un puerto con bandeja de salida y despachador invocable; avisos al cliente final por EXT-05; consentimiento diferido; EV-04 reprogramada; EV-09 y EV-11 añadidas; EV-03 sobre el desembolso | Realineación con la Entrega 1 (`realineacion-entrega-1.md`) |
 | 2026-10-31 | Propuesto | Resultado de EV-03, EV-09 y EV-11; estado real de la bandeja de salida y de la transacción; RA-10 y RA-11; nueva condición de revisión. Sin cambio de estado: EV-08 sigue pendiente | HV-05, HV-06, HV-07, HV-09 |
+| 2026-10-31 | Propuesto | EV-03 pasa a `Validada` con una prueba que lleva el aviso del código a `FALLIDO` mediante otro adaptador del notificador. Sin cambio de estado: EV-08 sigue pendiente | HV-05 |
