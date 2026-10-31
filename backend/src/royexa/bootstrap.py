@@ -1,0 +1,93 @@
+"""Composition root: the only place that knows which adapter fills each port."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from datetime import timedelta
+
+from royexa.adapters.memory import InMemoryStore, InMemoryUnitOfWork
+from royexa.adapters.simulated_notifier import SimulatedNotifier
+from royexa.clients.domain import ClientCatalog
+from royexa.identity_access.domain import Directory
+from royexa.notifications.dispatcher import NoticeQueries, NotificationDispatcher
+from royexa.notifications.ports import Notifier
+from royexa.sales.application import (
+    ApproveDisbursement,
+    ConfirmDisbursement,
+    GrantRenewalException,
+    RejectDisbursement,
+    RequestDisbursement,
+    SalesContext,
+    SalesQueries,
+)
+from royexa.seed import seed_clients, seed_directory, seed_store
+from royexa.shared.clock import Clock, SystemClock
+
+DEFAULT_CODE_TTL_MINUTES = 60
+
+
+@dataclass(frozen=True)
+class Settings:
+    code_ttl: timedelta = timedelta(minutes=DEFAULT_CODE_TTL_MINUTES)
+    notifier_failing: bool = False
+
+    @classmethod
+    def from_env(cls) -> Settings:
+        minutes = int(os.environ.get("ROYEXA_CODE_TTL_MINUTES", DEFAULT_CODE_TTL_MINUTES))
+        return cls(
+            code_ttl=timedelta(minutes=minutes),
+            notifier_failing=os.environ.get("ROYEXA_NOTIFIER_FAILING") == "1",
+        )
+
+
+@dataclass(frozen=True)
+class Container:
+    directory: Directory
+    clients: ClientCatalog
+    store: InMemoryStore
+    notifier: Notifier
+    request: RequestDisbursement
+    approve: ApproveDisbursement
+    reject: RejectDisbursement
+    confirm: ConfirmDisbursement
+    grant_exception: GrantRenewalException
+    queries: SalesQueries
+    dispatcher: NotificationDispatcher
+    notices: NoticeQueries
+    context: SalesContext
+
+
+def build_container(
+    settings: Settings | None = None,
+    clock: Clock | None = None,
+    notifier: Notifier | None = None,
+) -> Container:
+    settings = settings or Settings()
+    clock = clock or SystemClock()
+    notifier = notifier or SimulatedNotifier(
+        sink=lambda line: print(line, flush=True), failing=settings.notifier_failing
+    )
+    store = seed_store()
+    directory = seed_directory()
+    clients = seed_clients()
+
+    def unit_of_work() -> InMemoryUnitOfWork:
+        return InMemoryUnitOfWork(store)
+
+    context = SalesContext(unit_of_work, clock, directory, clients, settings.code_ttl)
+    return Container(
+        directory=directory,
+        clients=clients,
+        store=store,
+        notifier=notifier,
+        request=RequestDisbursement(context),
+        approve=ApproveDisbursement(context),
+        reject=RejectDisbursement(context),
+        confirm=ConfirmDisbursement(context),
+        grant_exception=GrantRenewalException(context),
+        queries=SalesQueries(unit_of_work),
+        dispatcher=NotificationDispatcher(unit_of_work, notifier, clock),
+        notices=NoticeQueries(unit_of_work),
+        context=context,
+    )

@@ -1,0 +1,27 @@
+[project]
+name = "royexa"
+version = "0.3.0"
+description = "ROYEXA: disbursement vertical slice (Entrega 3)."
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.162.0",
+    "uvicorn>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-m 'not postgres' --strict-markers"
+markers = [
+    "postgres: requires a reachable PostgreSQL 17 (docker compose up -d postgres).",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]
