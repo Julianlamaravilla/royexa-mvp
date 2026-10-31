@@ -83,7 +83,7 @@ El significado de estos identificadores no cambia. La matriz solo indica dónde 
 | `ALT-03A` | Reencuadrar | Seleccionada por `ADR-004`, con confirmación idempotente. |
 | `ALT-03B` | Diferir | Era la selección de `ADR-003`. |
 | `ALT-03C` | Conservar | Descartada en la Entrega 2. |
-| `ADR-001` | Reencuadrar | Costo cero, PostgreSQL local obligatorio y comando local. Sigue `Propuesto`. |
+| `ADR-001` | Reencuadrar | Costo cero, PostgreSQL local obligatorio y comando local. `Aceptado` desde el 2026-10-31 (sección 9). |
 | `ADR-002` | Reencuadrar | Puerto de cola, notificador simulado y evidencia ajustada. Sigue `Propuesto`. |
 | `ADR-003` | Diferir | Pasa a `Reemplazado por ADR-004` solo con la confirmación docente. |
 | `INV-01` | Reencuadrar | El saldo lo calcula el servidor, sin referencia al teléfono. |
@@ -117,7 +117,7 @@ El significado de estos identificadores no cambia. La matriz solo indica dónde 
 
 ### 4.5 Evidencias
 
-Las evidencias se resuelven en la Entrega 3. Este documento no marca ninguna como validada.
+Esta tabla conserva la clasificación de la realineación. Las evidencias se resolvieron en la Entrega 3: el resultado está en la sección 9.
 
 | Identificador | Clase | Estado o momento | Ajuste |
 |---|---|---|---|
@@ -171,6 +171,8 @@ Todas las resoluciones están pendientes de confirmación docente. El detalle or
 | `EV-12` | Reconfirmar el código no duplica el asiento ni el descuento de caja. | `arquitectura.md`, sección 6.4, y `ADR-004`. |
 | `ADR-004` | Operación en línea con confirmación idempotente del código. | [`adr/ADR-004-operacion-en-linea-con-confirmacion-idempotente.md`](adr/ADR-004-operacion-en-linea-con-confirmacion-idempotente.md) |
 | `ALT-06A`, `ALT-06B`, `ALT-06C` | Alternativas de `AD-06`. Se selecciona `ALT-06B`. | `arquitectura.md`, sección 3.4. |
+| `RA-10` | El libro y los datos en memoria no comparten una transacción. Surge en la Entrega 3 (`HV-07`). | `arquitectura.md`, sección 6.1. |
+| `RA-11` | La entrega de avisos es de al menos una vez. Surge en la Entrega 3 (`HV-06`). | `arquitectura.md`, sección 6.1. |
 
 ## 7. Puntos de recuperación
 
@@ -189,3 +191,25 @@ La Entrega 0 y la Entrega 1 no se editan en esta realineación. Después de la e
 | `ADR-004` y `ADR-003` | Pendiente | `ADR-004` sigue `Propuesto` y `ADR-003` no cambia de estado. |
 | `DIV-08`, un integrante | Pendiente | Autorización docente: pendiente. Motivo: por aportar por el autor. |
 | Retroalimentación de Canvas sobre la Entrega 2 | Pendiente de incorporar | Si contradice este documento, prevalece la retroalimentación. |
+
+## 9. Resultado en la Entrega 3
+
+Corte del 2026-10-31. Los resultados, hallazgos y limitaciones completos están en [`../03-diseno-vertical/diseno-y-vertical.md`](../03-diseno-vertical/diseno-y-vertical.md), secciones 8 y 10.
+
+| Evidencia | Estado |
+|---|---|
+| `EV-01`, `EV-02` | Validada |
+| `EV-03` | Parcialmente validada (`HV-05`) |
+| `EV-04`, `EV-05`, `EV-06`, `EV-07` | Reprogramada, sin destino en el curso |
+| `EV-08` | Prevista para la Entrega 4 |
+| `EV-09`, `EV-11`, `EV-12` | Validada |
+| `EV-10` | Reprogramada a la Entrega 4 |
+
+| Decisión | Estado | Motivo |
+|---|---|---|
+| `ADR-001` | `Aceptado` | `EV-01` y `EV-02` quedaron `Validada`. |
+| `ADR-002` | `Propuesto` | Falta `EV-08`. Se ajustó con `HV-05`, `HV-06` y `HV-07`. |
+| `ADR-003` | `Propuesto`, sin cambios | Depende de la confirmación docente de `DIV-02`. |
+| `ADR-004` | `Propuesto` | Depende de la misma confirmación. Se ajustó con `HV-04` y `HV-07`. |
+
+**Lo que este resultado no cierra.** Ninguna confirmación de la sección 8 se obtuvo durante la Entrega 3. `workspace.dsl`, incluida la vista `c4-componentes`, sigue sin validarse con Structurizr. `c4-componentes.svg`, `secuencia-vertical.svg` y `secuencia-alternativa.svg` siguen sin exportarse, y `c4-contexto.svg` y `c4-contenedores.svg` todavía muestran el modelo de la Entrega 2.

@@ -1,0 +1,181 @@
+ROYEXA, Entrega 3: resultado de pruebas y del recorrido
+=======================================================
+
+Fecha:    2026-10-31
+Código:   f07f7ae y 8aa1104, rama entrega-3-linea-base
+Entorno:  macOS, Python 3.14.6, uv 0.11.7, pytest 9.2.0, PostgreSQL 17.11 (imagen postgres:17)
+Evidencias: EV-01, EV-02, EV-03, EV-09, EV-11, EV-12
+
+Salida real, sin editar. Solo se quitó el prefijo de las rutas locales del aviso de
+Starlette. Los comandos se ejecutaron desde backend/. --no-header y -v solo cambian el
+formato de la salida; PostgreSQL se levantó con: docker compose up -d --wait postgres
+
+El aviso de obsolescencia viene de la dependencia Starlette y no del código del proyecto.
+
+
+1. uv run pytest -v --no-header
+   Sin Docker. Las pruebas marcadas postgres quedan sin seleccionar.
+-------------------------------------------------------------------
+============================= test session starts ==============================
+collecting ... collected 42 items / 18 deselected / 24 selected
+
+tests/architecture/test_pr08_dependencies.py::test_pr08_module_graph_is_acyclic PASSED [  4%]
+tests/architecture/test_pr08_dependencies.py::test_pr08_cycle_detector_reports_a_cycle PASSED [  8%]
+tests/architecture/test_pr08_dependencies.py::test_pr08_domain_code_imports_no_framework_or_adapter PASSED [ 12%]
+tests/architecture/test_pr08_dependencies.py::test_pr08_business_modules_never_call_notifications PASSED [ 16%]
+tests/vertical/test_pr01_valid_confirmation.py::test_pr01_valid_code_records_entry_schedule_and_cash_deduction PASSED [ 20%]
+tests/vertical/test_pr01_valid_confirmation.py::test_pr01_result_is_queryable_with_who_requested_and_who_approved PASSED [ 25%]
+tests/vertical/test_pr01_valid_confirmation.py::test_pr01_response_never_reveals_the_code_to_the_collector PASSED [ 29%]
+tests/vertical/test_pr02_self_approval_rejected.py::test_pr02_admin_cannot_approve_what_they_requested PASSED [ 33%]
+tests/vertical/test_pr02_self_approval_rejected.py::test_pr02_collector_cannot_approve_their_own_request PASSED [ 37%]
+tests/vertical/test_pr02_self_approval_rejected.py::test_pr02_a_different_admin_can_still_approve_after_the_rejection PASSED [ 41%]
+tests/vertical/test_pr03_expired_code.py::test_pr03_expired_code_rejects_without_deduction_and_leaves_reason_entry PASSED [ 45%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_unpaid_prior_loan_blocks_the_request PASSED [ 50%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_settled_prior_loan_does_not_block PASSED [ 54%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_registered_exception_unblocks_once PASSED [ 58%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_only_an_administrator_grants_the_exception PASSED [ 62%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_exception_needs_an_unpaid_loan_and_a_reason PASSED [ 66%]
+tests/vertical/test_pr04_renewal_rule.py::test_pr04_rule_holds_again_when_the_money_moves PASSED [ 70%]
+tests/vertical/test_pr05_idempotent_confirmation.py::test_pr05_retry_returns_the_first_result_without_a_second_effect PASSED [ 75%]
+tests/vertical/test_pr05_idempotent_confirmation.py::test_pr05_loser_of_the_uniqueness_race_recovers_the_committed_result PASSED [ 79%]
+tests/vertical/test_pr05_idempotent_confirmation.py::test_pr05_two_simultaneous_confirmations_settle_once PASSED [ 83%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_failed_receipt_keeps_the_money_confirmed_and_stays_visible PASSED [ 87%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_fifth_failure_marks_the_notice_failed PASSED [ 91%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_retry_delivers_once_the_channel_recovers PASSED [ 95%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_undelivered_code_moves_no_money PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  .venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 24 passed, 18 deselected, 1 warning in 0.47s =================
+
+
+2. uv run pytest tests/vertical --no-header -q
+   Solo las pruebas del recorrido.
+-------------------------------------------------------------------
+....................                                                     [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  .venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+20 passed, 1 warning in 0.33s
+
+
+3. uv run pytest -m postgres -v --no-header
+   PR-07 sobre PostgreSQL 17.11. EV-01, EV-02, EV-12.
+-------------------------------------------------------------------
+============================= test session starts ==============================
+collecting ... collected 42 items / 24 deselected / 18 selected
+
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[UPDATE] PASSED [  5%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[DELETE] PASSED [ 11%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[TRUNCATE] PASSED [ 16%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_catalog_grants_only_select_and_insert PASSED [ 22%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_catalog_lists_no_other_grant_on_any_table PASSED [ 27%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_catalog_shows_no_column_level_change_privilege PASSED [ 33%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_has_no_way_around_the_grants PASSED [ 38%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_migrations_are_repeatable PASSED [ 44%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_constraint_refuses_a_second_entry_of_the_same_type PASSED [ 50%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_disbursement_flow_writes_one_entry_on_the_real_ledger PASSED [ 55%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_expired_attempt_keeps_its_reason_on_the_real_ledger PASSED [ 61%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_two_simultaneous_confirmations_settle_once_on_the_real_ledger PASSED [ 66%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_stale_commit_leaves_no_entry_on_the_real_ledger PASSED [ 72%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_failed_ledger_commit_changes_nothing_and_surfaces_its_error PASSED [ 77%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_session_closes_once_when_its_commit_fails PASSED [ 83%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_session_rollback_after_commit_is_harmless PASSED [ 88%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_unit_of_work_reused_after_commit_still_releases_its_connection PASSED [ 94%]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_every_path_of_the_flow_returns_its_connection PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  .venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 18 passed, 24 deselected, 1 warning in 0.88s =================
+
+
+4. uv run pytest -m "" --no-header -q
+   Las 42 pruebas juntas.
+-------------------------------------------------------------------
+..........................................                               [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  .venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+42 passed, 1 warning in 1.20s
+
+
+5. Recorrido por HTTP con el libro en PostgreSQL
+   Servidor: ROYEXA_LEDGER_URL=postgresql://royexa_app:...@localhost:55432/royexa
+             uv run uvicorn royexa.main:app
+   Los datos son de demostración. El código de confirmación era de un solo uso.
+   Pasos en docs/03-diseno-vertical/diseno-y-vertical.md, sección 7.6.
+-------------------------------------------------------------------
+## solicitud como cobrador-1
+201
+{'status': 'SOLICITADO', 'requested_by': 'cobrador-1', 'amount_cents': 100000, 'interest_cents': 20000}
+## aprobación como cobrador-1 (autoaprobación)
+{"type":"https://royexa.local/problemas/autoaprobacion-prohibida","title":"Quien origina no puede aprobar","status":403,"detail":"cobrador-1"}
+403
+## aprobación como admin-1
+{'status': 'APROBADO', 'approved_by': 'admin-1', 'code_expires_at': '2026-10-31T14:51:44.307247Z'} [{'actor_id': 'cobrador-1', 'actor_role': 'COBRADOR', 'at': '2026-10-31T13:51:44.290436Z', 'reason': 'quien_origina_no_aprueba'}]
+## despacho
+{"attempted":1,"sent":1}
+[EXT-05] to=cliente-1 kind=CODIGO_CONFIRMACION disbursement=7a598541-cf20-4fce-8e41-cc5350373f19 payload={'code': '5811D5E3'}
+## confirmación: estado, identidades, número de cuotas, primera cuota, asiento
+200 {'status': 'CONFIRMADO', 'requested_by': 'cobrador-1', 'approved_by': 'admin-1', 'confirmed_by': 'cobrador-1'} 20 {'sequence': 1, 'due_date': '2026-11-02', 'amount_cents': 6000} DESEMBOLSO 100000 -100000
+## repetición de la confirmación
+200
+## caja
+{"id":"caja-cobrador-1","collector_id":"cobrador-1","opening_balance_cents":100000000,"balance_cents":99900000,"closed":false}
+## número de asientos en el libro
+1
+## avisos del desembolso: tipo, estado, intentos
+[('CODIGO_CONFIRMACION', 'ENVIADO', 1), ('COMPROBANTE_DESEMBOLSO', 'PENDIENTE', 0)]
+
+
+6. Mismo servidor tras reiniciarlo, con la misma base de datos (HV-07)
+-------------------------------------------------------------------
+## caja: vuelve al saldo sembrado
+{"id":"caja-cobrador-1","collector_id":"cobrador-1","opening_balance_cents":100000000,"balance_cents":100000000,"closed":false}
+## libro: el asiento persiste, con su efecto en la caja
+asientos 1 [-100000]
+## desembolso: ya no existe en memoria
+{"type":"https://royexa.local/problemas/desembolso-no-encontrado","title":"Desembolso no encontrado","status":404,"detail":"7a598541-cf20-4fce-8e41-cc5350373f19"}
+404
+
+
+7. Clon limpio, 2026-10-31
+   git clone del repositorio; git switch entrega-3-linea-base. Se ejecutó sobre esta
+   rama antes de añadir esta sección y una frase a la sección 6.3 del documento de
+   diseño, que son los únicos cambios posteriores. Sin .venv previo y con un contenedor
+   de PostgreSQL nuevo.
+   Comandos de backend/README.md, en ese orden.
+-------------------------------------------------------------------
+$ uv sync
+$ uv run pytest
+================= 24 passed, 18 deselected, 1 warning in 3.23s =================
+$ uv run pytest tests/vertical
+======================== 20 passed, 1 warning in 0.33s =========================
+$ docker compose up -d --wait postgres
+ Container clean-postgres-1 Healthy
+$ uv run pytest -m postgres
+================= 18 passed, 24 deselected, 1 warning in 0.85s =================
+$ uv run pytest -m ""
+======================== 42 passed, 1 warning in 1.21s =========================
+$ uv run python -m royexa.migrate
+001_ledger.sql
+$ ROYEXA_LEDGER_URL=postgresql://royexa_app:...@localhost:55432/royexa uv run uvicorn royexa.main:app --port 8000
+Pasos de la sección 7.6 con curl:
+approve 200
+{"attempted":1,"sent":1}
+confirm 200
+{"id":"caja-cobrador-1","collector_id":"cobrador-1","opening_balance_cents":100000000,"balance_cents":99900000,"closed":false}

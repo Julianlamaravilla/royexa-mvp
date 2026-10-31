@@ -369,7 +369,7 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 - **Beneficios:** El rechazo lo hace la base de datos, aunque el código falle. La garantía se demuestra con una prueba automatizada que intenta alterar el libro con el rol de la aplicación.
 - **Costos o sacrificios:** Los privilegios deben mantenerse correctos en cada migración. Cada operación de dinero pasa por una llamada más. Un dato derivado mutable (el efectivo esperado de la caja) debe actualizarse en la misma transacción.
 - **Riesgos:** Una migración con una concesión demasiado amplia anula la garantía (`RA-01`). Quien tenga el rol propietario puede alterar el libro (`RA-02`).
-- **Puntos sensibles:** El conjunto de privilegios sobre el libro y sobre el registro de cambios.
+- **Puntos sensibles:** El conjunto de privilegios sobre el libro. La redacción anterior citaba también un registro de cambios que el esquema no tiene (`HV-02`).
 - **Elementos arquitectónicos afectados:** `CON-03`, `CON-04`.
 - **Evidencia disponible:** Ninguna en este repositorio. TRACKEA contiene una migración con el libro y una prueba de aceptación, sin resultado de ejecución registrado; se toman como referencia, no como evidencia.
 - **Evidencia necesaria:** `EV-01`, `EV-02`.
@@ -399,6 +399,8 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 | D1 Evidencia frente a privilegiados | Deseable | No cumple | No cumple | Cumple | Solo 01C. Puede añadirse después sobre 01B. |
 
 #### Decisión provisional
+
+> **Anotación (2026-10-31).** `EV-01` y `EV-02` quedaron `Validada` y `ADR-001` pasó a `Aceptado`, con los límites que declara ese registro (`HV-01`, `HV-03`, `HV-07`).
 
 - **Alternativa seleccionada:** ALT-01B.
 - **Justificación:** Es la única que cumple el criterio obligatorio de rechazo aunque falle el código y que permite demostrarlo con una prueba automatizada, que es la forma de verificación de `EC-01`. TRACKEA, que queda como referencia, tomó la misma decisión (rol de la aplicación sin actualización ni borrado, roles separados y libro con un solo escritor). PostgreSQL local es obligatorio para `EV-01` y `EV-02`: un libro en memoria equivale a ALT-01A.
@@ -726,6 +728,7 @@ Las tres decisiones forman una sola idea: el dinero solo se escribe en un lugar,
 - **Sistema objeto de estudio:** ROYEXA, registro de cobranza en calle con libro mayor inalterable y cierre de caja diario.
 - **Unidad o unidades de ejecución:** la API del servidor (`CON-03`, FastAPI con Uvicorn en local), único proceso de la Entrega 3; y, en la Entrega 4 (provisional), la web mínima renderizada en el servidor (`CON-02`), que corre en local y llama a la API. `CON-01` queda diferido. Todos los módulos del servidor forman parte de `CON-03`.
 - **Almacenamientos:** PostgreSQL 17 local (`CON-04`), con el libro, los préstamos, las cajas y la bandeja de salida de eventos. Es obligatorio para demostrar el libro (`EV-01`, `EV-02`). Los adaptadores en memoria sirven para las pruebas que no dependen de esa garantía. `CON-05` queda diferido.
+- **Almacenamiento en la Entrega 3 (2026-10-31):** solo el libro está en `CON-04`. Desembolsos, préstamos, cajas y bandeja de salida viven en memoria también en ejecución, y se pierden al reiniciar (`HV-07`, `RA-10`).
 - **Fronteras externas:** el notificador simulado (`EXT-05`). `EXT-01` a `EXT-04` quedan diferidos.
 - **Responsabilidades principales:** en el servidor, módulos con dueño único de sus entidades: `identity_access` (mínimo, con usuarios sembrados), `clients`, `loans`, `sales` (dueño del desembolso; conserva el nombre heredado), `ledger`, `cash_box` y `notifications`. Quedan diferidos `tenancy`, `devices`, `consent`, `sync`, `expenses`, `reporting` y `payments`, que vuelve en la Entrega 4 (provisional).
 - **Dirección de las dependencias:** el grafo de módulos es acíclico. Los módulos de dinero dependen de identidad y de clientes; `ledger` depende de `cash_box` para asignar cada asiento a una caja; solo `notifications` lee eventos y ningún módulo de negocio lo llama. Las aplicaciones cliente dependen de la API, nunca de la base de datos.
@@ -816,6 +819,8 @@ No forma parte de la línea base. Se conserva como registro de la Entrega 2.
 
 #### Coherencia entre vistas
 
+La vista de componentes de `CON-03` se añadió al mismo `workspace.dsl` con la clave `c4-componentes` y se explica en [`../03-diseno-vertical/diseno-y-vertical.md`](../03-diseno-vertical/diseno-y-vertical.md), sección 2.
+
 El sistema que el diagrama de Contexto muestra como una unidad se descompone en `CON-02`, `CON-03` y `CON-04`. `CON-01` y `CON-05` siguen en el modelo con la etiqueta `Diferido` y no aparecen en las vistas. El cobrador y el administrador usan la API directamente en la Entrega 3 y `CON-02` en la Entrega 4. `EXT-05` se relaciona con `CON-03`, único contenedor que lo invoca, y entrega al cliente final. No aparecen capas, paquetes ni módulos: los módulos del servidor están dentro de `CON-03` y no son contenedores, porque se ejecutan juntos.
 
 ---
@@ -835,12 +840,14 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 | RA-07 | La operación sin conexión no está en el alcance de la Entrega 1 y la trazabilidad podría no aceptarse. | AD-03, `DIV-02` | Media | Alto | Discutir `DIV-02` con el docente antes de la evaluación. | Cierra con la resolución de `DIV-02`, pendiente de confirmación docente. |
 | RA-08 | En v1 no existe un comprobante independiente hacia el cliente final, así que el control frente al prestatario que la Entrega 1 considera no negociable (`RES-05`) queda sin cubrir. | `ASR-02`, `ASR-05`, `DIV-01` | Alta | Alto | Registrar en `DIV-01`; decidir con el docente si se difiere o se reincorpora. | Cierra con la resolución de `DIV-01`, pendiente de confirmación docente. |
 | RA-09 | Un cobro llega con la hora del teléfono muy distinta de la del servidor y cae en la caja equivocada. | `RN-02`, AD-03 | Media | Medio | Regla de umbral de 24 horas con alerta (pendiente de confirmar con el cliente). | Diferido con `DIV-02`. |
+| RA-10 | El libro y los datos en memoria no comparten una transacción. Una caída entre los dos pasos del `commit`, o un reinicio, deja asientos en `CON-04` sin su desembolso ni su efecto en la caja. | AD-02, ALT-02A, `HV-07` | Media | Alto | Limitarlo a la demostración local, declararlo y llevar desembolsos, cajas y bandeja de salida a `CON-04` en la misma transacción que el libro. | Abierto |
+| RA-11 | La entrega de avisos es de al menos una vez. Un fallo al confirmar tras enviar repite el aviso, y una excepción distinta de `NotifierUnavailable` corta la ejecución del despachador. | AD-02, ALT-02A, `HV-06` | Media | Medio | Tratar cualquier fallo del adaptador como un intento fallido y dar al adaptador real un identificador de mensaje para descartar duplicados. | Abierto |
 
 ### 6.2 Supuestos
 
 | ID | Supuesto | Decisión relacionada | Consecuencia si es falso | Forma de validación | Estado |
 |---|---|---|---|---|---|
-| SUP-01 | PostgreSQL 17 local permite roles separados y retirar privilegios de forma explícita. | AD-01 / ADR-001 | El libro no puede protegerse por privilegios y hay que volver a una alternativa con más control en la aplicación. | `EV-01`, `EV-02` | Abierto |
+| SUP-01 | PostgreSQL 17 local permite roles separados y retirar privilegios de forma explícita. | AD-01 / ADR-001 | El libro no puede protegerse por privilegios y hay que volver a una alternativa con más control en la aplicación. | `EV-01`, `EV-02` | Confirmado por `EV-01` y `EV-02` sobre PostgreSQL 17.11 (`HV-01`). |
 | SUP-02 | Los administradores usan Telegram (aún no confirmado con el cliente). | AD-02 / ADR-002 | Hay que cambiar el canal de reportes; la arquitectura no cambia porque el canal es un adaptador. | `EV-08` | Diferido: el notificador es simulado. |
 | SUP-03 | Un servicio con dos tareas cubre unos 2.000 clientes con los tiempos objetivo (lote de sincronización en 500 ms, cierre de caja en 300 ms, tablero en 1 s). | AD-02 / ADR-002 | Se reconsidera la separación de módulos o el dimensionamiento. | `EV-04` | Diferido: la demostración es local. |
 | SUP-04 | La jornada de un cobrador cabe en menos de 1 minuto de conexión 4G con lotes de hasta 100 operaciones. | AD-03 / ADR-003 | Hay que rediseñar el tamaño de lote o la descarga. | `EV-05` | Diferido con `DIV-02`. |
@@ -862,7 +869,7 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 | ID | Pregunta que debe responder | Actividad de validación | Resultado esperado | Momento previsto |
 |---|---|---|---|---|
 | EV-01 | ¿El rol de la aplicación puede alterar el libro? | Ejecutar la prueba de aceptación que intenta `UPDATE`, `DELETE` y `TRUNCATE` sobre un asiento con el rol de la aplicación y consulta después la fila. | El 100 % de los intentos falla con error de permiso y la fila queda intacta. | Entrega 3 |
-| EV-02 | ¿Tras aplicar todas las migraciones el rol de la aplicación carece de esos privilegios? | Consultar el catálogo de privilegios de la base de datos y afirmar la ausencia de modificar, borrar y vaciar sobre el libro y el registro de cambios. | Ausencia de los tres privilegios, comprobada en cada ejecución del comando local de pruebas. | Entrega 3 |
+| EV-02 | ¿Tras aplicar todas las migraciones el rol de la aplicación carece de esos privilegios? | Consultar el catálogo de privilegios de la base de datos y afirmar la ausencia de modificar, borrar y vaciar sobre el libro, y que el rol de la aplicación y `PUBLIC` no tienen concesiones sobre otra tabla. | Ausencia de los tres privilegios, comprobada en cada ejecución de `uv run pytest -m postgres`. | Entrega 3 |
 | EV-03 | ¿Un fallo del notificador invalida el dinero o pasa inadvertido? | Sustituir el notificador simulado por un adaptador que falla al notificar el código de un desembolso e invocar el despachador. | El desembolso y el dinero se conservan; cada invocación cuenta un intento y tras 5 el envío queda fallido y consultable por el administrador. | Entrega 3 |
 | EV-04 | ¿Se cumplen los tiempos objetivo con dos tareas? | Medir el percentil 95 del lote de sincronización, del cierre de caja y del tablero contra el entorno de pruebas con unos 1,5 millones de asientos. | 500 ms, 300 ms y 1 s respectivamente. | Reprogramada, sin destino en el curso |
 | EV-05 | ¿Un reintento duplica el cobro? | Enviar el mismo identificador desde el mismo dispositivo y desde otro, un lote de 101 y una falla a mitad de la transacción. | Un solo pago y un solo asiento; el reintento devuelve el resultado original. | Reprogramada, sin destino en el curso |
@@ -879,6 +886,7 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 - `EV-10` y `CA-11` tratan de pagos, fuera del recorrido de desembolso, y pasan a la Entrega 4 (provisional).
 - `CA-12` sí entra, porque cubre el fallo al notificar un código de confirmación.
 - `CA-07` se redacta sobre un pago, pero sus campos se exigen al asiento del desembolso y deben aparecer en la traza.
+- El resultado de cada evidencia está en [`../03-diseno-vertical/diseno-y-vertical.md`](../03-diseno-vertical/diseno-y-vertical.md), sección 8. Esta tabla conserva lo que se pidió comprobar.
 
 ---
 
@@ -893,8 +901,10 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 | 2026-10-30 | Comparación de `AD-06` en la sección 3.4; se selecciona `ALT-06B` | La trazabilidad de la Entrega 2 la había diferido a la Entrega 3 | `arquitectura.md`, `trazabilidad-arquitectonica.md` | Julian Andres Restrepo |
 | 2026-10-30 | Columna «Resolución» y `DIV-08` en 7.1; estado de `RA`, `SUP` y puntos sensibles; `EV-12` y `EXT-05` nuevos; evidencias reprogramadas | Registrar la línea base sin borrar identificadores | `arquitectura.md`, `realineacion-entrega-1.md` | Julian Andres Restrepo |
 | 2026-10-30 | Se corrigió la afirmación «La Entrega 1 no se modificó» | El commit `5077046` editó los integrantes en `propuesta.md` y `requisitos.md` | `arquitectura.md` | Julian Andres Restrepo |
+| 2026-10-31 | `EV-02` deja de citar el registro de cambios, que no existe en el esquema, y nombra el comando que la ejecuta | El recorrido vertical no lo implementa y la evidencia no podía comprobarse como estaba escrita (`HV-02`) | `arquitectura.md`, `adr/ADR-001` | Julian Andres Restrepo |
+| 2026-10-31 | `ADR-001` pasa a `Aceptado`; `ADR-002` y `ADR-004` se ajustan y siguen `Propuesto`; `SUP-01` confirmado; `RA-10` y `RA-11` nuevos; vista `c4-componentes` añadida al DSL | Resultado de la Entrega 3 (`HV-01` a `HV-09`) | `arquitectura.md`, `adr/ADR-001`, `adr/ADR-002`, `adr/ADR-004`, `diagramas/workspace.dsl`, `realineacion-entrega-1.md` | Julian Andres Restrepo |
 
-**Pendiente antes de entregar:** validar `workspace.dsl` con Structurizr y sustituir los SVG por su exportación oficial; los SVG actuales todavía muestran el modelo de la Entrega 2. El archivo [`adr/ADR-00X-titulo-de-la-decision.md`](adr/ADR-00X-titulo-de-la-decision.md) es la plantilla y se conserva sin cambios.
+**Pendiente antes de entregar:** validar `workspace.dsl` con Structurizr, que tampoco ha procesado la vista `c4-componentes`, y sustituir los SVG por su exportación oficial; los SVG actuales todavía muestran el modelo de la Entrega 2. El archivo [`adr/ADR-00X-titulo-de-la-decision.md`](adr/ADR-00X-titulo-de-la-decision.md) es la plantilla y se conserva sin cambios.
 
 ### 7.1 Divergencias entre la Entrega 1 y TRACKEA
 

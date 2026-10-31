@@ -18,7 +18,7 @@ Un desembolso o un pago, su asiento y el efecto sobre la caja deben confirmarse 
 - **Escenarios de calidad:** EC-01, EC-04
 - **ASR:** ASR-01, ASR-02, ASR-05
 - **Restricciones:** RES-02, RES-03, RES-05, RES-06
-- **Riesgos:** RA-03, RA-04
+- **Riesgos:** RA-03, RA-04, RA-10, RA-11
 - **Supuestos:** Ninguno vigente. SUP-02 y SUP-03 quedan diferidos.
 
 ## 2. Asunto de decisión
@@ -77,7 +77,12 @@ Un desembolso o un pago, su asiento y el efecto sobre la caja deben confirmarse 
 
 Se selecciona **ALT-02A** porque es la única que cumple a la vez la atomicidad del dinero y la independencia del aviso respecto del dinero, con la capacidad de un equipo mínimo y costo cero (RES-06). TRACKEA queda como referencia.
 
-La decisión se considera provisional hasta obtener la evidencia indicada en este registro.
+La decisión se considera provisional hasta obtener la evidencia indicada en este registro. Sigue `Propuesto` hasta EV-08, prevista para la Entrega 4.
+
+**Estado de la implementación (2026-10-31).** El código de la Entrega 3 no cumple todavía dos enunciados de esta decisión, y se declara aquí en lugar de ocultarlo (HV-07):
+
+- La bandeja de salida es un adaptador en memoria también en ejecución, no solo en las pruebas. Solo el libro está en PostgreSQL.
+- El criterio de «una sola transacción» se cumple por coordinación. `InMemoryUnitOfWork.commit` comprueba las escrituras obsoletas, confirma la sesión de PostgreSQL y después publica la memoria, todo bajo un mismo candado. Esa secuencia no es una transacción atómica: si el proceso cae entre los dos pasos, el asiento queda sin su efecto en memoria (RA-10).
 
 ## 6. Consecuencias
 
@@ -98,6 +103,8 @@ La decisión se considera provisional hasta obtener la evidencia indicada en est
 
 - RA-03: un evento perdido deja al cliente final sin código o comprobante.
 - RA-04: las fronteras entre módulos se erosionan.
+- RA-10: el libro y los datos en memoria no comparten una transacción.
+- RA-11: la entrega de avisos es de al menos una vez. Un aviso puede repetirse, y una excepción distinta de `NotifierUnavailable` corta la ejecución del despachador.
 
 ## 7. Elementos arquitectónicos afectados
 
@@ -119,6 +126,16 @@ La decisión se considera provisional hasta obtener la evidencia indicada en est
 
 EV-11 pertenece a AD-06, que no tiene ADR propio y se decide en `arquitectura.md`, sección 3.4. Se registra aquí porque este ADR incluye RN-06 en su trazabilidad y la regla se ejecuta dentro del monolito modular.
 
+**Resultado (2026-10-31).** Detalle en `docs/03-diseno-vertical/diseno-y-vertical.md`, sección 8.
+
+| Evidencia | Estado | Resultado | Hallazgo |
+|---|---|---|---|
+| EV-03 | Parcialmente validada | El dinero se conserva, cada invocación cuenta un intento y el estado es consultable. Los 5 fallos hasta `FALLIDO` se observaron sobre el comprobante, no sobre el código que pide la evidencia, y el fallo se simula con una opción del mismo adaptador. | HV-05, HV-06 |
+| EV-04 | Reprogramada | Sin destino en el curso. | No aplica |
+| EV-08 | Prevista para la Entrega 4 | Sin resultado todavía. | No aplica |
+| EV-09 | Validada | Grafo de módulos sin ciclos y ningún módulo de negocio importa `notifications` ni el marco web (PR-08). | HV-09 |
+| EV-11 | Validada | Autoaprobaciones del administrador y del cobrador rechazadas con 403, sin aviso de código y con la identidad registrada (PR-02). | HV-09 |
+
 ## 9. Condiciones de revisión
 
 Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
@@ -126,6 +143,7 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 - EV-09 detecta ciclos que no pueden eliminarse, o el despachador invocable no basta para demostrar EV-03.
 - Se retoma el escenario de dos tareas y volumen; solo entonces EV-04 y SUP-03 vuelven a condicionar esta decisión.
 - El recorrido vertical revela un costo o acoplamiento no previsto entre módulos.
+- La persistencia en PostgreSQL de desembolsos, cajas y bandeja de salida no logra una sola transacción con el libro (HV-07).
 - Aparece una alternativa viable con consecuencias significativamente mejores.
 
 ## 10. Decisiones relacionadas
@@ -139,3 +157,4 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 |---|---|---|---|
 | 2026-09-20 | Propuesto | Creación inicial | Sincronización con el estado de TRACKEA |
 | 2026-10-30 | Propuesto | Costo cero; cola detrás de un puerto con bandeja de salida y despachador invocable; avisos al cliente final por EXT-05; consentimiento diferido; EV-04 reprogramada; EV-09 y EV-11 añadidas; EV-03 sobre el desembolso | Realineación con la Entrega 1 (`realineacion-entrega-1.md`) |
+| 2026-10-31 | Propuesto | Resultado de EV-03, EV-09 y EV-11; estado real de la bandeja de salida y de la transacción; RA-10 y RA-11; nueva condición de revisión. Sin cambio de estado: EV-08 sigue pendiente | HV-05, HV-06, HV-07, HV-09 |

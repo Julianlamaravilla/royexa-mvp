@@ -90,13 +90,16 @@ Este cambio de criterios decide el resultado, por lo que se declara de forma exp
 
 Se selecciona **ALT-03A** porque cumple el criterio obligatorio con una complejidad asumible y costo cero, dentro del alcance comprometido en la Entrega 1. ALT-03B queda diferida porque depende de una aplicación móvil fuera de la línea base.
 
-La idempotencia se construye con dos mecanismos y un contrato de respuesta:
+La idempotencia se construye con tres mecanismos y un contrato de respuesta:
 
 | Mecanismo | Qué aporta |
 |---|---|
 | Máquina de estados del desembolso | Solo un desembolso `Aprobado` puede pasar a `Confirmado` o `Caducado`. Un desembolso en estado final no vuelve a transitar. |
 | Restricción de unicidad sobre el asiento, por desembolso y tipo | Si dos confirmaciones compiten, la base de datos rechaza el segundo asiento y su transacción se revierte. |
+| Relectura del perdedor (añadido el 2026-10-31, HV-04) | `ConfirmDisbursement.execute` captura `WriteConflict` y repite `_attempt` una sola vez. Esa repetición lee lo ya confirmado y recibe `ALREADY_CONFIRMED`, así que quien pierde la carrera no recibe un error. Si la repetición también pierde, responde 409 `conflicto-de-escritura`. |
 | Resultado original en el reintento | La repetición responde con el resultado de la primera confirmación, sin asiento nuevo, sin descuento de caja y sin nueva notificación. |
+
+RN-05 se vuelve a comprobar al asentar, no solo al solicitar: dos solicitudes abiertas del mismo cliente pueden estar aprobadas a la vez, y la segunda en confirmarse recibe `PriorLoanNotSettled` sin mover dinero (HV-04).
 
 ADR-003 pasa a `Reemplazado por ADR-004` solo cuando el docente confirme la resolución de DIV-02. Hasta entonces ambos registros siguen en `Propuesto` y la línea base de trabajo se apoya en este.
 
@@ -115,11 +118,13 @@ La decisión se considera provisional hasta obtener la evidencia indicada en est
 - El registro depende de la conexión. Si el producto llegara a operar en una ruta real, el hueco del papel volvería a estar abierto.
 - La preocupación de INT-01 por demostrar lo cobrado sin señal queda sin respuesta en el curso.
 - La idempotencia cubre la confirmación del desembolso. Los pagos de la Entrega 4 no tienen un código que sirva de barrera y necesitarán su propia clave.
+- La repetición es una sola. Dos conflictos seguidos llegan al cliente como 409 y este debe reintentar.
 
 ### Riesgos residuales
 
 - RA-07: cierra cuando el docente confirme la resolución de DIV-02. Pendiente.
 - Una migración podría retirar la restricción de unicidad. Se registra como punto sensible en `arquitectura.md`, sección 6.3.
+- RA-10: la unicidad vive en PostgreSQL, pero la máquina de estados del desembolso vive en memoria. Tras un reinicio el desembolso desaparece y solo queda el asiento (HV-07).
 
 ## 7. Elementos arquitectónicos afectados
 
@@ -127,13 +132,15 @@ La decisión se considera provisional hasta obtener la evidencia indicada en est
 - **Contenedores:** CON-02 (Entrega 4), CON-03, CON-04
 - **Sistemas externos:** EXT-05, que no recibe un segundo envío en el reintento
 - **Relaciones C4:** «API del servidor → Base de datos» (inserta el asiento una sola vez por desembolso y tipo)
-- **Artefactos adicionales:** módulos `sales` y `ledger`, y la migración que define la restricción de unicidad, que se producen en la Entrega 3
+- **Artefactos adicionales:** `backend/src/royexa/sales/`, `backend/src/royexa/ledger/` y `backend/migrations/001_ledger.sql`, que define la restricción de unicidad `ledger_entry_one_per_disbursement_and_type`
 
 ## 8. Evidencia y validación
 
 | Evidencia | Actividad | Resultado esperado | Momento previsto |
 |---|---|---|---|
 | EV-12 | Repetir por HTTP la confirmación de un desembolso ya confirmado y lanzar dos confirmaciones concurrentes del mismo código. | Un solo asiento y un solo descuento de caja; todas las respuestas devuelven el resultado original. | Entrega 3 |
+
+**Resultado (2026-10-31).** EV-12 quedó `Validada`: un solo asiento, un solo descuento y un solo comprobante, con adaptadores en memoria (PR-05) y sobre la restricción real de PostgreSQL (PR-07). Detalle en `docs/03-diseno-vertical/diseno-y-vertical.md`, sección 8. El registro sigue `Propuesto`: su estado depende de la confirmación docente de DIV-02, no de esta evidencia.
 
 ## 9. Condiciones de revisión
 
@@ -155,3 +162,4 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 | Fecha | Estado | Cambio | Motivo |
 |---|---|---|---|
 | 2026-10-30 | Propuesto | Creación inicial | Realineación con la Entrega 1 sobre una demostración local de costo cero |
+| 2026-10-31 | Propuesto | Se añade la relectura del perdedor: repite `_attempt` una vez y devuelve el resultado confirmado. RN-05 se repite al asentar. Resultado de EV-12 y RA-10. Sin cambio de estado: falta la confirmación docente | HV-04, HV-07 |
