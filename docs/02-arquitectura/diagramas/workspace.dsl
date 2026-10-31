@@ -66,6 +66,118 @@ workspace "ROYEXA" "Arquitectura candidata realineada con la Entrega 1" {
                     "Identificador" "CON-03"
                     "Decisiones" "AD-01, AD-02, AD-03, AD-06, ADR-001, ADR-002, ADR-004"
                 }
+
+                // =====================================================
+                // 2.2 COMPONENTES DE CON-03 (Entrega 3)
+                // =====================================================
+                // Solo se descompone CON-03, el contenedor del recorrido.
+                // Cada componente agrupa un módulo real de backend/src/royexa.
+                // shared/ es un núcleo compartido sin dependencias hacia los
+                // módulos: no se modela como componente.
+
+                entradaHttp = component "Entrada HTTP" "Traduce HTTP a casos de uso, resuelve el actor, exige el rol de administrador donde corresponde y convierte los errores de dominio en detalles de problema." "FastAPI, api.py" {
+                    properties {
+                        "Identificador" "CMP-01"
+                        "Contratos" "CTR-01"
+                        "Origen" "RF-03, RF-04, RF-06, AD-06"
+                    }
+                }
+
+                casosUso = component "Casos de uso de desembolso" "Coordina solicitar, aprobar, rechazar, confirmar y conceder la excepción. No decide reglas: abre la unidad de trabajo y aplica lo que deciden los agregados." "Python, sales/application.py" {
+                    properties {
+                        "Identificador" "CMP-02"
+                        "Contratos" "CTR-02, CTR-04, CTR-11"
+                        "Origen" "RF-03, RF-05, ADR-004"
+                    }
+                }
+
+                dominioDesembolso = component "Dominio del desembolso" "Agregado Disbursement y código de confirmación: estados, autoaprobación prohibida, caducidad e idempotencia de la confirmación." "Python, sales/domain.py" {
+                    properties {
+                        "Identificador" "CMP-03"
+                        "Origen" "RF-03, RN-03, RN-06, EC-02, ADR-004"
+                    }
+                }
+
+                prestamos = component "Préstamos" "Condiciones, calendario de cuotas de lunes a sábado, regla de renovación y excepción de un solo uso." "Python, loans/" {
+                    properties {
+                        "Identificador" "CMP-04"
+                        "Contratos" "CTR-06"
+                        "Origen" "RF-05, RN-05, CA-09, CA-10"
+                    }
+                }
+
+                libro = component "Libro de movimientos" "Único escritor del libro: crea cada asiento y lo enlaza con su efecto sobre la caja." "Python, ledger/" {
+                    properties {
+                        "Identificador" "CMP-05"
+                        "Contratos" "CTR-05"
+                        "Origen" "RF-04, RN-04, CA-07, INV-02, ADR-001"
+                    }
+                }
+
+                caja = component "Caja" "Saldo de la caja del cobrador. Solo admite movimientos mientras está abierta." "Python, cash_box/" {
+                    properties {
+                        "Identificador" "CMP-06"
+                        "Contratos" "CTR-07"
+                        "Origen" "RN-02, RN-03"
+                    }
+                }
+
+                identidadCatalogos = component "Identidad y catálogos" "Usuarios, roles, rutas y clientes sembrados, sin gestión de cuentas." "Python, identity_access/ y clients/" {
+                    properties {
+                        "Identificador" "CMP-07"
+                        "Origen" "RES-04, AD-06, ALT-06B"
+                    }
+                }
+
+                avisos = component "Avisos" "Único lector de la bandeja de salida: despacha cada aviso pendiente, cuenta intentos y expone el estado al administrador." "Python, notifications/" {
+                    properties {
+                        "Identificador" "CMP-08"
+                        "Contratos" "CTR-03, CTR-09, CTR-10, CTR-11"
+                        "Origen" "RF-06, CA-12, EC-04, ASR-05, ADR-002"
+                    }
+                }
+
+                persistenciaMemoria = component "Persistencia en memoria" "Implementa la unidad de trabajo con transacciones por copia: desembolsos, préstamos, cajas y bandeja de salida viven aquí durante la Entrega 3." "Python, adapters/memory.py" {
+                    tags "Adaptador"
+                    properties {
+                        "Identificador" "CMP-09"
+                        "Contratos" "CTR-04, CTR-05, CTR-06, CTR-07, CTR-08, CTR-09, CTR-12"
+                        "Origen" "ADR-002, ADR-004"
+                    }
+                }
+
+                adaptadorPostgres = component "Adaptador PostgreSQL del libro" "Implementa el puerto del libro sobre PostgreSQL con el rol de la aplicación, una transacción por unidad de trabajo." "psycopg, adapters/postgres_ledger.py" {
+                    tags "Adaptador"
+                    properties {
+                        "Identificador" "CMP-10"
+                        "Contratos" "CTR-05, CTR-12"
+                        "Origen" "ADR-001, ADR-004, EV-01, EV-02, EV-12"
+                    }
+                }
+
+                adaptadorNotificador = component "Adaptador del notificador" "Implementa el puerto del notificador. Reproduce el fallo del canal cuando se configura." "Python, adapters/simulated_notifier.py" {
+                    tags "Adaptador"
+                    properties {
+                        "Identificador" "CMP-11"
+                        "Contratos" "CTR-10"
+                        "Origen" "RES-03, RES-05, ADR-002, EC-04"
+                    }
+                }
+
+                composicion = component "Composición" "Elige qué adaptador llena cada puerto a partir de la configuración y siembra los datos de la demostración." "Python, bootstrap.py, main.py, seed.py" {
+                    properties {
+                        "Identificador" "CMP-12"
+                        "Origen" "RES-02, ADR-001"
+                    }
+                }
+
+                migrador = component "Migrador" "Aplica el esquema del libro y sus privilegios con el rol propietario. No participa en las peticiones." "psycopg, migrate.py" {
+                    tags "Soporte"
+                    properties {
+                        "Identificador" "CMP-13"
+                        "Origen" "ADR-001, RA-01"
+                    }
+                }
             }
 
             baseDatos = container "Base de datos" "Conserva el libro mayor de solo inserción, préstamos, cajas y la bandeja de salida de eventos." "PostgreSQL 17 local" {
@@ -157,6 +269,51 @@ workspace "ROYEXA" "Arquitectura candidata realineada con la Entrega 1" {
         sistema.api -> fcm "Envía avisos push" "HTTPS"
         sistema.api -> telegram "Envía reportes y alertas" "HTTPS"
         sistema.api -> sentry "Envía errores sin datos personales" "HTTPS"
+
+        // -------------------------------------------------------------
+        // Relaciones entre componentes de CON-03 (Entrega 3)
+        // -------------------------------------------------------------
+        // Se declaran después de las relaciones entre contenedores: así las
+        // relaciones implícitas no duplican las que ya existen. Las flechas
+        // hacia un adaptador son de ejecución y atraviesan el puerto indicado.
+        // La dependencia de código va al revés: el adaptador importa el puerto.
+
+        cobrador -> sistema.api.entradaHttp "Solicita y confirma desembolsos" "HTTP/JSON local, CTR-01"
+        administrador -> sistema.api.entradaHttp "Aprueba, rechaza, concede excepciones, despacha avisos y consulta el libro" "HTTP/JSON local, CTR-01"
+
+        sistema.api.entradaHttp -> sistema.api.casosUso "Invoca casos de uso y consultas" "CTR-02"
+        sistema.api.entradaHttp -> sistema.api.avisos "Invoca el despachador y lee el estado de los avisos" "CTR-03"
+        sistema.api.entradaHttp -> sistema.api.identidadCatalogos "Resuelve el actor de la cabecera X-Actor-Id" "Llamada directa"
+
+        sistema.api.casosUso -> sistema.api.dominioDesembolso "Delega transiciones, RN-03 y RN-06" "Llamada directa"
+        sistema.api.casosUso -> sistema.api.prestamos "Aplica RN-05 y origina el préstamo" "Llamada directa"
+        sistema.api.casosUso -> sistema.api.libro "Pide el asiento del desembolso o del intento caducado" "Llamada directa"
+        sistema.api.casosUso -> sistema.api.identidadCatalogos "Resuelve cliente, ruta y cobrador" "Llamada directa"
+        sistema.api.casosUso -> sistema.api.persistenciaMemoria "Abre la unidad de trabajo, guarda estados y encola avisos" "CTR-04, CTR-06, CTR-08"
+
+        sistema.api.dominioDesembolso -> sistema.api.prestamos "Usa las condiciones del préstamo" "Llamada directa"
+        sistema.api.dominioDesembolso -> sistema.api.identidadCatalogos "Recibe cliente, ruta y actor" "Llamada directa"
+        sistema.api.prestamos -> sistema.api.identidadCatalogos "Comprueba el rol de quien concede la excepción" "Llamada directa"
+
+        sistema.api.libro -> sistema.api.caja "Descuenta la caja al asentar" "Llamada directa"
+        sistema.api.libro -> sistema.api.persistenciaMemoria "Localiza y guarda la caja; inserta asientos si no hay PostgreSQL configurado" "CTR-05, CTR-07"
+        sistema.api.libro -> sistema.api.adaptadorPostgres "Inserta asientos cuando PostgreSQL está configurado" "CTR-05"
+
+        sistema.api.avisos -> sistema.api.persistenciaMemoria "Lee y actualiza la bandeja de salida" "CTR-08, CTR-09"
+        sistema.api.avisos -> sistema.api.adaptadorNotificador "Envía cada aviso pendiente" "CTR-10"
+
+        sistema.api.persistenciaMemoria -> sistema.api.adaptadorPostgres "Confirma o revierte la sesión del libro con la unidad de trabajo" "CTR-12"
+
+        sistema.api.composicion -> sistema.api.entradaHttp "Crea la aplicación y le entrega el contenedor" "Llamada directa"
+        sistema.api.composicion -> sistema.api.casosUso "Inyecta el contexto de los casos de uso" "Llamada directa"
+        sistema.api.composicion -> sistema.api.avisos "Inyecta unidad de trabajo, notificador y reloj" "Llamada directa"
+        sistema.api.composicion -> sistema.api.persistenciaMemoria "Crea el almacén sembrado y la unidad de trabajo" "Llamada directa"
+        sistema.api.composicion -> sistema.api.adaptadorPostgres "Crea la sesión del libro si existe ROYEXA_LEDGER_URL" "Llamada directa"
+        sistema.api.composicion -> sistema.api.adaptadorNotificador "Crea el notificador simulado" "Llamada directa"
+
+        sistema.api.adaptadorPostgres -> sistema.baseDatos "Inserta y lee asientos con el rol royexa_app" "SQL local"
+        sistema.api.migrador -> sistema.baseDatos "Aplica migraciones con el rol royexa_migrator" "SQL local"
+        sistema.api.adaptadorNotificador -> notificador "Registra el código de confirmación y el comprobante" "Llamada local a través de un puerto"
     }
 
     views {
@@ -180,6 +337,17 @@ workspace "ROYEXA" "Arquitectura candidata realineada con la Entrega 1" {
             include clienteFinal
             exclude "element.tag==Diferido"
             autoLayout tb
+        }
+
+        // =============================================================
+        // C4 NIVEL 3: COMPONENTES DE CON-03 (Entrega 3)
+        // =============================================================
+
+        component sistema.api "c4-componentes" "Componentes de CON-03 que participan en el recorrido de desembolso, UC-01 a UC-05." {
+            include *
+            include clienteFinal
+            exclude "element.tag==Diferido"
+            autoLayout lr
         }
 
         styles {
@@ -206,6 +374,20 @@ workspace "ROYEXA" "Arquitectura candidata realineada con la Entrega 1" {
 
             element "Database" {
                 shape Cylinder
+            }
+
+            element "Component" {
+                background #85bbf0
+                color #000000
+            }
+
+            element "Adaptador" {
+                background #b8d4f0
+                color #000000
+            }
+
+            element "Soporte" {
+                border dashed
             }
         }
     }
