@@ -212,4 +212,6 @@ Corte del 2026-10-31. Los resultados, hallazgos y limitaciones completos están 
 | `ADR-003` | `Propuesto`, sin cambios | Depende de la confirmación docente de `DIV-02`. |
 | `ADR-004` | `Propuesto` | Depende de la misma confirmación. Se ajustó con `HV-04` y `HV-07`. |
 
-**Lo que este resultado no cierra.** Ninguna confirmación de la sección 8 se obtuvo durante la Entrega 3. `workspace.dsl`, incluida la vista `c4-componentes`, sigue sin validarse con Structurizr. `c4-componentes.svg`, `secuencia-vertical.svg` y `secuencia-alternativa.svg` siguen sin exportarse, y `c4-contexto.svg` y `c4-contenedores.svg` todavía muestran el modelo de la Entrega 2.
+**Lo que este resultado no cierra.** Las confirmaciones de la sección 8 que siguen como `Pendiente` no se obtuvieron durante la Entrega 3.
+
+**Lo que sí se cerró en los diagramas.** `workspace.dsl`, incluida la vista `c4-componentes`, se validó con Structurizr, lo que comprueba su sintaxis y sus referencias, no que el modelo sea correcto. Los cinco SVG de C4 y de secuencia se exportaron desde sus fuentes y reflejan la línea base realineada (`docs/03-diseno-vertical/diseno-y-vertical.md`, sección 7.7).

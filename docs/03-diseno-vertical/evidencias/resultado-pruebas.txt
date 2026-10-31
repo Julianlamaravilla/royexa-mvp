@@ -181,3 +181,28 @@ approve 200
 {"attempted":1,"sent":1}
 confirm 200
 {"id":"caja-cobrador-1","collector_id":"cobrador-1","opening_balance_cents":100000000,"balance_cents":99900000,"closed":false}
+
+
+8. Exportación de los diagramas, 2026-10-31
+   Resultado de docs/03-diseno-vertical/diagramas/exportar-diagramas.sh, ejecutado desde
+   la raíz del repositorio con Docker en ejecución. A diferencia de las secciones
+   anteriores, esto es un resumen de lo observado y no la salida literal del script.
+   Commit de los diagramas: d5e9c21.
+-------------------------------------------------------------------
+$ docs/03-diseno-vertical/diagramas/exportar-diagramas.sh
+Imágenes:   structurizr/cli:2024.03.03, plantuml/plantuml:1.2024.8
+Resultado:  código de salida 0
+Validación: structurizr validate con código de salida 0 sobre workspace.dsl, incluida
+            la vista c4-componentes
+Exportados: structurizr-c4-contexto.puml, structurizr-c4-contenedores.puml,
+            structurizr-c4-componentes.puml
+Generados por PlantUML, con esos tres archivos y las dos secuencias, en bytes:
+  c4-contexto.svg            52218
+  c4-contenedores.svg        82403
+  c4-componentes.svg        206851
+  secuencia-vertical.svg     53169
+  secuencia-alternativa.svg  39290
+Ningún SVG contiene texto de error de sintaxis. Se inspeccionaron a la vista y son legibles.
+
+Alcance: la validación comprueba la sintaxis y las referencias de workspace.dsl. No
+demuestra que el modelo sea correcto.

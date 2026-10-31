@@ -88,5 +88,5 @@ Esta matriz extiende la trazabilidad de las Entregas 1 y 2 hasta componentes, co
 - [x] Todos los `CMP`, `CTR`, `UC`, `PR` y `HV` están definidos en la Entrega 3.
 - [x] Cada prueba declarada existe en el repositorio.
 - [x] Cada ruta de código existe en el commit entregado.
-- [x] Los diagramas de secuencia coinciden con los componentes y contratos. Se compararon por lectura con el código; todavía no se han procesado con PlantUML.
+- [x] Los diagramas de secuencia coinciden con los componentes y contratos. Se compararon por lectura con el código; PlantUML los procesó sin errores (`evidencias/resultado-pruebas.txt`, sección 8).
 - [x] Los hallazgos que afectan decisiones están reflejados en los ADR.

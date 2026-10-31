@@ -791,7 +791,7 @@ No forma parte de la línea base. Se conserva como registro de la Entrega 2.
 ### 5.1 Fuente del modelo
 
 - **Archivo Structurizr DSL:** [`diagramas/workspace.dsl`](diagramas/workspace.dsl)
-- **Exportaciones:** [`diagramas/c4-contexto.svg`](diagramas/c4-contexto.svg) y [`diagramas/c4-contenedores.svg`](diagramas/c4-contenedores.svg). **Pendientes de reexportar:** se dibujaron a mano a partir del DSL de la Entrega 2 y todavía muestran ese modelo. Deben generarse desde el `workspace.dsl` realineado. Ver la nota en 7.
+- **Exportaciones:** [`diagramas/c4-contexto.svg`](diagramas/c4-contexto.svg) y [`diagramas/c4-contenedores.svg`](diagramas/c4-contenedores.svg). Desde el 2026-10-31 son la exportación oficial del `workspace.dsl` realineado y sustituyen a los SVG de la Entrega 2, dibujados a mano. El comando está en [`../03-diseno-vertical/diseno-y-vertical.md`](../03-diseno-vertical/diseno-y-vertical.md), sección 7.7.
 
 ### 5.2 C4 de Contexto, nivel 1
 
@@ -816,7 +816,7 @@ No forma parte de la línea base. Se conserva como registro de la Entrega 2.
 | CON-01 | Aplicación móvil del cobrador (diferido, `DIV-02`) | Registrar cobros, no pagos y gastos sin señal en una cola local cifrada y sincronizar al volver la señal. | Candidata de la Entrega 2: React Native, TypeScript, SQLCipher; Android 10 o superior | ADR-003 |
 | CON-02 | Aplicación web mínima | Permitir al cobrador y al administrador operar desembolsos, pagos y cierre de caja. No existe en la Entrega 3; se construye en la Entrega 4 (provisional). | Plantillas renderizadas en el servidor, en local | AD-02, AD-03, ADR-002, ADR-004 |
 | CON-03 | API del servidor | Validar las reglas de negocio, calcular el dinero en centavos, escribir el libro mayor y registrar eventos para avisos. | Python 3.14, FastAPI, Uvicorn local | AD-01, AD-02, AD-03, AD-06, ADR-001, ADR-002, ADR-004 |
-| CON-04 | Base de datos | Conservar el libro de solo inserción, préstamos, cajas y la bandeja de salida de eventos. | PostgreSQL 17 local; adaptadores en memoria para las pruebas | AD-01, AD-02, AD-03, ADR-001, ADR-002, ADR-004 |
+| CON-04 | Base de datos | Conservar el libro de solo inserción. La línea base prevé también préstamos, cajas y la bandeja de salida de eventos, que en la Entrega 3 siguen en memoria (`HV-07`). | PostgreSQL 17 local; adaptadores en memoria para las pruebas y, en la Entrega 3, para los datos que no son el libro | AD-01, AD-02, AD-03, ADR-001, ADR-002, ADR-004 |
 | CON-05 | Almacén de fotos (diferido) | Guardar fotos de documento, residencia, comercio y comprobantes de gasto, con verificación de hash. | Candidata de la Entrega 2: Amazon S3 | Sin decisión |
 
 #### Coherencia entre vistas
@@ -907,8 +907,9 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 | 2026-10-31 | `ADR-001` pasa a `Aceptado`; `ADR-002` y `ADR-004` se ajustan y siguen `Propuesto`; `SUP-01` confirmado; `RA-10` y `RA-11` nuevos; vista `c4-componentes` añadida al DSL | Resultado de la Entrega 3 (`HV-01` a `HV-09`) | `arquitectura.md`, `adr/ADR-001`, `adr/ADR-002`, `adr/ADR-004`, `diagramas/workspace.dsl`, `realineacion-entrega-1.md` | Julian Andres Restrepo |
 | 2026-10-31 | `EV-03` pasa a `Validada`; la cobertura de ASR y las columnas de evidencia de la trazabilidad muestran el resultado de la Entrega 3 | Se añadió la prueba que faltaba (`HV-05`) y la matriz seguía indicando evidencia pendiente | `arquitectura.md`, `trazabilidad-arquitectonica.md`, `realineacion-entrega-1.md`, `adr/ADR-002` | Julian Andres Restrepo |
 | 2026-10-31 | `DIV-08` queda resuelta: el docente autorizó el trabajo individual | Confirmación del autor; el repositorio no guarda la constancia de esa autorización | `arquitectura.md`, `realineacion-entrega-1.md`, `docs/03-diseno-vertical/diseno-y-vertical.md` | Julian Andres Restrepo |
+| 2026-10-31 | `workspace.dsl` se valida con Structurizr, incluida la vista `c4-componentes`, y los SVG de C4 pasan a ser su exportación oficial; `CON-04` y su relación con `CON-03` se alinean con `HV-07` | Los SVG dibujados a mano mostraban el modelo de la Entrega 2. La validación comprueba sintaxis y referencias, no que el modelo sea correcto | `diagramas/workspace.dsl`, `diagramas/c4-contexto.svg`, `diagramas/c4-contenedores.svg`, `arquitectura.md`, `docs/03-diseno-vertical/diseno-y-vertical.md` | Julian Andres Restrepo |
 
-**Pendiente antes de entregar:** validar `workspace.dsl` con Structurizr, que tampoco ha procesado la vista `c4-componentes`, y sustituir los SVG por su exportación oficial; los SVG actuales todavía muestran el modelo de la Entrega 2. El archivo [`adr/ADR-00X-titulo-de-la-decision.md`](adr/ADR-00X-titulo-de-la-decision.md) es la plantilla y se conserva sin cambios.
+El archivo [`adr/ADR-00X-titulo-de-la-decision.md`](adr/ADR-00X-titulo-de-la-decision.md) es la plantilla y se conserva sin cambios.
 
 ### 7.1 Divergencias entre la Entrega 1 y TRACKEA
 
