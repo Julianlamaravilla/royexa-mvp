@@ -1,0 +1,83 @@
+@startuml
+title UC-03 y UC-02 — Desembolso de un préstamo — Escenarios alternativos y de error
+
+actor "INT-01: Cobrador" as Cobrador
+actor "INT-02: Administrador\nque originó la solicitud" as Admin
+boundary "CMP-01: Entrada HTTP\napi.py" as Entrada
+control "CMP-02: Casos de uso\nsales/application.py" as CasoUso
+entity "CMP-03: Disbursement\nsales/domain.py" as Dominio
+control "CMP-05: LedgerPosting\nledger/posting.py" as Posting
+collections "CTR-04: SalesUnitOfWork\nCMP-09: InMemoryUnitOfWork" as UoW
+database "CTR-05: LedgerRepository\nCMP-10: PostgresLedgerRepository" as Libro
+
+note over Cobrador, Libro
+Referencias: UC-02, UC-03; RF-03, RF-04; CA-06; RN-03, RN-04, RN-06; EC-02; INV-02; ADR-001, ADR-004.
+end note
+
+== UC-03: código caducado (CA-06, RN-03, RN-04) ==
+
+note over Cobrador, Libro
+Precondición: desembolso APROBADO y el reloj del servidor ya alcanzó expires_at.
+end note
+
+Cobrador -> Entrada: POST /v1/disbursements/{id}/confirm\ncode, device_time
+Entrada -> CasoUso: ConfirmDisbursement.execute(actor, disbursement_id, code, device_time)
+CasoUso -> UoW: disbursements.get(disbursement_id)
+UoW --> CasoUso: Disbursement
+CasoUso -> Dominio: confirm(plain_code, actor, now)
+note right of Dominio: El código se comprueba primero:\nun código errado no aprende nada.\nConfirmationCode.is_expired(now)
+Dominio --> CasoUso: ConfirmationOutcome.EXPIRED, status=CADUCADO
+CasoUso -> Posting: post_expired_attempt(id, collector_id, principal, actor.id, device_time, now)
+Posting -> UoW: cash.open_box_of(collector_id)
+UoW --> Posting: CashBox, sin descuento
+Posting -> Libro: append(LedgerEntry DESEMBOLSO_CADUCADO, reason=codigo_caducado)
+Posting --> CasoUso: LedgerEntry
+CasoUso -> UoW: disbursements.save(disbursement); commit()
+CasoUso --> Entrada: ConfirmationCodeExpired
+Entrada --> Cobrador: 409 application/problem+json\n/problemas/codigo-caducado
+
+note over Cobrador, Libro
+Resultado observable: caja sin cambios, status=CADUCADO, sin préstamo
+y un asiento DESEMBOLSO_CADUCADO con su motivo. Repetir la confirmación devuelve
+ConfirmationOutcome.ALREADY_EXPIRED: el mismo 409, sin escritura nueva.
+end note
+
+== UC-02: autoaprobación rechazada (CA-06, RN-06, EC-02) ==
+
+Admin -> Entrada: POST /v1/disbursements/{id}/approve
+Entrada -> CasoUso: ApproveDisbursement.execute(actor, disbursement_id, reason)
+CasoUso -> UoW: disbursements.get(disbursement_id)
+UoW --> CasoUso: Disbursement
+CasoUso -> Dominio: approve(actor, plain_code, now, code_ttl, reason)
+Dominio -> Dominio: _ensure_may_approve(actor, now)\n_record_refusal(actor, now, "quien_origina_no_aprueba")
+Dominio --> CasoUso: SelfApprovalForbidden
+note right of CasoUso: El rechazo es un hecho que se conserva:\nse guarda y se confirma antes de relanzarlo.\nNo se crea código ni aviso.
+CasoUso -> UoW: disbursements.save(disbursement); commit()
+CasoUso --> Entrada: SelfApprovalForbidden
+Entrada --> Admin: 403 application/problem+json\n/problemas/autoaprobacion-prohibida
+
+note over Cobrador, Libro
+Resultado observable: la solicitud sigue en SOLICITADO, approved_by es nulo y
+rejected_approval_attempts conserva la identidad de quien lo intentó.
+end note
+
+== UC-03: dos confirmaciones compiten (RN-04, INV-02, ADR-004) ==
+
+Cobrador -> Entrada: POST /v1/disbursements/{id}/confirm\nmismo code, respuesta anterior perdida o petición simultánea
+Entrada -> CasoUso: ConfirmDisbursement.execute(actor, disbursement_id, code, device_time)
+CasoUso -> CasoUso: _attempt(...)
+CasoUso -> Posting: post_disbursement(id, collector_id, principal, actor.id, device_time, now)
+Posting -> Libro: append(LedgerEntry DESEMBOLSO)
+Libro --> Posting: DuplicateLedgerEntry (WriteConflict)
+Posting --> CasoUso: DuplicateLedgerEntry
+note right of Libro: Otra transacción ganó. Con PostgreSQL\nresponde la restricción de unicidad;\ncommit() también puede lanzar StaleWrite.
+CasoUso -> UoW: sale del bloque sin commit: se descarta todo
+CasoUso -> CasoUso: _attempt(...), una sola vez más
+CasoUso -> UoW: disbursements.get(disbursement_id)
+UoW --> CasoUso: Disbursement CONFIRMADO
+CasoUso -> Dominio: confirm(plain_code, actor, now)
+Dominio --> CasoUso: ConfirmationOutcome.ALREADY_CONFIRMED
+CasoUso --> Entrada: Disbursement, sin escrituras
+Entrada --> Cobrador: 200 DisbursementOut, el resultado original
+
+@enduml

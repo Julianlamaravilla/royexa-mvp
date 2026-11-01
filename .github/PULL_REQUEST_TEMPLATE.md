@@ -1,4 +1,4 @@
-# Entrega 0: propuesta del proyecto
+# Entrega 3: diseño interno y primer recorrido vertical
 
 ## Integrantes
 
@@ -6,7 +6,8 @@
 
 ## Documento para revisar
 
-- docs/00-propuesta/propuesta.md
+- docs/03-diseno-vertical/diseno-y-vertical.md
+- docs/03-diseno-vertical/trazabilidad-implementacion.md
 
 ## Descripcion
 

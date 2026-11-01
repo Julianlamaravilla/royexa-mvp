@@ -1,6 +1,6 @@
 # ADR-001: Libro de movimientos de solo inserción garantizado por la base de datos
 
-- **Estado:** Propuesto
+- **Estado:** Aceptado
 - **Fecha:** 2026-09-20
 - **Responsables:** Julian Andres Restrepo
 - **Asunto relacionado:** AD-01
@@ -8,7 +8,7 @@
 
 ## 1. Contexto
 
-El producto existe para impedir el fraude interno. Ese propósito se pierde si un movimiento de dinero puede modificarse o borrarse después de confirmado, porque un fraude se ocultaría editando el pasado. Reciben asientos los pagos, los desembolsos, los gastos, los movimientos de caja y las correcciones. Además, el saldo debe poder derivarse de los asientos y no de una columna que alguien edite.
+El producto existe para impedir el fraude interno. Ese propósito se pierde si un movimiento de dinero puede modificarse o borrarse después de confirmado, porque un fraude se ocultaría editando el pasado. Reciben asientos los pagos, los desembolsos, los movimientos de caja y las correcciones. Además, el saldo debe poder derivarse de los asientos y no de una columna que alguien edite.
 
 La pregunta es dónde vive la garantía: en la disciplina del código de la aplicación o en la propia base de datos.
 
@@ -19,8 +19,8 @@ La pregunta es dónde vive la garantía: en la disciplina del código de la apli
 - **Reglas o invariantes:** RN-04, INV-02
 - **Escenarios de calidad:** EC-01
 - **ASR:** ASR-01
-- **Restricciones:** RES-04, RES-02
-- **Riesgos:** RA-01, RA-02
+- **Restricciones:** RES-04, RES-02, RES-06
+- **Riesgos:** RA-01, RA-02, RA-10
 - **Supuestos:** SUP-01
 
 ## 2. Asunto de decisión
@@ -39,7 +39,7 @@ La pregunta es dónde vive la garantía: en la disciplina del código de la apli
 
 - Ser verificable con una prueba automatizada repetible.
 - Ser operable por un equipo mínimo.
-- No añadir servicios de pago al presupuesto de infraestructura.
+- Costo cero: no añadir servicios de pago (RES-06).
 
 ### Deseables
 
@@ -76,9 +76,15 @@ La pregunta es dónde vive la garantía: en la disciplina del código de la apli
 
 ## 5. Decisión
 
-Se selecciona **ALT-01B** porque es la única alternativa que cumple el criterio obligatorio de rechazo aunque el código falle y permite demostrarlo con una prueba automatizada, que es la forma de verificación prevista para EC-01. Además coincide con la decisión ya tomada en TRACKEA.
+Se selecciona **ALT-01B** porque es la única alternativa que cumple el criterio obligatorio de rechazo aunque el código falle y permite demostrarlo con una prueba automatizada, que es la forma de verificación prevista para EC-01. TRACKEA, que queda como referencia, tomó la misma decisión.
+
+PostgreSQL local es obligatorio para EV-01 y EV-02. Un libro en memoria equivale a ALT-01A, ya descartada, y `propuesta.md` (sección L) exige que la inmutabilidad no dependa solo de que la aplicación se comporte bien. Los adaptadores en memoria sirven para otras pruebas, no para demostrar esta garantía.
 
 La decisión se considera provisional hasta obtener la evidencia indicada en este registro.
+
+Este registro pasa a `Aceptado` solo si EV-01 y EV-02 quedan `Validada`.
+
+**Aceptación (2026-10-31).** EV-01 y EV-02 quedaron `Validada` sobre PostgreSQL 17 (HV-01). La aceptación cubre el rechazo de las alteraciones y el único módulo escritor. No cubre dos partes del criterio obligatorio y de ALT-01B, que siguen abiertas: el asiento compensatorio no existe todavía (HV-03) y el saldo de la caja es un campo en memoria, no la suma de los asientos (HV-07).
 
 ## 6. Consecuencias
 
@@ -92,11 +98,13 @@ La decisión se considera provisional hasta obtener la evidencia indicada en est
 - Cada operación de dinero pasa por una llamada más al módulo del libro.
 - Los privilegios exigen una prueba de ausencia en cada migración.
 - El propietario de la base de datos sigue pudiendo alterar el libro.
+- La garantía solo protege lo que está en PostgreSQL. En la Entrega 3 eso es únicamente el libro (HV-07).
 
 ### Riesgos residuales
 
 - RA-01: una migración concede privilegios de más.
 - RA-02: acceso privilegiado a la base de datos.
+- RA-10: el libro y los datos en memoria no comparten una transacción.
 
 ## 7. Elementos arquitectónicos afectados
 
@@ -104,14 +112,23 @@ La decisión se considera provisional hasta obtener la evidencia indicada en est
 - **Contenedores:** CON-03, CON-04
 - **Sistemas externos:** No aplica
 - **Relaciones C4:** «API del servidor → Base de datos» (lee y escribe el dominio; inserta asientos con un rol que no puede modificarlos)
-- **Artefactos adicionales:** migración del esquema inicial en TRACKEA (`backend/migrations/versions/0001_b1_schema.py`), módulo del libro (`backend/src/royexa/ledger/`) y prueba de aceptación (`backend/tests/acceptance/ledger_append_only/`)
+- **Artefactos adicionales:** `backend/migrations/001_ledger.sql`, `backend/src/royexa/ledger/`, `backend/src/royexa/adapters/postgres_ledger.py` y `backend/tests/postgres/test_pr07_ledger_privileges.py`, producidos en la Entrega 3. Las rutas de TRACKEA citadas en la versión anterior de este registro quedan retiradas.
 
 ## 8. Evidencia y validación
 
 | Evidencia | Actividad | Resultado esperado | Momento previsto |
 |---|---|---|---|
 | EV-01 | Ejecutar la prueba que intenta modificar, borrar y vaciar un asiento con el rol de la aplicación y consulta después la fila. | El 100 % de los intentos falla con error de permiso y la fila queda intacta. | Entrega 3 |
-| EV-02 | Consultar el catálogo de privilegios tras aplicar todas las migraciones. | Ausencia de modificar, borrar y vaciar sobre el libro y el registro de cambios, en cada integración continua. | Entrega 3 |
+| EV-02 | Consultar el catálogo de privilegios tras aplicar todas las migraciones. | Ausencia de modificar, borrar y vaciar sobre el libro, y ninguna concesión al rol de la aplicación ni a `PUBLIC` sobre otra tabla, en cada ejecución de `uv run pytest -m postgres`. | Entrega 3 |
+
+**Redacción de EV-02 (2026-10-31).** Decía «sobre el libro y el registro de cambios» y «en cada ejecución del comando local de pruebas». El esquema no tiene una tabla de registro de cambios y el comando por defecto no ejecuta esta prueba, así que se ajustó a lo que puede comprobarse (HV-02). La prueba falla si aparece una tabla nueva accesible para el rol, de modo que un registro de cambios futuro no escaparía a la comprobación.
+
+**Resultado (2026-10-31).** Detalle en `docs/03-diseno-vertical/diseno-y-vertical.md`, sección 8.
+
+| Evidencia | Estado | Resultado | Hallazgo |
+|---|---|---|---|
+| EV-01 | Validada | `UPDATE`, `DELETE` y `TRUNCATE` fallan con `InsufficientPrivilege` y la fila queda intacta (PR-07). | HV-01 |
+| EV-02 | Validada | El catálogo solo muestra `SELECT` e `INSERT` sobre `ledger_entry`, sin concesiones por columna ni a `PUBLIC`; el rol no es propietario ni superusuario; repetir la migración no cambia nada (PR-07). | HV-01, HV-02 |
 
 ## 9. Condiciones de revisión
 
@@ -120,15 +137,19 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 - EV-02 encuentra privilegios de más que no pueden mantenerse de forma estable.
 - Un requisito exige detectar la manipulación hecha por quien tenga acceso privilegiado; en ese caso se añade ALT-01C como refuerzo.
 - El recorrido vertical revela que pasar cada operación por un módulo único introduce un costo o acoplamiento no previsto.
+- La implementación de CA-08 muestra que el asiento compensatorio no cabe en este diseño. Hoy `amount_cents` debe ser positivo y `entry_type` solo admite dos valores, así que esa corrección exige una migración (HV-03).
 - Aparece una alternativa viable con consecuencias significativamente mejores.
 
 ## 10. Decisiones relacionadas
 
 - ADR-002 (el libro es escrito por un módulo y comunicado con el resto por llamadas directas).
-- ADR-003 (el identificador de operación evita que el libro reciba dos veces el mismo cobro).
+- ADR-004 (la restricción de unicidad por desembolso y tipo evita que el libro reciba dos veces el mismo desembolso). Sustituye a ADR-003 en esta relación cuando el docente confirme la resolución de DIV-02.
 
 ## 11. Historial
 
 | Fecha | Estado | Cambio | Motivo |
 |---|---|---|---|
 | 2026-09-20 | Propuesto | Creación inicial | Sincronización con el estado de TRACKEA |
+| 2026-10-30 | Propuesto | Costo cero en lugar de presupuesto de infraestructura; PostgreSQL local obligatorio para EV-01 y EV-02; comando local en lugar de integración continua; rutas de TRACKEA retiradas; relación con ADR-004 | Realineación con la Entrega 1 (`realineacion-entrega-1.md`) |
+| 2026-10-31 | Propuesto | Redacción de EV-02: se retira «el registro de cambios», que no existe en el esquema, y se nombra el comando que la ejecuta | HV-02 |
+| 2026-10-31 | Aceptado | EV-01 y EV-02 en `Validada`; rutas reales de los artefactos; límites de la aceptación y RA-10 | HV-01, HV-03, HV-07 |

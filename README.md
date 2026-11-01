@@ -19,8 +19,8 @@ Grupo: 10
 
 ## Estado actual
 
-- Entrega actual: Entrega 2
-- Estado: Documentación de la propuesta, los requisitos y la arquitectura candidata diligenciada, sincronizada con el estado del producto en TRACKEA a 2026-09-20. Las divergencias con la Entrega 1 están en la sección 7.1 de [docs/02-arquitectura/arquitectura.md](docs/02-arquitectura/arquitectura.md)
+- Entrega actual: Entrega 3
+- Estado: Arquitectura realineada con la Entrega 1 sobre una demostración local de costo cero, pendiente de confirmación docente. El detalle está en [docs/02-arquitectura/realineacion-entrega-1.md](docs/02-arquitectura/realineacion-entrega-1.md). La implementación de la Entrega 3 está en curso.
 
 ## Instruccion oficial de entrega
 

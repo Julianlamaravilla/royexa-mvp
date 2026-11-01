@@ -1,31 +1,101 @@
 @startuml
-' Reemplace el contenido por el recorrido real.
-title UC-01 — [Nombre del recorrido] — Escenario principal
+title UC-01, UC-02, UC-05 y UC-03 — Desembolso de un préstamo — Escenario principal
 
-actor "[INT-XX: Actor]" as Actor
-boundary "[CMP-01: Entrada]" as Entrada
-control "[CMP-02: Caso de uso]" as CasoUso
-entity "[CMP-03: Dominio]" as Dominio
-collections "[CTR-01: Puerto]" as Puerto
-database "[CMP-04: Adaptador]" as Adaptador
+actor "INT-01: Cobrador" as Cobrador
+actor "INT-02: Administrador" as Admin
+actor "INT-03: Cliente final" as Cliente
+boundary "CMP-01: Entrada HTTP\napi.py" as Entrada
+control "CMP-02: Casos de uso\nsales/application.py" as CasoUso
+entity "CMP-03: Disbursement\nsales/domain.py" as Dominio
+entity "CMP-04: Préstamos\nloans/domain.py" as Prestamos
+control "CMP-05: LedgerPosting\nledger/posting.py" as Posting
+entity "CMP-06: CashBox\ncash_box/domain.py" as Caja
+collections "CTR-04: SalesUnitOfWork\nCMP-09: InMemoryUnitOfWork" as UoW
+database "CTR-05: LedgerRepository\nCMP-10: PostgresLedgerRepository" as Libro
+control "CMP-08: NotificationDispatcher\nnotifications/dispatcher.py" as Despachador
+participant "CTR-10: Notifier\nCMP-11: SimulatedNotifier" as Notificador
+participant "EXT-05: Notificador simulado" as Ext
 
-note over Actor, Adaptador
-Referencias: RF-XX, CA-XX, RN-XX, ADR-XXX
+note over Cobrador, Libro
+Referencias: UC-01, UC-02, UC-03, UC-05; RF-03, RF-04, RF-05, RF-06;
+CA-05, CA-07, CA-09; RN-03, RN-04, RN-05, RN-06; ADR-001, ADR-002, ADR-004.
+Cada caso de uso abre su propia unidad de trabajo y termina con commit().
 end note
 
-Actor -> Entrada: [Solicitud]
-Entrada -> CasoUso: ejecutar([comando])
-CasoUso -> Puerto: obtener([id])
-Puerto -> Adaptador: obtener([id])
-Adaptador --> Puerto: [datos]
-Puerto --> CasoUso: [objeto de dominio]
-CasoUso -> Dominio: [comportamiento de negocio]
-Dominio --> CasoUso: [resultado]
-CasoUso -> Puerto: guardar([entidad])
-Puerto -> Adaptador: guardar([entidad])
-Adaptador --> Puerto: [confirmación]
-Puerto --> CasoUso: [confirmación]
-CasoUso --> Entrada: [resultado]
-Entrada --> Actor: [resultado observable]
+== UC-01: solicitud (RF-03, RN-05) ==
+
+Cobrador -> Entrada: POST /v1/disbursements\nX-Actor-Id, client_id, amount_cents, term_days, installment_count
+Entrada -> CasoUso: RequestDisbursement.execute(actor, client_id, terms)
+CasoUso -> UoW: loans.unsettled_for_client(client.id)
+UoW --> CasoUso: None
+CasoUso -> Dominio: Disbursement.request(id, client, route, collector, actor, terms, now, None)
+Dominio --> CasoUso: Disbursement SOLICITADO
+CasoUso -> Prestamos: ensure_renewal_allowed(prior, exception)
+note right of Prestamos: RN-05: sin préstamo\nanterior impago, pasa
+CasoUso -> UoW: disbursements.add(disbursement); commit()
+CasoUso --> Entrada: Disbursement
+Entrada --> Cobrador: 201 DisbursementOut, status=SOLICITADO
+
+== UC-02: aprobación por otra persona (RF-03, RN-06, EC-02) ==
+
+Admin -> Entrada: POST /v1/disbursements/{id}/approve
+Entrada -> CasoUso: ApproveDisbursement.execute(actor, disbursement_id, reason)
+CasoUso -> UoW: disbursements.get(disbursement_id)
+UoW --> CasoUso: Disbursement
+CasoUso -> Dominio: approve(actor, plain_code, now, code_ttl, reason)
+note right of Dominio: RN-06 se evalúa primero.\nConfirmationCode.issue guarda\nsolo el resumen y la caducidad.
+Dominio --> CasoUso: APROBADO
+CasoUso -> UoW: disbursements.save(disbursement)
+CasoUso -> UoW: outbox.add(OutboxMessage CODIGO_CONFIRMACION); commit()
+CasoUso --> Entrada: Disbursement
+Entrada --> Admin: 200 DisbursementOut, status=APROBADO, sin el código
+
+== UC-05: despacho del código (RF-06, ADR-002) ==
+
+Admin -> Entrada: POST /v1/notifications/dispatch
+Entrada -> Despachador: dispatch()
+Despachador -> UoW: outbox.pending()
+UoW --> Despachador: [OutboxMessage]
+Despachador -> Notificador: send(Notification)
+Notificador -> Ext: registra el código
+Ext -> Cliente: código de confirmación (simulado)
+Notificador --> Despachador: entrega aceptada
+Despachador -> UoW: message.record_delivery(now); outbox.save(message); commit()
+Despachador --> Entrada: DispatchReport(attempted=1, sent=1)
+Entrada --> Admin: 200 DispatchOut
+
+== UC-03: confirmación con código vigente (CA-05, CA-07, CA-09, RN-03, RN-04) ==
+
+Cliente -> Cobrador: presenta el código (fuera del sistema)
+Cobrador -> Entrada: POST /v1/disbursements/{id}/confirm\ncode, device_time
+Entrada -> CasoUso: ConfirmDisbursement.execute(actor, disbursement_id, code, device_time)
+CasoUso -> UoW: disbursements.get(disbursement_id)
+UoW --> CasoUso: Disbursement
+CasoUso -> Dominio: confirm(plain_code, actor, now)
+Dominio --> CasoUso: ConfirmationOutcome.CONFIRMED
+CasoUso -> UoW: loans.unsettled_for_client(client_id)
+UoW --> CasoUso: None
+CasoUso -> Prestamos: ensure_renewal_allowed(prior, exception)
+note right of Prestamos: RN-05 se repite al mover el dinero:\notra solicitud pudo liquidarse antes
+CasoUso -> Prestamos: Loan.originate(client_id, id, terms, interest, now.date())
+Prestamos --> CasoUso: Loan con su calendario
+CasoUso -> UoW: loans.add(loan)
+CasoUso -> Dominio: attach_loan(loan.id)
+CasoUso -> Posting: post_disbursement(id, collector_id, principal, actor.id, device_time, now)
+Posting -> UoW: cash.open_box_of(collector_id)
+UoW --> Posting: CashBox
+Posting -> Caja: deduct(amount)
+Posting -> UoW: cash.save(box)
+Posting -> Libro: append(LedgerEntry DESEMBOLSO)
+note right of Libro: INSERT como royexa_app.\nÚnico por desembolso y tipo
+Posting --> CasoUso: LedgerEntry
+CasoUso -> UoW: outbox.add(OutboxMessage COMPROBANTE_DESEMBOLSO)
+CasoUso -> UoW: disbursements.save(disbursement); commit()
+UoW -> Libro: LedgerSession.commit()
+note right of UoW: Comprueba escrituras obsoletas,\nconfirma el libro y publica la memoria.\nNo es una transacción atómica única.
+CasoUso --> Entrada: Disbursement
+Entrada -> CasoUso: SalesQueries.detail(disbursement_id)
+CasoUso --> Entrada: DisbursementDetail
+Entrada --> Cobrador: 200 DisbursementOut, status=CONFIRMADO,\nloan, ledger_entries, requested_by, approved_by
 
 @enduml
