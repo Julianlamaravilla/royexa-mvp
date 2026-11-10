@@ -22,7 +22,7 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
 
 ## Tareas
 
-- [ ] **T0 Integración continua.** Workflow de GitHub Actions que, en cada pull request hacia `mvp`, levanta PostgreSQL 17 como servicio y ejecuta `uv run pytest -m ""` desde `backend/`.
+- [x] **T0 Integración continua.** Workflow de GitHub Actions que, en cada pull request hacia `mvp`, levanta PostgreSQL 17 como servicio y ejecuta `uv run pytest -m ""` desde `backend/`.
   - Acepta: el workflow corre en el pull request de esta misma tarea y pasa con las 70 pruebas actuales.
 - [ ] **T1 Persistencia completa.** Adaptadores PostgreSQL para desembolsos, préstamos, cajas y avisos, con migraciones nuevas numeradas desde `002`.
   - Acepta: tras reiniciar el servidor, un desembolso confirmado, su préstamo y la caja siguen consultables; las pruebas verticales pasan contra PostgreSQL; el README elimina la limitación de memoria.
@@ -51,3 +51,4 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
 ## Evidencia
 
 - Punto de partida: commit `3677409` en `mvp`, 70 pruebas (52 sin PostgreSQL, 18 con PostgreSQL), según `backend/README.md`.
+- T0: `.github/workflows/ci.yml` ejecuta `uv run pytest -m ""` en cada pull request hacia `mvp`, con PostgreSQL 17 como servicio en el puerto 55432. Local: 70 pruebas en verde contra PostgreSQL 16 instalado en la máquina (la sesión no tiene daemon de Docker y no había 17). Pendiente: confirmar que el workflow pasa en el propio pull request. Nota: la rama es `mvp-t0-ci`, no `mvp/t0-ci`, porque Git no permite crear `mvp/...` mientras exista la rama `mvp`.
