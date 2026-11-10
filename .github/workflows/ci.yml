@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [mvp]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: royexa
+          POSTGRES_USER: royexa_migrator
+          POSTGRES_PASSWORD: royexa_migrator
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U royexa_migrator -d royexa"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.32"
+      - run: uv sync --locked
+      - run: uv run pytest -m ""
