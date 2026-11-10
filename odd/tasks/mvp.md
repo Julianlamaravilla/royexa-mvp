@@ -7,7 +7,7 @@ Repositorio de trabajo: `Julianlamaravilla/royexa-mvp`, rama base `mvp`. El repo
 ## Reglas para cada sesión
 
 1. Leer este archivo completo y tomar la primera tarea sin marcar, en orden. No saltar tareas.
-2. Crear una rama `mvp/<id>-<nombre-corto>` desde `mvp` actualizada.
+2. Crear una rama `tasks/<id>-<nombre-corto>` desde `mvp` actualizada (no `mvp/...`: Git no permite ese prefijo mientras exista la rama `mvp`).
 3. Probar primero: escribir la prueba que falla, implementar, refactorizar con las pruebas en verde.
 4. Antes de abrir el pull request, ejecutar desde `backend/`: `uv run pytest -m ""`. Todas deben pasar.
 5. Abrir un pull request hacia `mvp`, uno por tarea. El merge lo hace el usuario.
