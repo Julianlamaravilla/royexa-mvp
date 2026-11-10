@@ -14,6 +14,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from psycopg import errors
+from database import reset_database
 from support import FakeClock, Flow
 
 from royexa.adapters.memory import InMemoryUnitOfWork
@@ -79,13 +80,9 @@ def clock() -> FakeClock:
 
 @pytest.fixture
 def container(clock):
-    built = build_container(Settings(ledger_url=APP_URL), clock, SimulatedNotifier())
-    yield built
-    with psycopg.connect(MIGRATOR_URL) as owner:
-        owner.execute(
-            "DELETE FROM ledger_entry WHERE disbursement_id = ANY(%s)",
-            (list(built.store.tables.disbursements),),
-        )
+    reset_database()
+    yield build_container(Settings(ledger_url=APP_URL), clock, SimulatedNotifier())
+    reset_database()
 
 
 @pytest.fixture
@@ -172,10 +169,19 @@ def test_pr07_catalog_lists_no_other_grant_on_any_table():
             """
         ).fetchall()
 
-    assert sorted(grants) == [
-        ("ledger_entry", "royexa_app", "INSERT"),
-        ("ledger_entry", "royexa_app", "SELECT"),
-    ]
+    # T1a decided: mutable state may be inserted and updated, never deleted.
+    state = ("cash_box", "loan", "loan_installment", "outbox_message", "renewal_exception")
+    assert sorted(grants) == sorted(
+        [
+            ("ledger_entry", "royexa_app", "INSERT"),
+            ("ledger_entry", "royexa_app", "SELECT"),
+        ]
+        + [
+            (table, "royexa_app", privilege)
+            for table in state
+            for privilege in ("INSERT", "SELECT", "UPDATE")
+        ]
+    )
 
 
 def test_pr07_catalog_shows_no_column_level_change_privilege():
@@ -216,8 +222,8 @@ def test_pr07_app_role_has_no_way_around_the_grants():
 
 def test_pr07_migrations_are_repeatable():
     """PR-07 / EV-02: applying twice leaves the same privileges and raises nothing."""
-    assert apply_migrations() == ["001_ledger.sql"]
-    assert apply_migrations() == ["001_ledger.sql"]
+    assert apply_migrations() == ["001_ledger.sql", "002_state.sql"]
+    assert apply_migrations() == ["001_ledger.sql", "002_state.sql"]
     assert _privileges() == APPEND_ONLY
 
 

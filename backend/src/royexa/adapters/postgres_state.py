@@ -1,0 +1,235 @@
+"""Cash boxes, loans, renewal exceptions and notices on PostgreSQL (T1a, ADR-002).
+
+All four repositories share the connection of the ledger session, so entry, deduction,
+loan and notice commit together or not at all.
+"""
+
+from __future__ import annotations
+
+import psycopg
+from psycopg.types.json import Jsonb
+
+from royexa.adapters.postgres_ledger import PostgresLedgerSession
+from royexa.cash_box.domain import CashBox
+from royexa.loans.domain import Installment, Loan, RenewalException
+from royexa.shared.errors import StaleWrite
+from royexa.shared.money import Money
+from royexa.shared.outbox import NoticeKind, NoticeStatus, OutboxMessage
+
+_BOX = "id, collector_id, opening_balance_cents, balance_cents, closed"
+_EXCEPTION = "id, client_id, prior_loan_id, granted_by, reason, granted_at, consumed_by"
+_NOTICE = (
+    "id, kind, client_id, disbursement_id, created_at, payload, status, attempts, "
+    "last_error, sent_at"
+)
+
+
+class PostgresCashRepository:
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+        self._versions: dict[str, int] = {}
+
+    def open_box_of(self, collector_id: str) -> CashBox | None:
+        row = self._connection.execute(
+            f"SELECT {_BOX}, version FROM cash_box WHERE collector_id = %s AND NOT closed",
+            (collector_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        self._versions[row[0]] = row[5]
+        return CashBox(row[0], row[1], Money(row[2]), Money(row[3]), row[4])
+
+    def save(self, box: CashBox) -> None:
+        """Optimistic: the write wins only if nobody changed the box since it was read."""
+        values = (box.opening_balance.cents, box.balance.cents, box.closed, box.id)
+        if box.id in self._versions:
+            written = self._connection.execute(
+                "UPDATE cash_box SET opening_balance_cents = %s, balance_cents = %s, "
+                "closed = %s, version = version + 1 WHERE id = %s AND version = %s",
+                (*values, self._versions[box.id]),
+            ).rowcount
+            if written == 0:
+                raise StaleWrite(f"cash_box/{box.id}")
+            self._versions[box.id] += 1
+        else:
+            self._connection.execute(
+                "INSERT INTO cash_box (opening_balance_cents, balance_cents, closed, id, "
+                "collector_id) VALUES (%s, %s, %s, %s, %s)",
+                (*values, box.collector_id),
+            )
+            self._versions[box.id] = 0
+
+
+class PostgresLoanRepository:
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+
+    def add(self, loan: Loan) -> None:
+        self._connection.execute(
+            "INSERT INTO loan (id, client_id, disbursement_id, principal_cents, interest_cents) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            (loan.id, loan.client_id, loan.disbursement_id, loan.principal.cents, loan.interest.cents),
+        )
+        for item in loan.installments:
+            self._connection.execute(
+                "INSERT INTO loan_installment (loan_id, sequence, due_date, amount_cents, "
+                "paid_cents) VALUES (%s, %s, %s, %s, %s)",
+                (loan.id, item.sequence, item.due_date, item.amount.cents, item.paid.cents),
+            )
+
+    def get(self, loan_id: str) -> Loan | None:
+        return next(iter(self._loans("WHERE id = %s", (loan_id,))), None)
+
+    def unsettled_for_client(self, client_id: str) -> Loan | None:
+        loans = self._loans("WHERE client_id = %s", (client_id,))
+        return next((loan for loan in loans if not loan.is_settled), None)
+
+    def _loans(self, where: str, params: tuple) -> list[Loan]:
+        rows = self._connection.execute(
+            "SELECT id, client_id, disbursement_id, principal_cents, interest_cents "
+            f"FROM loan {where} ORDER BY id",
+            params,
+        ).fetchall()
+        loans = []
+        for loan_id, client_id, disbursement_id, principal, interest in rows:
+            installments = self._connection.execute(
+                "SELECT sequence, due_date, amount_cents, paid_cents FROM loan_installment "
+                "WHERE loan_id = %s ORDER BY sequence",
+                (loan_id,),
+            )
+            schedule = tuple(
+                Installment(seq, due, Money(amount), Money(paid))
+                for seq, due, amount, paid in installments
+            )
+            loans.append(
+                Loan(loan_id, client_id, disbursement_id, Money(principal), Money(interest), schedule)
+            )
+        return loans
+
+    def add_exception(self, exception: RenewalException) -> None:
+        self._connection.execute(
+            f"INSERT INTO renewal_exception ({_EXCEPTION}) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            _exception_values(exception),
+        )
+
+    def save_exception(self, exception: RenewalException) -> None:
+        self._connection.execute(
+            "UPDATE renewal_exception SET consumed_by = %s WHERE id = %s",
+            (exception.consumed_by, exception.id),
+        )
+
+    def get_exception(self, exception_id: str) -> RenewalException | None:
+        row = self._connection.execute(
+            f"SELECT {_EXCEPTION} FROM renewal_exception WHERE id = %s", (exception_id,)
+        ).fetchone()
+        return RenewalException(*row) if row else None
+
+    def open_exception_for(self, client_id: str) -> RenewalException | None:
+        row = self._connection.execute(
+            f"SELECT {_EXCEPTION} FROM renewal_exception "
+            "WHERE client_id = %s AND consumed_by IS NULL ORDER BY seq LIMIT 1",
+            (client_id,),
+        ).fetchone()
+        return RenewalException(*row) if row else None
+
+
+def _exception_values(exception: RenewalException) -> tuple:
+    return (
+        exception.id,
+        exception.client_id,
+        exception.prior_loan_id,
+        exception.granted_by,
+        exception.reason,
+        exception.granted_at,
+        exception.consumed_by,
+    )
+
+
+class PostgresOutbox:
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+
+    def add(self, message: OutboxMessage) -> None:
+        self._connection.execute(
+            f"INSERT INTO outbox_message ({_NOTICE}) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            _notice_values(message),
+        )
+
+    def get(self, message_id: str) -> OutboxMessage | None:
+        return next(iter(self._messages("WHERE id = %s", (message_id,))), None)
+
+    def save(self, message: OutboxMessage) -> None:
+        self._connection.execute(
+            "UPDATE outbox_message SET payload = %s, status = %s, attempts = %s, "
+            "last_error = %s, sent_at = %s WHERE id = %s",
+            (
+                Jsonb(message.payload),
+                message.status.value,
+                message.attempts,
+                message.last_error,
+                message.sent_at,
+                message.id,
+            ),
+        )
+
+    def pending(self) -> list[OutboxMessage]:
+        return self._messages("WHERE status = %s", (NoticeStatus.PENDING.value,))
+
+    def all(self, disbursement_id: str | None = None) -> list[OutboxMessage]:
+        if disbursement_id is None:
+            return self._messages("", ())
+        return self._messages("WHERE disbursement_id = %s", (disbursement_id,))
+
+    def _messages(self, where: str, params: tuple) -> list[OutboxMessage]:
+        rows = self._connection.execute(
+            f"SELECT {_NOTICE} FROM outbox_message {where} ORDER BY seq", params
+        )
+        return [
+            OutboxMessage(
+                id, NoticeKind(kind), client, disbursement, created, payload,
+                NoticeStatus(status), attempts, error, sent,
+            )
+            for id, kind, client, disbursement, created, payload, status, attempts, error, sent
+            in rows
+        ]
+
+
+def _notice_values(message: OutboxMessage) -> tuple:
+    return (
+        message.id,
+        message.kind.value,
+        message.client_id,
+        message.disbursement_id,
+        message.created_at,
+        Jsonb(message.payload),
+        message.status.value,
+        message.attempts,
+        message.last_error,
+        message.sent_at,
+    )
+
+
+class PostgresSession(PostgresLedgerSession):
+    """The ledger session plus the mutable state, in one transaction."""
+
+    def __init__(self, url: str) -> None:
+        super().__init__(url)
+        self.cash = PostgresCashRepository(self._connection)
+        self.loans = PostgresLoanRepository(self._connection)
+        self.outbox = PostgresOutbox(self._connection)
+
+
+def seed_database(url: str, boxes: list[CashBox], loans: list[Loan]) -> None:
+    """Demo data (RES-02). Rows that already exist are left as they are."""
+    with psycopg.connect(url) as connection:
+        for box in boxes:
+            connection.execute(
+                "INSERT INTO cash_box (id, collector_id, opening_balance_cents, balance_cents, "
+                "closed) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                (box.id, box.collector_id, box.opening_balance.cents, box.balance.cents, box.closed),
+            )
+        for loan in loans:
+            if connection.execute("SELECT 1 FROM loan WHERE id = %s", (loan.id,)).fetchone():
+                continue
+            session_loans = PostgresLoanRepository(connection)
+            session_loans.add(loan)
