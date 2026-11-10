@@ -54,16 +54,24 @@ def _prior_loan(loan_id: str, client_id: str, paid: Money) -> Loan:
     )
 
 
-def seed_store() -> InMemoryStore:
-    unpaid = _prior_loan("prestamo-impago", "cliente-2", Money(50_000))
-    settled = _prior_loan("prestamo-liquidado", "cliente-3", Money(120_000))
-    boxes = [
+def seed_loans() -> list[Loan]:
+    return [
+        _prior_loan("prestamo-impago", "cliente-2", Money(50_000)),
+        _prior_loan("prestamo-liquidado", "cliente-3", Money(120_000)),
+    ]
+
+
+def seed_boxes() -> list[CashBox]:
+    return [
         CashBox(f"caja-{collector}", collector, OPENING_CASH, OPENING_CASH)
         for collector in (COLLECTOR_ID, "cobrador-2")
     ]
+
+
+def seed_store() -> InMemoryStore:
     return InMemoryStore(
         Tables(
-            loans={unpaid.id: unpaid, settled.id: settled},
-            cash_boxes={box.id: box for box in boxes},
+            loans={loan.id: loan for loan in seed_loans()},
+            cash_boxes={box.id: box for box in seed_boxes()},
         )
     )
