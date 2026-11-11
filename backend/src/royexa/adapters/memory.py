@@ -111,6 +111,9 @@ class InMemoryLoanRepository:
                 return loan
         return None
 
+    def for_client(self, client_id: str) -> list[Loan]:
+        return [loan for loan in self._loans.values() if loan.client_id == client_id]
+
     def add_exception(self, exception: RenewalException) -> None:
         self._exceptions[exception.id] = exception
 
