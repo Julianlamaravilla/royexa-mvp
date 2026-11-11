@@ -16,6 +16,7 @@ MAX_DELIVERY_ATTEMPTS = 5
 class NoticeKind(StrEnum):
     CONFIRMATION_CODE = "CODIGO_CONFIRMACION"
     DISBURSEMENT_RECEIPT = "COMPROBANTE_DESEMBOLSO"
+    PAYMENT_RECEIPT = "COMPROBANTE_PAGO"
 
 
 class NoticeStatus(StrEnum):
@@ -29,13 +30,14 @@ class OutboxMessage:
     id: str
     kind: NoticeKind
     client_id: str
-    disbursement_id: str
+    disbursement_id: str | None
     created_at: datetime
     payload: dict[str, str] = field(default_factory=dict)
     status: NoticeStatus = NoticeStatus.PENDING
     attempts: int = 0
     last_error: str | None = None
     sent_at: datetime | None = None
+    payment_id: str | None = None
 
     @classmethod
     def enqueue(
@@ -47,6 +49,21 @@ class OutboxMessage:
         payload: dict[str, str] | None = None,
     ) -> OutboxMessage:
         return cls(new_id(), kind, client_id, disbursement_id, created_at, payload or {})
+
+    @classmethod
+    def enqueue_payment_receipt(
+        cls, client_id: str, payment_id: str, created_at: datetime, payload: dict[str, str]
+    ) -> OutboxMessage:
+        """RF-06, CA-11: the receipt of one payment. Enqueued in the payment's transaction."""
+        return cls(
+            new_id(),
+            NoticeKind.PAYMENT_RECEIPT,
+            client_id,
+            None,
+            created_at,
+            payload,
+            payment_id=payment_id,
+        )
 
     def record_delivery(self, at: datetime) -> None:
         self.attempts += 1
@@ -69,4 +86,6 @@ class Outbox(Protocol):
     def get(self, message_id: str) -> OutboxMessage | None: ...
     def save(self, message: OutboxMessage) -> None: ...
     def pending(self) -> list[OutboxMessage]: ...
-    def all(self, disbursement_id: str | None = None) -> list[OutboxMessage]: ...
+    def all(
+        self, disbursement_id: str | None = None, payment_id: str | None = None
+    ) -> list[OutboxMessage]: ...

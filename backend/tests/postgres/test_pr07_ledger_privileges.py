@@ -46,6 +46,7 @@ ALL_MIGRATIONS = [
     "005_loan_order.sql",
     "006_payments.sql",
     "007_non_payments.sql",
+    "008_payment_receipt.sql",
 ]
 NOW = datetime(2026, 10, 30, 14, 0, tzinfo=UTC)
 RECEIPT = "COMPROBANTE_DESEMBOLSO"

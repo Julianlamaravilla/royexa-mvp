@@ -16,9 +16,10 @@ class NotifierUnavailable(Exception):
 class Notification:
     message_id: str
     client_id: str
-    disbursement_id: str
+    disbursement_id: str | None
     kind: NoticeKind
     payload: dict[str, str] = field(default_factory=dict)
+    payment_id: str | None = None
 
 
 class Notifier(Protocol):
