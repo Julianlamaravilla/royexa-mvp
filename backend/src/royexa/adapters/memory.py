@@ -16,7 +16,7 @@ from royexa.cash_box.domain import CashBox
 from royexa.clients.domain import Client
 from royexa.ledger.domain import DuplicateLedgerEntry, LedgerEntry
 from royexa.ledger.ports import LedgerRepository
-from royexa.loans.domain import Loan, Payment, RenewalException
+from royexa.loans.domain import Loan, NonPayment, Payment, RenewalException
 from royexa.sales.domain import Disbursement
 from royexa.shared.errors import StaleWrite
 from royexa.shared.outbox import NoticeStatus, OutboxMessage
@@ -26,6 +26,7 @@ _KEYED_TABLES = (
     "disbursements",
     "loans",
     "payments",
+    "non_payments",
     "renewal_exceptions",
     "cash_boxes",
     "outbox",
@@ -38,6 +39,7 @@ class Tables:
     disbursements: dict[str, Disbursement] = field(default_factory=dict)
     loans: dict[str, Loan] = field(default_factory=dict)
     payments: dict[str, Payment] = field(default_factory=dict)
+    non_payments: dict[str, NonPayment] = field(default_factory=dict)
     renewal_exceptions: dict[str, RenewalException] = field(default_factory=dict)
     cash_boxes: dict[str, CashBox] = field(default_factory=dict)
     outbox: dict[str, OutboxMessage] = field(default_factory=dict)
@@ -150,6 +152,17 @@ class InMemoryPaymentRepository:
         return [payment for payment in self._rows.values() if payment.loan_id == loan_id]
 
 
+class InMemoryNonPaymentRepository:
+    def __init__(self, tables: Tables) -> None:
+        self._rows = tables.non_payments
+
+    def add(self, non_payment: NonPayment) -> None:
+        self._rows[non_payment.id] = non_payment
+
+    def for_loan(self, loan_id: str) -> list[NonPayment]:
+        return [item for item in self._rows.values() if item.loan_id == loan_id]
+
+
 class InMemoryCashRepository:
     def __init__(self, tables: Tables) -> None:
         self._boxes = tables.cash_boxes
@@ -215,6 +228,7 @@ class InMemoryUnitOfWork:
             self.disbursements = InMemoryDisbursementRepository(self._work)
             self.loans = InMemoryLoanRepository(self._work)
             self.payments = InMemoryPaymentRepository(self._work)
+            self.non_payments = InMemoryNonPaymentRepository(self._work)
             self.cash = InMemoryCashRepository(self._work)
             self.outbox = InMemoryOutbox(self._work)
         else:
@@ -233,6 +247,9 @@ class InMemoryUnitOfWork:
             self.payments = getattr(self._session, "payments", None) or InMemoryPaymentRepository(
                 self._work
             )
+            self.non_payments = getattr(
+                self._session, "non_payments", None
+            ) or InMemoryNonPaymentRepository(self._work)
         return self
 
     def __exit__(self, *exc_info: object) -> None:

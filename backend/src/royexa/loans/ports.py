@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from royexa.loans.domain import Loan, Payment, RenewalException
+from royexa.loans.domain import Loan, NonPayment, Payment, RenewalException
 
 
 class LoanRepository(Protocol):
@@ -22,5 +22,12 @@ class LoanRepository(Protocol):
 class PaymentRepository(Protocol):
     def add(self, payment: Payment) -> None: ...
     def for_loan(self, loan_id: str) -> list[Payment]:
+        """In the order they were registered."""
+        ...
+
+
+class NonPaymentRepository(Protocol):
+    def add(self, non_payment: NonPayment) -> None: ...
+    def for_loan(self, loan_id: str) -> list[NonPayment]:
         """In the order they were registered."""
         ...

@@ -4,10 +4,10 @@ Identity comes from the X-Actor-Id header against seeded users: declared limitat
 ALT-06B. Errors follow RFC 9457 problem details.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, Request
+from fastapi import Depends, FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -24,15 +24,19 @@ from royexa.identity_access.domain import RouteNotFound, UnknownActor, User
 from royexa.ledger.domain import LedgerEntry
 from royexa.loans.domain import (
     ExceptionNotAllowed,
+    InvalidCommitmentDate,
     InvalidLoanTerms,
     Loan,
+    LoanAlreadySettled,
     LoanNotFound,
     LoanTerms,
+    NonPayment,
     Payment,
     PaymentExceedsBalance,
     PaymentNotAllowed,
     PriorLoanNotSettled,
     ReasonRequired,
+    VisitNotAllowed,
     exact_decimal,
 )
 from royexa.sales.application import DisbursementDetail
@@ -50,8 +54,8 @@ from royexa.sales.domain import (
 )
 from royexa.shared.errors import DomainError, WriteConflict
 from royexa.shared.money import InvalidAmount, Money
-from royexa.shared.payments import PaymentMethod
 from royexa.shared.outbox import OutboxMessage
+from royexa.shared.payments import PaymentMethod
 
 PROBLEM_BASE = "https://royexa.local/problemas/"
 PROBLEM_MEDIA_TYPE = "application/problem+json"
@@ -70,6 +74,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     ValidatorNotAllowed: (403, "validador-no-autorizado", "Solo el cobrador de la ruta valida"),
     ClientOutsideRoute: (403, "cliente-fuera-de-ruta", "El cliente no pertenece a la ruta"),
     ClientRegistrationNotAllowed: (403, "rol-administrador-requerido", "Solo un administrador da de alta clientes"),
+    VisitNotAllowed: (403, "visita-no-permitida", "Solo el cobrador de la ruta registra la visita"),
     PaymentNotAllowed: (403, "pago-no-permitido", "Solo el cobrador de la ruta registra el pago"),
     ExceptionNotAllowed: (403, "excepcion-no-permitida", "Excepcion no permitida"),
     DisbursementNotFound: (404, "desembolso-no-encontrado", "Desembolso no encontrado"),
@@ -78,12 +83,14 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     RouteNotFound: (404, "ruta-no-encontrada", "Ruta no encontrada"),
     NoOpenCashBox: (409, "caja-no-disponible", "El cobrador no tiene caja abierta"),
     CashBoxClosed: (409, "caja-cerrada", "La caja esta cerrada"),
+    LoanAlreadySettled: (409, "prestamo-liquidado", "El prestamo ya esta liquidado"),
     PriorLoanNotSettled: (409, "prestamo-anterior-sin-liquidar", "Prestamo anterior sin liquidar"),
     InvalidTransition: (409, "transicion-invalida", "Transicion de estado no permitida"),
     ConfirmationCodeExpired: (409, "codigo-caducado", "El codigo de confirmacion caduco"),
     WriteConflict: (409, "conflicto-de-escritura", "Operacion concurrente; reintente"),
     InvalidConfirmationCode: (422, "codigo-invalido", "Codigo de confirmacion invalido"),
     AmountExceedsRouteLimit: (422, "monto-sobre-limite-de-ruta", "Monto sobre el limite de ruta"),
+    InvalidCommitmentDate: (422, "compromiso-invalido", "El compromiso debe ser posterior al dia del registro"),
     PaymentExceedsBalance: (422, "pago-excede-saldo", "El pago excede el saldo del prestamo"),
     InvalidClient: (422, "cliente-invalido", "Cliente invalido"),
     InvalidLoanTerms: (422, "condiciones-invalidas", "Condiciones de prestamo invalidas"),
@@ -142,6 +149,31 @@ class PaymentBody(BaseModel):
     amount_cents: int = Field(gt=0)
     method: PaymentMethod
     device_time: datetime
+
+
+class NonPaymentBody(BaseModel):
+    reason: str
+    commitment_date: date
+    device_time: datetime
+
+
+class NonPaymentOut(BaseModel):
+    id: str
+    loan_id: str
+    client_id: str
+    collector_id: str
+    reason: str
+    commitment_date: date
+    device_time: datetime
+    server_time: datetime
+
+
+class PendingVisitOut(BaseModel):
+    client_id: str
+    client_name: str
+    loan_id: str
+    outstanding_cents: int
+    remaining_installments: str
 
 
 class AllocationOut(BaseModel):
@@ -296,6 +328,29 @@ def _payment_out(payment: Payment) -> PaymentOut:
             AllocationOut(sequence=item.sequence, amount_cents=item.amount.cents)
             for item in payment.allocations
         ],
+    )
+
+
+def _non_payment_out(item: NonPayment) -> NonPaymentOut:
+    return NonPaymentOut(
+        id=item.id,
+        loan_id=item.loan_id,
+        client_id=item.client_id,
+        collector_id=item.collector_id,
+        reason=item.reason,
+        commitment_date=item.commitment_date,
+        device_time=item.device_time,
+        server_time=item.server_time,
+    )
+
+
+def _pending_out(item: PendingVisit) -> PendingVisitOut:
+    return PendingVisitOut(
+        client_id=item.client_id,
+        client_name=item.client_name,
+        loan_id=item.loan_id,
+        outstanding_cents=item.outstanding.cents,
+        remaining_installments=exact_decimal(item.remaining_installments),
     )
 
 
@@ -474,6 +529,24 @@ def create_app(container: Container) -> FastAPI:
     @app.get("/v1/loans/{loan_id}/payments", response_model=list[PaymentOut])
     def read_payments(loan_id: str, _: Actor) -> list[PaymentOut]:
         return [_payment_out(item) for item in container.payment_queries.for_loan(loan_id)]
+
+    @app.post("/v1/loans/{loan_id}/non-payments", status_code=201, response_model=NonPaymentOut)
+    def register_non_payment(loan_id: str, body: NonPaymentBody, actor: Actor) -> NonPaymentOut:
+        return _non_payment_out(
+            container.register_non_payment.execute(
+                actor, loan_id, body.reason, body.commitment_date, body.device_time
+            )
+        )
+
+    @app.get("/v1/loans/{loan_id}/non-payments", response_model=list[NonPaymentOut])
+    def read_non_payments(loan_id: str, _: Actor) -> list[NonPaymentOut]:
+        return [_non_payment_out(item) for item in container.visit_queries.non_payments_of(loan_id)]
+
+    @app.get("/v1/routes/{route_id}/pending-visits", response_model=list[PendingVisitOut])
+    def read_pending_visits(
+        route_id: str, actor: Actor, day: Annotated[date | None, Query(alias="date")] = None
+    ) -> list[PendingVisitOut]:
+        return [_pending_out(item) for item in container.visit_queries.pending(actor, route_id, day)]
 
     @app.get("/v1/loans/{loan_id}", response_model=LoanOut)
     def read_loan(loan_id: str, _: Actor) -> LoanOut:

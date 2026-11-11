@@ -40,6 +40,18 @@ class PaymentExceedsBalance(DomainError):
     """RN-01: a payment never exceeds the balance."""
 
 
+class VisitNotAllowed(DomainError):
+    """RF-01: only the collector of the route registers a visit; an administrator reads."""
+
+
+class LoanAlreadySettled(DomainError):
+    """CA-02: a non-payment is registered on a loan that still has a balance."""
+
+
+class InvalidCommitmentDate(DomainError):
+    """T3-P2: the commitment falls after the day of the registration."""
+
+
 class PaymentNotAllowed(DomainError):
     """RF-01: the collector of the client's route registers the payment."""
 
@@ -214,6 +226,51 @@ class Payment:
             allocations,
         )
         return payment, updated
+
+
+@dataclass(frozen=True)
+class NonPayment:
+    """A visit that collected nothing (RF-01, CA-02). It changes no balance and moves no
+    money; it only ends the day's pending visit and records why and until when (T3-P2)."""
+
+    id: str
+    loan_id: str
+    client_id: str
+    collector_id: str
+    reason: str
+    commitment_date: date
+    device_time: datetime
+    server_time: datetime
+
+    @classmethod
+    def register(
+        cls,
+        actor: User,
+        route: Route,
+        loan: Loan,
+        reason: str,
+        commitment_date: date,
+        device_time: datetime,
+        now: datetime,
+    ) -> NonPayment:
+        if actor.id != route.collector_id:
+            raise VisitNotAllowed(actor.id)
+        if loan.is_settled:
+            raise LoanAlreadySettled(loan.id)
+        if not reason.strip():
+            raise ReasonRequired("a non-payment needs a reason")
+        if commitment_date <= now.date():
+            raise InvalidCommitmentDate(commitment_date.isoformat())
+        return cls(
+            new_id(),
+            loan.id,
+            loan.client_id,
+            actor.id,
+            reason.strip(),
+            commitment_date,
+            device_time,
+            now,
+        )
 
 
 @dataclass
