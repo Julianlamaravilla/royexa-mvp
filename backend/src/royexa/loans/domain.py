@@ -162,6 +162,11 @@ class Loan:
             Fraction(0),
         )
 
+    @property
+    def next_due_date(self) -> date | None:
+        """The due date of the oldest installment still owed; none once the loan is settled."""
+        return next((item.due_date for item in self.installments if item.pending.is_positive), None)
+
     def apply_payment(self, amount: Money) -> tuple[Loan, tuple[Allocation, ...]]:
         """RN-01: oldest installments first, the excess to the next, never past the balance.
         Returns the loan after the payment; this one is left as it was."""
