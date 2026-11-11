@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from royexa.adapters.memory import InMemoryStore, InMemoryUnitOfWork
 from royexa.adapters.simulated_notifier import SimulatedNotifier
-from royexa.clients.domain import ClientCatalog
+from royexa.clients.application import ClientQueries, RegisterClient
 from royexa.identity_access.domain import Directory
 from royexa.notifications.dispatcher import NoticeQueries, NotificationDispatcher
 from royexa.notifications.ports import Notifier
@@ -46,7 +46,8 @@ class Settings:
 @dataclass(frozen=True)
 class Container:
     directory: Directory
-    clients: ClientCatalog
+    register_client: RegisterClient
+    client_queries: ClientQueries
     store: InMemoryStore
     notifier: Notifier
     request: RequestDisbursement
@@ -74,9 +75,8 @@ def build_container(
     if settings.ledger_url:
         from royexa.adapters.postgres_state import seed_database
 
-        seed_database(settings.ledger_url, seed_boxes(), seed_loans())
+        seed_database(settings.ledger_url, seed_boxes(), seed_loans(), seed_clients())
     directory = seed_directory()
-    clients = seed_clients()
 
     def ledger_session():
         # Imported here so the in-memory demo and its tests need no database driver.
@@ -87,10 +87,11 @@ def build_container(
     def unit_of_work() -> InMemoryUnitOfWork:
         return InMemoryUnitOfWork(store, ledger_session if settings.ledger_url else None)
 
-    context = SalesContext(unit_of_work, clock, directory, clients, settings.code_ttl)
+    context = SalesContext(unit_of_work, clock, directory, settings.code_ttl)
     return Container(
         directory=directory,
-        clients=clients,
+        register_client=RegisterClient(unit_of_work, directory),
+        client_queries=ClientQueries(unit_of_work),
         store=store,
         notifier=notifier,
         request=RequestDisbursement(context),
