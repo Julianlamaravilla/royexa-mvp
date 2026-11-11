@@ -7,7 +7,7 @@ Repositorio de trabajo: `Julianlamaravilla/royexa-mvp`, rama base `mvp`. El repo
 ## Reglas para cada sesión
 
 1. Leer este archivo completo y tomar la primera tarea sin marcar, en orden. No saltar tareas.
-2. Crear una rama `mvp/<id>-<nombre-corto>` desde `mvp` actualizada.
+2. Crear una rama `tasks/<id>-<nombre-corto>` desde `mvp` actualizada (no `mvp/...`: Git no permite ese prefijo mientras exista la rama `mvp`).
 3. Probar primero: escribir la prueba que falla, implementar, refactorizar con las pruebas en verde.
 4. Antes de abrir el pull request, ejecutar desde `backend/`: `uv run pytest -m ""`. Todas deben pasar.
 5. Abrir un pull request hacia `mvp`, uno por tarea. El merge lo hace el usuario.
@@ -24,7 +24,9 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
 
 - [x] **T0 Integración continua.** Workflow de GitHub Actions que, en cada pull request hacia `mvp`, levanta PostgreSQL 17 como servicio y ejecuta `uv run pytest -m ""` desde `backend/`.
   - Acepta: el workflow corre en el pull request de esta misma tarea y pasa con las 70 pruebas actuales.
-- [ ] **T1 Persistencia completa.** Adaptadores PostgreSQL para desembolsos, préstamos, cajas y avisos, con migraciones nuevas numeradas desde `002`.
+- [x] **T1a Persistencia: cajas, préstamos, excepciones y avisos.** Migración `002` y adaptadores PostgreSQL para cajas, préstamos con su calendario, excepciones de renovación y avisos (bandeja de salida), dentro de la misma transacción del libro. Los desembolsos siguen en memoria hasta T1b.
+  - Acepta: tras reiniciar el servidor, el préstamo, la caja y los avisos de un desembolso confirmado siguen consultables; dos transacciones que cambian la misma caja no se pisan; las pruebas con PostgreSQL pasan.
+- [ ] **T1b Persistencia: desembolsos.** Adaptador PostgreSQL para desembolsos (con sus intentos de aprobación rechazados y el código en forma de huella), migración `003`, y retirada del almacén en memoria del camino con PostgreSQL.
   - Acepta: tras reiniciar el servidor, un desembolso confirmado, su préstamo y la caja siguen consultables; las pruebas verticales pasan contra PostgreSQL; el README elimina la limitación de memoria.
 - [ ] **T2 Clientes y préstamos (RF-05).** Alta y consulta de clientes; consulta de préstamos con su calendario de cuotas derivado de monto, plazo e interés.
   - Acepta: los criterios de aceptación de RF-05 tienen una prueba cada uno.
@@ -52,3 +54,4 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
 
 - Punto de partida: commit `3677409` en `mvp`, 70 pruebas (52 sin PostgreSQL, 18 con PostgreSQL), según `backend/README.md`.
 - T0: `.github/workflows/ci.yml` ejecuta `uv run pytest -m ""` en cada pull request hacia `mvp`, con PostgreSQL 17 como servicio en el puerto 55432. Local: 70 pruebas en verde contra PostgreSQL 16 instalado en la máquina (la sesión no tiene daemon de Docker y no había 17). En el propio pull request el workflow pasó con PostgreSQL 17 (todos los pasos en verde, incluido `uv run pytest -m ""`). Pendiente: nada. Nota: la rama es `mvp-t0-ci`, no `mvp/t0-ci`, porque Git no permite crear `mvp/...` mientras exista la rama `mvp`.
+- T1a: migración `002_state.sql` y `adaptadores/postgres_state.py` (cajas con escritura optimista por versión, préstamos con calendario, excepciones y avisos) en la misma transacción del libro. 79 pruebas en verde con `uv run pytest -m ""` (52 sin PostgreSQL, 27 con PostgreSQL: 9 nuevas de T1a). PostgreSQL 16 instalado en la máquina de la sesión (sin daemon de Docker); la CI lo ejecuta con PostgreSQL 17. Las pruebas del PR-07 sobre privilegios y migraciones se ajustaron para declarar los permisos de las tablas nuevas (insertar y actualizar, nunca borrar). El PR pasa de las 400 líneas de autor por poco (unas 480 con pruebas); no se dividió más porque el adaptador y su prueba de reinicio no tienen sentido por separado. Pendiente: T1b (desembolsos). Rama `mvp-t1a-persistence`, por la misma razón de T0.

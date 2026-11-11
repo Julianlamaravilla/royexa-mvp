@@ -21,7 +21,7 @@ from royexa.sales.application import (
     SalesContext,
     SalesQueries,
 )
-from royexa.seed import seed_clients, seed_directory, seed_store
+from royexa.seed import seed_boxes, seed_clients, seed_directory, seed_loans, seed_store
 from royexa.shared.clock import Clock, SystemClock
 
 DEFAULT_CODE_TTL_MINUTES = 60
@@ -71,14 +71,18 @@ def build_container(
         sink=lambda line: print(line, flush=True), failing=settings.notifier_failing
     )
     store = seed_store()
+    if settings.ledger_url:
+        from royexa.adapters.postgres_state import seed_database
+
+        seed_database(settings.ledger_url, seed_boxes(), seed_loans())
     directory = seed_directory()
     clients = seed_clients()
 
     def ledger_session():
         # Imported here so the in-memory demo and its tests need no database driver.
-        from royexa.adapters.postgres_ledger import PostgresLedgerSession
+        from royexa.adapters.postgres_state import PostgresSession
 
-        return PostgresLedgerSession(settings.ledger_url)
+        return PostgresSession(settings.ledger_url)
 
     def unit_of_work() -> InMemoryUnitOfWork:
         return InMemoryUnitOfWork(store, ledger_session if settings.ledger_url else None)
