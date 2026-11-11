@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol, Self
 
 from royexa.cash_box.ports import CashRepository
+from royexa.clients.ports import ClientRepository
 from royexa.ledger.ports import LedgerRepository
 from royexa.loans.ports import LoanRepository
 from royexa.sales.domain import Disbursement
@@ -19,6 +20,7 @@ class SalesUnitOfWork(Protocol):
     """ADR-002: entry, deduction, schedule and outbox message commit together or not at all.
     Leaving the block without `commit` discards every write."""
 
+    clients: ClientRepository
     disbursements: DisbursementRepository
     loans: LoanRepository
     cash: CashRepository

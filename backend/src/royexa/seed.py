@@ -4,7 +4,7 @@ from datetime import date
 
 from royexa.adapters.memory import InMemoryStore, Tables
 from royexa.cash_box.domain import CashBox
-from royexa.clients.domain import Client, ClientCatalog
+from royexa.clients.domain import Client
 from royexa.identity_access.domain import Directory, Role, Route, User
 from royexa.loans.domain import Installment, Loan
 from royexa.shared.money import Money
@@ -32,15 +32,13 @@ def seed_directory() -> Directory:
     )
 
 
-def seed_clients() -> ClientCatalog:
-    return ClientCatalog(
-        [
-            Client("cliente-1", "Cliente sin prestamos", ROUTE_ID),
-            Client("cliente-2", "Cliente con saldo pendiente", ROUTE_ID),
-            Client("cliente-3", "Cliente con prestamo liquidado", ROUTE_ID),
-            Client("cliente-4", "Cliente de otra ruta", "ruta-2"),
-        ]
-    )
+def seed_clients() -> list[Client]:
+    return [
+        Client("cliente-1", "Cliente sin prestamos", ROUTE_ID),
+        Client("cliente-2", "Cliente con saldo pendiente", ROUTE_ID),
+        Client("cliente-3", "Cliente con prestamo liquidado", ROUTE_ID),
+        Client("cliente-4", "Cliente de otra ruta", "ruta-2"),
+    ]
 
 
 def _prior_loan(loan_id: str, client_id: str, paid: Money) -> Loan:
@@ -71,6 +69,7 @@ def seed_boxes() -> list[CashBox]:
 def seed_store() -> InMemoryStore:
     return InMemoryStore(
         Tables(
+            clients={client.id: client for client in seed_clients()},
             loans={loan.id: loan for loan in seed_loans()},
             cash_boxes={box.id: box for box in seed_boxes()},
         )
