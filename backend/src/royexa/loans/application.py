@@ -25,6 +25,7 @@ from royexa.loans.domain import (
 from royexa.loans.ports import LoanRepository, NonPaymentRepository, PaymentRepository
 from royexa.shared.clock import Clock
 from royexa.shared.money import Money
+from royexa.shared.outbox import Outbox, OutboxMessage
 from royexa.shared.payments import PaymentMethod
 
 
@@ -42,6 +43,7 @@ class PaymentsUnitOfWork(LoansUnitOfWork, Protocol):
     payments: PaymentRepository
     cash: CashRepository
     ledger: LedgerRepository
+    outbox: Outbox
 
     def commit(self) -> None: ...
 
@@ -81,8 +83,24 @@ class RegisterPayment:
             LedgerPosting(uow.ledger, uow.cash).post_payment(
                 payment.id, actor.id, amount, method, actor.id, device_time, now
             )
+            uow.outbox.add(
+                OutboxMessage.enqueue_payment_receipt(
+                    payment.client_id, payment.id, now, _receipt_payload(payment, updated)
+                )
+            )
             uow.commit()
         return payment, updated
+
+
+def _receipt_payload(payment: Payment, loan: Loan) -> dict[str, str]:
+    """CA-11: the amount received, the balance left and the next due date (empty once the
+    loan is settled)."""
+    due = loan.next_due_date
+    return {
+        "amount_cents": str(payment.amount.cents),
+        "outstanding_cents": str(loan.outstanding.cents),
+        "next_due_date": due.isoformat() if due else "",
+    }
 
 
 class PaymentQueries:

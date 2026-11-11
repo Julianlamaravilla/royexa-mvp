@@ -193,11 +193,14 @@ class InMemoryOutbox:
     def pending(self) -> list[OutboxMessage]:
         return [m for m in self._messages.values() if m.status is NoticeStatus.PENDING]
 
-    def all(self, disbursement_id: str | None = None) -> list[OutboxMessage]:
+    def all(
+        self, disbursement_id: str | None = None, payment_id: str | None = None
+    ) -> list[OutboxMessage]:
         return [
             m
             for m in self._messages.values()
-            if disbursement_id is None or m.disbursement_id == disbursement_id
+            if (disbursement_id is None or m.disbursement_id == disbursement_id)
+            and (payment_id is None or m.payment_id == payment_id)
         ]
 
 

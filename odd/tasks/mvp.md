@@ -36,7 +36,7 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: CA-01 y EC-03 tienen prueba (25 sobre una cuota de 50 deja 19,5 cuotas de 20, también como cálculo puro); el pago es consultable con la identidad del cobrador; dos pagos simultáneos no se pisan.
 - [x] **T3b No pago y pendientes de visita (RF-01, CA-02, T3-P1, T3-P2).** Registro de no pago con motivo y fecha de compromiso, y consulta de los clientes pendientes de visita del cobrador.
   - Acepta: CA-02 tiene prueba; las decisiones T3-P1 y T3-P2 están aplicadas tal como se resolvieron.
-- [ ] **T4 Comprobante del pago (RF-06).** Cada pago emite un aviso con importe, saldo restante y próximo vencimiento, por el notificador simulado y con el mismo patrón de bandeja de salida del desembolso.
+- [x] **T4 Comprobante del pago (RF-06).** Cada pago emite un aviso con importe, saldo restante y próximo vencimiento, por el notificador simulado y con el mismo patrón de bandeja de salida del desembolso.
   - Acepta: los criterios de RF-06 tienen prueba; un fallo del notificador no pierde el aviso.
 - [ ] **T5 Cierre de caja (RF-02, RN-02).** Cierre diario en tres paneles (pendientes, pagaron, no pagaron) con diferencia entre lo registrado y lo entregado; solo sin pendientes e irreversible.
   - Acepta: los criterios de RF-02 tienen prueba; un ajuste posterior al cierre exige un asiento nuevo.
@@ -80,3 +80,7 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - El día de un registro se cuenta en UTC (fecha del reloj del servidor). Si el piloto opera en otra zona horaria, la frontera del día se desplaza; queda para T5, que define el día de la caja.
   - El cálculo de pendientes consulta pagos y no pagos cliente por cliente; basta para una ruta, y se optimiza si T7 lo pide.
   - Pendiente: nada de T3. Siguiente: T4.
+- T4: cada pago encola su aviso `COMPROBANTE_PAGO` en la bandeja de salida dentro de la misma transacción del pago (`OutboxMessage.enqueue_payment_receipt`), con `amount_cents`, `outstanding_cents` y `next_due_date` (`Loan.next_due_date`: la cuota pendiente más antigua; vacía si el préstamo queda liquidado). El despachador existente lo envía, lo reintenta y lo marca fallido al quinto intento; `GET /v1/notifications?payment_id=` lo consulta sin exponer el contenido. Migración `008_payment_receipt.sql` (un aviso nombra su desembolso o su pago, nunca ambos; uno por pago). CA-11 y CA-12 tienen prueba (`tests/vertical/test_t4_payment_receipt.py`, con ambos adaptadores, y un reinicio en PostgreSQL con el aviso pendiente). 234 pruebas en verde con `uv run pytest -m ""` (106 sin PostgreSQL, 128 con PostgreSQL), tres corridas sin intermitencias. PostgreSQL 16 en la máquina de la sesión; la CI usa 17. Rama `tasks/t4-payment-receipt`.
+  - «Próximo vencimiento» se interpreta como la fecha de la cuota pendiente más antigua; puede estar vencida si el cliente va atrasado.
+  - El comprobante no incluye el contador de cuotas restantes: RF-06 pide importe, saldo y próximo vencimiento. Se añade al contenido si el piloto lo pide.
+  - Pendiente: nada de T4. Siguiente: T5.

@@ -270,7 +270,8 @@ class NoticeOut(BaseModel):
     id: str
     kind: str
     client_id: str
-    disbursement_id: str
+    disbursement_id: str | None
+    payment_id: str | None
     status: str
     attempts: int
     last_error: str | None
@@ -412,6 +413,7 @@ def _notice_out(message: OutboxMessage) -> NoticeOut:
         kind=message.kind.value,
         client_id=message.client_id,
         disbursement_id=message.disbursement_id,
+        payment_id=message.payment_id,
         status=message.status.value,
         attempts=message.attempts,
         last_error=message.last_error,
@@ -576,7 +578,11 @@ def create_app(container: Container) -> FastAPI:
         return DispatchOut(attempted=report.attempted, sent=report.sent)
 
     @app.get("/v1/notifications", response_model=list[NoticeOut])
-    def read_notifications(_: Admin, disbursement_id: str | None = None) -> list[NoticeOut]:
-        return [_notice_out(message) for message in container.notices.list(disbursement_id)]
+    def read_notifications(
+        _: Admin, disbursement_id: str | None = None, payment_id: str | None = None
+    ) -> list[NoticeOut]:
+        return [
+            _notice_out(message) for message in container.notices.list(disbursement_id, payment_id)
+        ]
 
     return app
