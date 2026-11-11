@@ -27,6 +27,7 @@ from royexa.loans.domain import (
     InvalidLoanTerms,
     Loan,
     LoanTerms,
+    LoanNotFound,
     PriorLoanNotSettled,
     ReasonRequired,
 )
@@ -67,6 +68,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     ExceptionNotAllowed: (403, "excepcion-no-permitida", "Excepcion no permitida"),
     DisbursementNotFound: (404, "desembolso-no-encontrado", "Desembolso no encontrado"),
     ClientNotFound: (404, "cliente-no-encontrado", "Cliente no encontrado"),
+    LoanNotFound: (404, "prestamo-no-encontrado", "Prestamo no encontrado"),
     RouteNotFound: (404, "ruta-no-encontrada", "Ruta no encontrada"),
     NoOpenCashBox: (409, "caja-no-disponible", "El cobrador no tiene caja abierta"),
     CashBoxClosed: (409, "caja-cerrada", "La caja esta cerrada"),
@@ -130,6 +132,8 @@ class InstallmentOut(BaseModel):
 
 class LoanOut(BaseModel):
     id: str
+    client_id: str
+    status: str
     principal_cents: int
     interest_cents: int
     outstanding_cents: int
@@ -219,6 +223,8 @@ class RenewalExceptionOut(BaseModel):
 def _loan_out(loan: Loan) -> LoanOut:
     return LoanOut(
         id=loan.id,
+        client_id=loan.client_id,
+        status="LIQUIDADO" if loan.is_settled else "ACTIVO",
         principal_cents=loan.principal.cents,
         interest_cents=loan.interest.cents,
         outstanding_cents=loan.outstanding.cents,
@@ -391,6 +397,14 @@ def create_app(container: Container) -> FastAPI:
     @app.get("/v1/clients/{client_id}", response_model=ClientOut)
     def read_client(client_id: str, _: Actor) -> ClientOut:
         return _client_out(container.client_queries.get(client_id))
+
+    @app.get("/v1/clients/{client_id}/loans", response_model=list[LoanOut])
+    def read_client_loans(client_id: str, _: Actor) -> list[LoanOut]:
+        return [_loan_out(loan) for loan in container.loan_queries.for_client(client_id)]
+
+    @app.get("/v1/loans/{loan_id}", response_model=LoanOut)
+    def read_loan(loan_id: str, _: Actor) -> LoanOut:
+        return _loan_out(container.loan_queries.get(loan_id))
 
     @app.post(
         "/v1/clients/{client_id}/renewal-exceptions",

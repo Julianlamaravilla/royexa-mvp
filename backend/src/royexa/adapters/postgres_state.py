@@ -121,13 +121,15 @@ class PostgresLoanRepository:
         return next(iter(self._loans("WHERE id = %s", (loan_id,))), None)
 
     def unsettled_for_client(self, client_id: str) -> Loan | None:
-        loans = self._loans("WHERE client_id = %s", (client_id,))
-        return next((loan for loan in loans if not loan.is_settled), None)
+        return next((loan for loan in self.for_client(client_id) if not loan.is_settled), None)
+
+    def for_client(self, client_id: str) -> list[Loan]:
+        return self._loans("WHERE client_id = %s", (client_id,))
 
     def _loans(self, where: str, params: tuple) -> list[Loan]:
         rows = self._connection.execute(
             "SELECT id, client_id, disbursement_id, principal_cents, interest_cents "
-            f"FROM loan {where} ORDER BY id",
+            f"FROM loan {where} ORDER BY seq",
             params,
         ).fetchall()
         loans = []
