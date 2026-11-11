@@ -16,12 +16,20 @@ from royexa.cash_box.domain import CashBox
 from royexa.clients.domain import Client
 from royexa.ledger.domain import DuplicateLedgerEntry, LedgerEntry
 from royexa.ledger.ports import LedgerRepository
-from royexa.loans.domain import Loan, RenewalException
+from royexa.loans.domain import Loan, Payment, RenewalException
 from royexa.sales.domain import Disbursement
 from royexa.shared.errors import StaleWrite
 from royexa.shared.outbox import NoticeStatus, OutboxMessage
 
-_KEYED_TABLES = ("clients", "disbursements", "loans", "renewal_exceptions", "cash_boxes", "outbox")
+_KEYED_TABLES = (
+    "clients",
+    "disbursements",
+    "loans",
+    "payments",
+    "renewal_exceptions",
+    "cash_boxes",
+    "outbox",
+)
 
 
 @dataclass
@@ -29,6 +37,7 @@ class Tables:
     clients: dict[str, Client] = field(default_factory=dict)
     disbursements: dict[str, Disbursement] = field(default_factory=dict)
     loans: dict[str, Loan] = field(default_factory=dict)
+    payments: dict[str, Payment] = field(default_factory=dict)
     renewal_exceptions: dict[str, RenewalException] = field(default_factory=dict)
     cash_boxes: dict[str, CashBox] = field(default_factory=dict)
     outbox: dict[str, OutboxMessage] = field(default_factory=dict)
@@ -44,11 +53,8 @@ class InMemoryStore:
 def _ensure_unique(entries: list[LedgerEntry], entry: LedgerEntry) -> None:
     """Same contract as the database constraint (INV-02, ADR-004)."""
     for existing in entries:
-        if (existing.disbursement_id, existing.entry_type) == (
-            entry.disbursement_id,
-            entry.entry_type,
-        ):
-            raise DuplicateLedgerEntry(entry.disbursement_id)
+        if (existing.operation_id, existing.entry_type) == (entry.operation_id, entry.entry_type):
+            raise DuplicateLedgerEntry(entry.operation_id)
 
 
 class InMemoryLedgerRepository:
@@ -102,6 +108,9 @@ class InMemoryLoanRepository:
     def add(self, loan: Loan) -> None:
         self._loans[loan.id] = loan
 
+    def save(self, loan: Loan) -> None:
+        self._loans[loan.id] = loan
+
     def get(self, loan_id: str) -> Loan | None:
         return self._loans.get(loan_id)
 
@@ -128,6 +137,17 @@ class InMemoryLoanRepository:
             if exception.client_id == client_id and exception.consumed_by is None:
                 return exception
         return None
+
+
+class InMemoryPaymentRepository:
+    def __init__(self, tables: Tables) -> None:
+        self._rows = tables.payments
+
+    def add(self, payment: Payment) -> None:
+        self._rows[payment.id] = payment
+
+    def for_loan(self, loan_id: str) -> list[Payment]:
+        return [payment for payment in self._rows.values() if payment.loan_id == loan_id]
 
 
 class InMemoryCashRepository:
@@ -194,6 +214,7 @@ class InMemoryUnitOfWork:
             self.clients = InMemoryClientRepository(self._work)
             self.disbursements = InMemoryDisbursementRepository(self._work)
             self.loans = InMemoryLoanRepository(self._work)
+            self.payments = InMemoryPaymentRepository(self._work)
             self.cash = InMemoryCashRepository(self._work)
             self.outbox = InMemoryOutbox(self._work)
         else:
@@ -209,6 +230,9 @@ class InMemoryUnitOfWork:
             self.loans = getattr(self._session, "loans", None) or InMemoryLoanRepository(self._work)
             self.cash = getattr(self._session, "cash", None) or InMemoryCashRepository(self._work)
             self.outbox = getattr(self._session, "outbox", None) or InMemoryOutbox(self._work)
+            self.payments = getattr(self._session, "payments", None) or InMemoryPaymentRepository(
+                self._work
+            )
         return self
 
     def __exit__(self, *exc_info: object) -> None:

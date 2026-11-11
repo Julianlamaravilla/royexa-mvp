@@ -14,7 +14,14 @@ from royexa.adapters.postgres_ledger import PostgresLedgerSession
 from royexa.cash_box.domain import CashBox
 from royexa.clients.domain import Client
 from royexa.identity_access.domain import Role
-from royexa.loans.domain import Installment, Loan, LoanTerms, RenewalException
+from royexa.loans.domain import (
+    Allocation,
+    Installment,
+    Loan,
+    LoanTerms,
+    Payment,
+    RenewalException,
+)
 from royexa.sales.domain import (
     ConfirmationCode,
     Disbursement,
@@ -23,6 +30,7 @@ from royexa.sales.domain import (
 )
 from royexa.shared.errors import StaleWrite
 from royexa.shared.money import Money
+from royexa.shared.payments import PaymentMethod
 from royexa.shared.outbox import NoticeKind, NoticeStatus, OutboxMessage
 
 _BOX = "id, collector_id, opening_balance_cents, balance_cents, closed"
@@ -117,6 +125,16 @@ class PostgresLoanRepository:
                 (loan.id, item.sequence, item.due_date, item.amount.cents, item.paid.cents),
             )
 
+    def save(self, loan: Loan) -> None:
+        """A concurrent payment on the same installment loses with a serialization failure."""
+        for item in loan.installments:
+            _update(
+                self._connection,
+                "UPDATE loan_installment SET paid_cents = %s WHERE loan_id = %s AND sequence = %s",
+                (item.paid.cents, loan.id, item.sequence),
+                f"loan/{loan.id}",
+            )
+
     def get(self, loan_id: str) -> Loan | None:
         return next(iter(self._loans("WHERE id = %s", (loan_id,))), None)
 
@@ -187,6 +205,57 @@ def _exception_values(exception: RenewalException) -> tuple:
         exception.granted_at,
         exception.consumed_by,
     )
+
+
+class PostgresPaymentRepository:
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+
+    def add(self, payment: Payment) -> None:
+        self._connection.execute(
+            "INSERT INTO payment (id, loan_id, client_id, collector_id, amount_cents, method, "
+            "device_time, server_time) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                payment.id,
+                payment.loan_id,
+                payment.client_id,
+                payment.collector_id,
+                payment.amount.cents,
+                payment.method.value,
+                payment.device_time,
+                payment.server_time,
+            ),
+        )
+        for allocation in payment.allocations:
+            self._connection.execute(
+                "INSERT INTO payment_allocation (payment_id, sequence, amount_cents) "
+                "VALUES (%s, %s, %s)",
+                (payment.id, allocation.sequence, allocation.amount.cents),
+            )
+
+    def for_loan(self, loan_id: str) -> list[Payment]:
+        rows = self._connection.execute(
+            "SELECT id, loan_id, client_id, collector_id, amount_cents, method, device_time, "
+            "server_time FROM payment WHERE loan_id = %s ORDER BY seq",
+            (loan_id,),
+        ).fetchall()
+        payments = []
+        for id, loan, client, collector, amount, method, device, server in rows:
+            allocations = tuple(
+                Allocation(sequence, Money(cents))
+                for sequence, cents in self._connection.execute(
+                    "SELECT sequence, amount_cents FROM payment_allocation "
+                    "WHERE payment_id = %s ORDER BY sequence",
+                    (id,),
+                )
+            )
+            payments.append(
+                Payment(
+                    id, loan, client, collector, Money(amount), PaymentMethod(method),
+                    device, server, allocations,
+                )
+            )
+        return payments
 
 
 class PostgresOutbox:
@@ -390,6 +459,7 @@ class PostgresSession(PostgresLedgerSession):
         self.disbursements = PostgresDisbursementRepository(self._connection)
         self.cash = PostgresCashRepository(self._connection)
         self.loans = PostgresLoanRepository(self._connection)
+        self.payments = PostgresPaymentRepository(self._connection)
         self.outbox = PostgresOutbox(self._connection)
 
 

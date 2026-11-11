@@ -123,3 +123,27 @@ class Flow:
 
     def grant_exception(self, client: str, actor: str = ADMIN, reason: str = "cliente recurrente") -> Response:
         return self._post(f"/v1/clients/{client}/renewal-exceptions", actor, {"reason": reason})
+
+    def pay(
+        self,
+        loan_id: str,
+        amount_cents: int,
+        method: str = "EFECTIVO",
+        actor: str = COLLECTOR,
+        device_time: str = DEVICE_TIME,
+    ) -> Response:
+        return self._post(
+            f"/v1/loans/{loan_id}/payments",
+            actor,
+            {"amount_cents": amount_cents, "method": method, "device_time": device_time},
+        )
+
+    def loan_of(self, disbursement_id: str) -> dict:
+        return self.read(disbursement_id)["loan"]
+
+    def confirmed(self, **kwargs) -> dict:
+        """A confirmed disbursement; returns it with its loan."""
+        disbursement = self.approved(**kwargs)
+        response = self.confirm(disbursement["id"], self.issued_code(disbursement["id"]))
+        assert response.status_code == 200, response.text
+        return response.json()
