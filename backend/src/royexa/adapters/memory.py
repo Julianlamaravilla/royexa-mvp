@@ -13,6 +13,7 @@ from threading import Lock
 from typing import Protocol, Self
 
 from royexa.cash_box.domain import CashBox
+from royexa.clients.domain import Client
 from royexa.ledger.domain import DuplicateLedgerEntry, LedgerEntry
 from royexa.ledger.ports import LedgerRepository
 from royexa.loans.domain import Loan, RenewalException
@@ -20,11 +21,12 @@ from royexa.sales.domain import Disbursement
 from royexa.shared.errors import StaleWrite
 from royexa.shared.outbox import NoticeStatus, OutboxMessage
 
-_KEYED_TABLES = ("disbursements", "loans", "renewal_exceptions", "cash_boxes", "outbox")
+_KEYED_TABLES = ("clients", "disbursements", "loans", "renewal_exceptions", "cash_boxes", "outbox")
 
 
 @dataclass
 class Tables:
+    clients: dict[str, Client] = field(default_factory=dict)
     disbursements: dict[str, Disbursement] = field(default_factory=dict)
     loans: dict[str, Loan] = field(default_factory=dict)
     renewal_exceptions: dict[str, RenewalException] = field(default_factory=dict)
@@ -62,6 +64,20 @@ class InMemoryLedgerRepository:
 
     def all(self) -> list[LedgerEntry]:
         return list(self._entries)
+
+
+class InMemoryClientRepository:
+    def __init__(self, tables: Tables) -> None:
+        self._rows = tables.clients
+
+    def add(self, client: Client) -> None:
+        self._rows[client.id] = client
+
+    def get(self, client_id: str) -> Client | None:
+        return self._rows.get(client_id)
+
+    def all(self) -> list[Client]:
+        return list(self._rows.values())
 
 
 class InMemoryDisbursementRepository:
@@ -172,6 +188,7 @@ class InMemoryUnitOfWork:
         self._work = deepcopy(self._base)
         if self._ledger_session_factory is None:
             self.ledger = InMemoryLedgerRepository(self._work.ledger)
+            self.clients = InMemoryClientRepository(self._work)
             self.disbursements = InMemoryDisbursementRepository(self._work)
             self.loans = InMemoryLoanRepository(self._work)
             self.cash = InMemoryCashRepository(self._work)
@@ -179,7 +196,10 @@ class InMemoryUnitOfWork:
         else:
             self._session = self._ledger_session_factory()
             self.ledger = self._session.repository
-            # T1a, T1b: a session that carries the state replaces the in-memory copies.
+            # T1a, T1b, T2a: a session that carries the state replaces the in-memory copies.
+            self.clients = getattr(self._session, "clients", None) or InMemoryClientRepository(
+                self._work
+            )
             self.disbursements = getattr(
                 self._session, "disbursements", None
             ) or InMemoryDisbursementRepository(self._work)

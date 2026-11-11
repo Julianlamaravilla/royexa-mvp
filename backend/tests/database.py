@@ -13,6 +13,7 @@ _TABLES = (
     "loan_installment",
     "loan",
     "cash_box",
+    "client",
 )
 
 

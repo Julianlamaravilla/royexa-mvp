@@ -184,6 +184,8 @@ def test_pr07_catalog_lists_no_other_grant_on_any_table():
         # T1b: disbursements may change state; refused attempts are append-only (RN-06).
         + [("disbursement", "royexa_app", privilege) for privilege in ("INSERT", "SELECT", "UPDATE")]
         + [("refused_approval_attempt", "royexa_app", p) for p in ("INSERT", "SELECT")]
+        # T2a: clients are registered and read, never changed or deleted by the application.
+        + [("client", "royexa_app", p) for p in ("INSERT", "SELECT")]
     )
 
 
@@ -225,8 +227,8 @@ def test_pr07_app_role_has_no_way_around_the_grants():
 
 def test_pr07_migrations_are_repeatable():
     """PR-07 / EV-02: applying twice leaves the same privileges and raises nothing."""
-    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql"]
-    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql"]
+    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql"]
+    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql"]
     assert _privileges() == APPEND_ONLY
 
 
