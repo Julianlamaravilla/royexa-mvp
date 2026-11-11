@@ -35,8 +35,8 @@ docker compose up -d --wait postgres
 Después, desde `backend/`:
 
 ```bash
-uv run pytest -m postgres    # las 27 pruebas con PostgreSQL
-uv run pytest -m ""          # las 79 pruebas
+uv run pytest -m postgres    # las 79 pruebas con PostgreSQL
+uv run pytest -m ""          # las 131 pruebas
 ```
 
 Las pruebas aplican la migración por sí mismas.
@@ -70,7 +70,9 @@ Las credenciales de `docker-compose.yml` y de la migración son valores de demos
 
 ## Limitaciones
 
-Con `ROYEXA_LEDGER_URL`, el libro, las cajas, los préstamos con su calendario, las excepciones de renovación y los avisos se guardan en PostgreSQL y sobreviven a un reinicio. Los desembolsos siguen en memoria (T1b): tras un reinicio no se pueden consultar, aunque su préstamo, su caja y su libro sí persisten. La lista completa está en la sección 10 del documento de diseño.
+Con `ROYEXA_LEDGER_URL`, todo el estado se guarda en PostgreSQL y sobrevive a un reinicio: libro, cajas, préstamos con su calendario, excepciones de renovación, avisos y desembolsos. Sin esa variable todo vive en memoria y se pierde al apagar el servidor. Los usuarios, rutas y clientes siguen sembrados en código. La lista completa está en la sección 10 del documento de diseño.
+
+Cada unidad de trabajo usa el aislamiento `REPEATABLE READ`: lee una copia consistente y, si otra transacción cambió antes la misma fila, pierde con un conflicto de escritura y reintenta (ADR-004).
 
 ## Al terminar
 

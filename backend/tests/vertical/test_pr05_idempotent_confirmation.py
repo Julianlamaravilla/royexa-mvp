@@ -7,7 +7,6 @@ from threading import Barrier
 
 from support import COLLECTOR
 
-from royexa.adapters.memory import InMemoryUnitOfWork
 from royexa.sales.application import ConfirmDisbursement
 
 DEVICE_TIME = datetime(2026, 10, 30, 13, 59, tzinfo=UTC)
@@ -44,14 +43,34 @@ def test_pr05_loser_of_the_uniqueness_race_recovers_the_committed_result(flow, c
     actor = container.directory.user(COLLECTOR)
     competitor_ran = []
 
-    class LosesTheRace(InMemoryUnitOfWork):
-        def commit(self) -> None:
-            if not competitor_ran:
-                competitor_ran.append(True)
-                container.confirm.execute(actor, disbursement["id"], code, DEVICE_TIME)
-            super().commit()
+    class LosesTheRace:
+        """The competitor commits right after this transaction read the disbursement, so
+        everything this one writes afterwards is stale. Wraps either adapter."""
 
-    racing = replace(container.context, uow=lambda: LosesTheRace(container.store))
+        def __init__(self) -> None:
+            self._inner = container.context.uow()
+
+        def __enter__(self):
+            self._inner.__enter__()
+            read = self._inner.disbursements.get
+
+            def get_then_let_competitor_commit(disbursement_id: str):
+                snapshot = read(disbursement_id)
+                if not competitor_ran:
+                    competitor_ran.append(True)
+                    container.confirm.execute(actor, disbursement_id, code, DEVICE_TIME)
+                return snapshot
+
+            self._inner.disbursements.get = get_then_let_competitor_commit
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            return self._inner.__exit__(*exc_info)
+
+        def __getattr__(self, name: str):
+            return getattr(self._inner, name)
+
+    racing = replace(container.context, uow=LosesTheRace)
 
     result = ConfirmDisbursement(racing).execute(actor, disbursement["id"], code, DEVICE_TIME)
 

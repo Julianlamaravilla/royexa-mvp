@@ -7,11 +7,19 @@ loan and notice commit together or not at all.
 from __future__ import annotations
 
 import psycopg
+from psycopg import errors
 from psycopg.types.json import Jsonb
 
 from royexa.adapters.postgres_ledger import PostgresLedgerSession
 from royexa.cash_box.domain import CashBox
-from royexa.loans.domain import Installment, Loan, RenewalException
+from royexa.identity_access.domain import Role
+from royexa.loans.domain import Installment, Loan, LoanTerms, RenewalException
+from royexa.sales.domain import (
+    ConfirmationCode,
+    Disbursement,
+    DisbursementStatus,
+    RefusedApprovalAttempt,
+)
 from royexa.shared.errors import StaleWrite
 from royexa.shared.money import Money
 from royexa.shared.outbox import NoticeKind, NoticeStatus, OutboxMessage
@@ -22,6 +30,14 @@ _NOTICE = (
     "id, kind, client_id, disbursement_id, created_at, payload, status, attempts, "
     "last_error, sent_at"
 )
+
+
+def _update(connection: psycopg.Connection, sql: str, params: tuple, what: str) -> int:
+    """A concurrent update that committed first surfaces as a serialization failure."""
+    try:
+        return connection.execute(sql, params).rowcount
+    except errors.SerializationFailure as error:
+        raise StaleWrite(what) from error
 
 
 class PostgresCashRepository:
@@ -43,11 +59,13 @@ class PostgresCashRepository:
         """Optimistic: the write wins only if nobody changed the box since it was read."""
         values = (box.opening_balance.cents, box.balance.cents, box.closed, box.id)
         if box.id in self._versions:
-            written = self._connection.execute(
+            written = _update(
+                self._connection,
                 "UPDATE cash_box SET opening_balance_cents = %s, balance_cents = %s, "
                 "closed = %s, version = version + 1 WHERE id = %s AND version = %s",
                 (*values, self._versions[box.id]),
-            ).rowcount
+                f"cash_box/{box.id}",
+            )
             if written == 0:
                 raise StaleWrite(f"cash_box/{box.id}")
             self._versions[box.id] += 1
@@ -113,9 +131,11 @@ class PostgresLoanRepository:
         )
 
     def save_exception(self, exception: RenewalException) -> None:
-        self._connection.execute(
+        _update(
+            self._connection,
             "UPDATE renewal_exception SET consumed_by = %s WHERE id = %s",
             (exception.consumed_by, exception.id),
+            f"renewal_exception/{exception.id}",
         )
 
     def get_exception(self, exception_id: str) -> RenewalException | None:
@@ -159,7 +179,8 @@ class PostgresOutbox:
         return next(iter(self._messages("WHERE id = %s", (message_id,))), None)
 
     def save(self, message: OutboxMessage) -> None:
-        self._connection.execute(
+        _update(
+            self._connection,
             "UPDATE outbox_message SET payload = %s, status = %s, attempts = %s, "
             "last_error = %s, sent_at = %s WHERE id = %s",
             (
@@ -170,6 +191,7 @@ class PostgresOutbox:
                 message.sent_at,
                 message.id,
             ),
+            f"outbox_message/{message.id}",
         )
 
     def pending(self) -> list[OutboxMessage]:
@@ -209,11 +231,138 @@ def _notice_values(message: OutboxMessage) -> tuple:
     )
 
 
+_DISBURSEMENT = (
+    "id, client_id, route_id, collector_id, requested_by, requested_at, principal_cents, "
+    "term_days, installment_count, interest_cents, status, renewal_exception_id, approved_by, "
+    "decided_by, decided_at, decision_reason, code_digest, code_expires_at, confirmed_by, "
+    "resolved_at, loan_id"
+)
+_MUTABLE = (
+    "status, renewal_exception_id, approved_by, decided_by, decided_at, decision_reason, "
+    "code_digest, code_expires_at, confirmed_by, resolved_at, loan_id"
+).split(", ")
+
+
+def _mutable_values(item: Disbursement) -> tuple:
+    return (
+        item.status.value,
+        item.renewal_exception_id,
+        item.approved_by,
+        item.decided_by,
+        item.decided_at,
+        item.decision_reason,
+        item.code.digest if item.code else None,
+        item.code.expires_at if item.code else None,
+        item.confirmed_by,
+        item.resolved_at,
+        item.loan_id,
+    )
+
+
+class PostgresDisbursementRepository:
+    """Optimistic like the cash box: a save wins only if the row is as it was read."""
+
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+        self._read: dict[str, tuple[int, int]] = {}  # id -> (version, stored attempts)
+
+    def add(self, item: Disbursement) -> None:
+        self._connection.execute(
+            f"INSERT INTO disbursement ({_DISBURSEMENT}) VALUES ({', '.join(['%s'] * 21)})",
+            (
+                item.id,
+                item.client_id,
+                item.route_id,
+                item.collector_id,
+                item.requested_by,
+                item.requested_at,
+                item.terms.principal.cents,
+                item.terms.term_days,
+                item.terms.installment_count,
+                item.interest.cents,
+                *_mutable_values(item),
+            ),
+        )
+        self._append_attempts(item, 0)
+        self._read[item.id] = (0, len(item.refused_approval_attempts))
+
+    def get(self, disbursement_id: str) -> Disbursement | None:
+        row = self._connection.execute(
+            f"SELECT {_DISBURSEMENT}, version FROM disbursement WHERE id = %s", (disbursement_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        attempts = [
+            RefusedApprovalAttempt(actor, Role(role), at, reason)
+            for actor, role, at, reason in self._connection.execute(
+                "SELECT actor_id, actor_role, at, reason FROM refused_approval_attempt "
+                "WHERE disbursement_id = %s ORDER BY sequence",
+                (disbursement_id,),
+            )
+        ]
+        self._read[disbursement_id] = (row[21], len(attempts))
+        code = ConfirmationCode(row[16], row[17]) if row[16] else None
+        return Disbursement(
+            id=row[0],
+            client_id=row[1],
+            route_id=row[2],
+            collector_id=row[3],
+            requested_by=row[4],
+            requested_at=row[5],
+            terms=LoanTerms(Money(row[6]), row[7], row[8]),
+            interest=Money(row[9]),
+            status=DisbursementStatus(row[10]),
+            renewal_exception_id=row[11],
+            approved_by=row[12],
+            decided_by=row[13],
+            decided_at=row[14],
+            decision_reason=row[15],
+            code=code,
+            confirmed_by=row[18],
+            resolved_at=row[19],
+            loan_id=row[20],
+            refused_approval_attempts=attempts,
+        )
+
+    def save(self, item: Disbursement) -> None:
+        version, stored = self._read[item.id]
+        assignments = ", ".join(f"{column} = %s" for column in _MUTABLE)
+        written = _update(
+            self._connection,
+            f"UPDATE disbursement SET {assignments}, version = version + 1 "
+            "WHERE id = %s AND version = %s",
+            (*_mutable_values(item), item.id, version),
+            f"disbursement/{item.id}",
+        )
+        if written == 0:
+            raise StaleWrite(f"disbursement/{item.id}")
+        self._append_attempts(item, stored)
+        self._read[item.id] = (version + 1, len(item.refused_approval_attempts))
+
+    def _append_attempts(self, item: Disbursement, already_stored: int) -> None:
+        for sequence, attempt in enumerate(
+            item.refused_approval_attempts[already_stored:], start=already_stored + 1
+        ):
+            self._connection.execute(
+                "INSERT INTO refused_approval_attempt (disbursement_id, sequence, actor_id, "
+                "actor_role, at, reason) VALUES (%s, %s, %s, %s, %s, %s)",
+                (
+                    item.id,
+                    sequence,
+                    attempt.actor_id,
+                    attempt.actor_role.value,
+                    attempt.at,
+                    attempt.reason,
+                ),
+            )
+
+
 class PostgresSession(PostgresLedgerSession):
     """The ledger session plus the mutable state, in one transaction."""
 
     def __init__(self, url: str) -> None:
         super().__init__(url)
+        self.disbursements = PostgresDisbursementRepository(self._connection)
         self.cash = PostgresCashRepository(self._connection)
         self.loans = PostgresLoanRepository(self._connection)
         self.outbox = PostgresOutbox(self._connection)
