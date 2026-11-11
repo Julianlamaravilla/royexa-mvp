@@ -38,6 +38,15 @@ FORBIDDEN = {
     "DELETE": "DELETE FROM ledger_entry WHERE id = %s",
     "TRUNCATE": "TRUNCATE ledger_entry",
 }
+ALL_MIGRATIONS = [
+    "001_ledger.sql",
+    "002_state.sql",
+    "003_disbursements.sql",
+    "004_clients.sql",
+    "005_loan_order.sql",
+    "006_payments.sql",
+    "007_non_payments.sql",
+]
 NOW = datetime(2026, 10, 30, 14, 0, tzinfo=UTC)
 RECEIPT = "COMPROBANTE_DESEMBOLSO"
 CONNECTION_DRAIN_SECONDS = 3
@@ -188,6 +197,8 @@ def test_pr07_catalog_lists_no_other_grant_on_any_table():
         + [("client", "royexa_app", p) for p in ("INSERT", "SELECT")]
         # T3a: payments and their allocation are append-only (RF-01).
         + [(t, "royexa_app", p) for t in ("payment", "payment_allocation") for p in ("INSERT", "SELECT")]
+        # T3b: a non-payment is a visit that happened and is never edited.
+        + [("non_payment", "royexa_app", p) for p in ("INSERT", "SELECT")]
     )
 
 
@@ -229,8 +240,8 @@ def test_pr07_app_role_has_no_way_around_the_grants():
 
 def test_pr07_migrations_are_repeatable():
     """PR-07 / EV-02: applying twice leaves the same privileges and raises nothing."""
-    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql", "005_loan_order.sql", "006_payments.sql"]
-    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql", "005_loan_order.sql", "006_payments.sql"]
+    assert apply_migrations() == ALL_MIGRATIONS
+    assert apply_migrations() == ALL_MIGRATIONS
     assert _privileges() == APPEND_ONLY
 
 
