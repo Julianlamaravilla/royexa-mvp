@@ -10,6 +10,8 @@ _TABLES = (
     "disbursement",
     "outbox_message",
     "renewal_exception",
+    "payment_allocation",
+    "payment",
     "loan_installment",
     "loan",
     "cash_box",
