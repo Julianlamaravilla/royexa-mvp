@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from royexa.identity_access.domain import User
-from royexa.shared.errors import DomainError
+from royexa.shared.errors import DomainError, NotFound
 from royexa.shared.ids import new_id
 from royexa.shared.money import Money
 
@@ -14,6 +14,10 @@ SUNDAY = 7
 
 
 class InvalidLoanTerms(DomainError):
+    pass
+
+
+class LoanNotFound(NotFound):
     pass
 
 

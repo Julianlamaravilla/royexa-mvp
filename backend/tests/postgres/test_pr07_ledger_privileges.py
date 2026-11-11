@@ -227,8 +227,8 @@ def test_pr07_app_role_has_no_way_around_the_grants():
 
 def test_pr07_migrations_are_repeatable():
     """PR-07 / EV-02: applying twice leaves the same privileges and raises nothing."""
-    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql"]
-    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql"]
+    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql", "005_loan_order.sql"]
+    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql", "005_loan_order.sql"]
     assert _privileges() == APPEND_ONLY
 
 

@@ -10,6 +10,7 @@ from royexa.adapters.memory import InMemoryStore, InMemoryUnitOfWork
 from royexa.adapters.simulated_notifier import SimulatedNotifier
 from royexa.clients.application import ClientQueries, RegisterClient
 from royexa.identity_access.domain import Directory
+from royexa.loans.application import LoanQueries
 from royexa.notifications.dispatcher import NoticeQueries, NotificationDispatcher
 from royexa.notifications.ports import Notifier
 from royexa.sales.application import (
@@ -48,6 +49,7 @@ class Container:
     directory: Directory
     register_client: RegisterClient
     client_queries: ClientQueries
+    loan_queries: LoanQueries
     store: InMemoryStore
     notifier: Notifier
     request: RequestDisbursement
@@ -92,6 +94,7 @@ def build_container(
         directory=directory,
         register_client=RegisterClient(unit_of_work, directory),
         client_queries=ClientQueries(unit_of_work),
+        loan_queries=LoanQueries(unit_of_work),
         store=store,
         notifier=notifier,
         request=RequestDisbursement(context),
