@@ -62,6 +62,7 @@ class NotificationDispatcher:
             message.disbursement_id,
             message.kind,
             dict(message.payload),
+            message.payment_id,
         )
 
 
@@ -71,6 +72,8 @@ class NoticeQueries:
     def __init__(self, uow: Callable[[], NotificationsUnitOfWork]) -> None:
         self._uow = uow
 
-    def list(self, disbursement_id: str | None = None) -> list[OutboxMessage]:
+    def list(
+        self, disbursement_id: str | None = None, payment_id: str | None = None
+    ) -> list[OutboxMessage]:
         with self._uow() as uow:
-            return uow.outbox.all(disbursement_id)
+            return uow.outbox.all(disbursement_id, payment_id)

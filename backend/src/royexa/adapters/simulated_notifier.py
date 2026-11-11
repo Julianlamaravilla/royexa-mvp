@@ -22,5 +22,6 @@ class SimulatedNotifier:
         if self._sink is not None:
             self._sink(
                 f"[EXT-05] to={notification.client_id} kind={notification.kind.value} "
-                f"disbursement={notification.disbursement_id} payload={notification.payload}"
+                f"disbursement={notification.disbursement_id} payment={notification.payment_id} "
+                f"payload={notification.payload}"
             )

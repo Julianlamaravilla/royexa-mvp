@@ -38,7 +38,7 @@ _BOX = "id, collector_id, opening_balance_cents, balance_cents, closed"
 _EXCEPTION = "id, client_id, prior_loan_id, granted_by, reason, granted_at, consumed_by"
 _NOTICE = (
     "id, kind, client_id, disbursement_id, created_at, payload, status, attempts, "
-    "last_error, sent_at"
+    "last_error, sent_at, payment_id"
 )
 
 
@@ -294,7 +294,7 @@ class PostgresOutbox:
 
     def add(self, message: OutboxMessage) -> None:
         self._connection.execute(
-            f"INSERT INTO outbox_message ({_NOTICE}) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            f"INSERT INTO outbox_message ({_NOTICE}) VALUES ({', '.join(['%s'] * 11)})",
             _notice_values(message),
         )
 
@@ -320,10 +320,13 @@ class PostgresOutbox:
     def pending(self) -> list[OutboxMessage]:
         return self._messages("WHERE status = %s", (NoticeStatus.PENDING.value,))
 
-    def all(self, disbursement_id: str | None = None) -> list[OutboxMessage]:
-        if disbursement_id is None:
-            return self._messages("", ())
-        return self._messages("WHERE disbursement_id = %s", (disbursement_id,))
+    def all(
+        self, disbursement_id: str | None = None, payment_id: str | None = None
+    ) -> list[OutboxMessage]:
+        filters = {"disbursement_id": disbursement_id, "payment_id": payment_id}
+        chosen = {column: value for column, value in filters.items() if value is not None}
+        where = " AND ".join(f"{column} = %s" for column in chosen)
+        return self._messages(f"WHERE {where}" if chosen else "", tuple(chosen.values()))
 
     def _messages(self, where: str, params: tuple) -> list[OutboxMessage]:
         rows = self._connection.execute(
@@ -332,9 +335,9 @@ class PostgresOutbox:
         return [
             OutboxMessage(
                 id, NoticeKind(kind), client, disbursement, created, payload,
-                NoticeStatus(status), attempts, error, sent,
+                NoticeStatus(status), attempts, error, sent, payment,
             )
-            for id, kind, client, disbursement, created, payload, status, attempts, error, sent
+            for id, kind, client, disbursement, created, payload, status, attempts, error, sent, payment
             in rows
         ]
 
@@ -351,6 +354,7 @@ def _notice_values(message: OutboxMessage) -> tuple:
         message.attempts,
         message.last_error,
         message.sent_at,
+        message.payment_id,
     )
 
 
