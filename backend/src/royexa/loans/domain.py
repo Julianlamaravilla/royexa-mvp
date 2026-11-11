@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
+from decimal import Decimal
+from fractions import Fraction
 
-from royexa.identity_access.domain import User
+from royexa.identity_access.domain import Route, User
 from royexa.shared.errors import DomainError, NotFound
 from royexa.shared.ids import new_id
-from royexa.shared.money import Money
+from royexa.shared.money import InvalidAmount, Money
+from royexa.shared.payments import PaymentMethod
 
 SUNDAY = 7
 
@@ -31,6 +34,26 @@ class ExceptionNotAllowed(DomainError):
 
 class ReasonRequired(DomainError):
     pass
+
+
+class PaymentExceedsBalance(DomainError):
+    """RN-01: a payment never exceeds the balance."""
+
+
+class PaymentNotAllowed(DomainError):
+    """RF-01: the collector of the client's route registers the payment."""
+
+
+def exact_decimal(value: Fraction) -> str:
+    """The fractional counter without rounding (RN-01, EC-03): a finite decimal when there
+    is one, otherwise the exact fraction."""
+    denominator = value.denominator
+    for factor in (2, 5):
+        while denominator % factor == 0:
+            denominator //= factor
+    if denominator != 1:
+        return f"{value.numerator}/{value.denominator}"
+    return format((Decimal(value.numerator) / Decimal(value.denominator)).normalize(), "f")
 
 
 @dataclass(frozen=True)
@@ -86,6 +109,14 @@ def build_schedule(terms: LoanTerms, interest: Money, start: date) -> tuple[Inst
 
 
 @dataclass(frozen=True)
+class Allocation:
+    """The part of a payment that went to one installment."""
+
+    sequence: int
+    amount: Money
+
+
+@dataclass(frozen=True)
 class Loan:
     id: str
     client_id: str
@@ -107,8 +138,82 @@ class Loan:
         return sum((item.pending for item in self.installments), Money(0))
 
     @property
+    def installment_count(self) -> int:
+        return len(self.installments)
+
+    @property
+    def remaining_installments(self) -> Fraction:
+        """RN-01: each installment counts for the share of it still owed, so 25 paid over
+        an installment of 50 leaves 19.5 of 20."""
+        return sum(
+            (Fraction(item.pending.cents, item.amount.cents) for item in self.installments),
+            Fraction(0),
+        )
+
+    def apply_payment(self, amount: Money) -> tuple[Loan, tuple[Allocation, ...]]:
+        """RN-01: oldest installments first, the excess to the next, never past the balance.
+        Returns the loan after the payment; this one is left as it was."""
+        if not amount.is_positive:
+            raise InvalidAmount("the payment must be positive")
+        if amount > self.outstanding:
+            raise PaymentExceedsBalance(self.id)
+        left = amount.cents
+        allocations: list[Allocation] = []
+        installments: list[Installment] = []
+        for item in self.installments:
+            take = min(left, item.pending.cents)
+            if take:
+                allocations.append(Allocation(item.sequence, Money(take)))
+                item = replace(item, paid=item.paid + Money(take))
+                left -= take
+            installments.append(item)
+        return replace(self, installments=tuple(installments)), tuple(allocations)
+
+    @property
     def is_settled(self) -> bool:
         return not self.outstanding.is_positive
+
+
+@dataclass(frozen=True)
+class Payment:
+    """Money received on a loan, in cash or by transfer (RF-01, RES-01)."""
+
+    id: str
+    loan_id: str
+    client_id: str
+    collector_id: str
+    amount: Money
+    method: PaymentMethod
+    device_time: datetime
+    server_time: datetime
+    allocations: tuple[Allocation, ...] = field(default_factory=tuple)
+
+    @classmethod
+    def register(
+        cls,
+        actor: User,
+        route: Route,
+        loan: Loan,
+        amount: Money,
+        method: PaymentMethod,
+        device_time: datetime,
+        now: datetime,
+    ) -> tuple[Payment, Loan]:
+        if actor.id != route.collector_id:
+            raise PaymentNotAllowed(actor.id)
+        updated, allocations = loan.apply_payment(amount)
+        payment = cls(
+            new_id(),
+            loan.id,
+            loan.client_id,
+            actor.id,
+            amount,
+            method,
+            device_time,
+            now,
+            allocations,
+        )
+        return payment, updated
 
 
 @dataclass

@@ -26,10 +26,14 @@ from royexa.loans.domain import (
     ExceptionNotAllowed,
     InvalidLoanTerms,
     Loan,
-    LoanTerms,
     LoanNotFound,
+    LoanTerms,
+    Payment,
+    PaymentExceedsBalance,
+    PaymentNotAllowed,
     PriorLoanNotSettled,
     ReasonRequired,
+    exact_decimal,
 )
 from royexa.sales.application import DisbursementDetail
 from royexa.sales.domain import (
@@ -46,6 +50,7 @@ from royexa.sales.domain import (
 )
 from royexa.shared.errors import DomainError, WriteConflict
 from royexa.shared.money import InvalidAmount, Money
+from royexa.shared.payments import PaymentMethod
 from royexa.shared.outbox import OutboxMessage
 
 PROBLEM_BASE = "https://royexa.local/problemas/"
@@ -65,6 +70,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     ValidatorNotAllowed: (403, "validador-no-autorizado", "Solo el cobrador de la ruta valida"),
     ClientOutsideRoute: (403, "cliente-fuera-de-ruta", "El cliente no pertenece a la ruta"),
     ClientRegistrationNotAllowed: (403, "rol-administrador-requerido", "Solo un administrador da de alta clientes"),
+    PaymentNotAllowed: (403, "pago-no-permitido", "Solo el cobrador de la ruta registra el pago"),
     ExceptionNotAllowed: (403, "excepcion-no-permitida", "Excepcion no permitida"),
     DisbursementNotFound: (404, "desembolso-no-encontrado", "Desembolso no encontrado"),
     ClientNotFound: (404, "cliente-no-encontrado", "Cliente no encontrado"),
@@ -78,6 +84,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     WriteConflict: (409, "conflicto-de-escritura", "Operacion concurrente; reintente"),
     InvalidConfirmationCode: (422, "codigo-invalido", "Codigo de confirmacion invalido"),
     AmountExceedsRouteLimit: (422, "monto-sobre-limite-de-ruta", "Monto sobre el limite de ruta"),
+    PaymentExceedsBalance: (422, "pago-excede-saldo", "El pago excede el saldo del prestamo"),
     InvalidClient: (422, "cliente-invalido", "Cliente invalido"),
     InvalidLoanTerms: (422, "condiciones-invalidas", "Condiciones de prestamo invalidas"),
     InvalidAmount: (422, "monto-invalido", "Monto invalido"),
@@ -128,6 +135,30 @@ class InstallmentOut(BaseModel):
     sequence: int
     due_date: str
     amount_cents: int
+    paid_cents: int
+
+
+class PaymentBody(BaseModel):
+    amount_cents: int = Field(gt=0)
+    method: PaymentMethod
+    device_time: datetime
+
+
+class AllocationOut(BaseModel):
+    sequence: int
+    amount_cents: int
+
+
+class PaymentOut(BaseModel):
+    id: str
+    loan_id: str
+    client_id: str
+    collector_id: str
+    amount_cents: int
+    method: str
+    device_time: datetime
+    server_time: datetime
+    allocations: list[AllocationOut]
 
 
 class LoanOut(BaseModel):
@@ -137,12 +168,21 @@ class LoanOut(BaseModel):
     principal_cents: int
     interest_cents: int
     outstanding_cents: int
+    installment_count: int
+    remaining_installments: str
     installments: list[InstallmentOut]
+
+
+class PaymentResultOut(BaseModel):
+    payment: PaymentOut
+    loan: LoanOut
 
 
 class LedgerEntryOut(BaseModel):
     id: str
-    disbursement_id: str
+    disbursement_id: str | None
+    payment_id: str | None
+    payment_method: str | None
     entry_type: str
     amount_cents: int
     cash_effect_cents: int
@@ -228,13 +268,33 @@ def _loan_out(loan: Loan) -> LoanOut:
         principal_cents=loan.principal.cents,
         interest_cents=loan.interest.cents,
         outstanding_cents=loan.outstanding.cents,
+        installment_count=loan.installment_count,
+        remaining_installments=exact_decimal(loan.remaining_installments),
         installments=[
             InstallmentOut(
                 sequence=item.sequence,
                 due_date=item.due_date.isoformat(),
                 amount_cents=item.amount.cents,
+                paid_cents=item.paid.cents,
             )
             for item in loan.installments
+        ],
+    )
+
+
+def _payment_out(payment: Payment) -> PaymentOut:
+    return PaymentOut(
+        id=payment.id,
+        loan_id=payment.loan_id,
+        client_id=payment.client_id,
+        collector_id=payment.collector_id,
+        amount_cents=payment.amount.cents,
+        method=payment.method.value,
+        device_time=payment.device_time,
+        server_time=payment.server_time,
+        allocations=[
+            AllocationOut(sequence=item.sequence, amount_cents=item.amount.cents)
+            for item in payment.allocations
         ],
     )
 
@@ -243,6 +303,8 @@ def _entry_out(entry: LedgerEntry) -> LedgerEntryOut:
     return LedgerEntryOut(
         id=entry.id,
         disbursement_id=entry.disbursement_id,
+        payment_id=entry.payment_id,
+        payment_method=entry.payment_method,
         entry_type=entry.entry_type.value,
         amount_cents=entry.amount.cents,
         cash_effect_cents=entry.cash_effect.cents,
@@ -401,6 +463,17 @@ def create_app(container: Container) -> FastAPI:
     @app.get("/v1/clients/{client_id}/loans", response_model=list[LoanOut])
     def read_client_loans(client_id: str, _: Actor) -> list[LoanOut]:
         return [_loan_out(loan) for loan in container.loan_queries.for_client(client_id)]
+
+    @app.post("/v1/loans/{loan_id}/payments", status_code=201, response_model=PaymentResultOut)
+    def register_payment(loan_id: str, body: PaymentBody, actor: Actor) -> PaymentResultOut:
+        payment, loan = container.register_payment.execute(
+            actor, loan_id, Money(body.amount_cents), body.method, body.device_time
+        )
+        return PaymentResultOut(payment=_payment_out(payment), loan=_loan_out(loan))
+
+    @app.get("/v1/loans/{loan_id}/payments", response_model=list[PaymentOut])
+    def read_payments(loan_id: str, _: Actor) -> list[PaymentOut]:
+        return [_payment_out(item) for item in container.payment_queries.for_loan(loan_id)]
 
     @app.get("/v1/loans/{loan_id}", response_model=LoanOut)
     def read_loan(loan_id: str, _: Actor) -> LoanOut:

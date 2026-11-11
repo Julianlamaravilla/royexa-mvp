@@ -32,3 +32,8 @@ class CashBox:
         """RN-03: only a confirmed disbursement reaches this point."""
         self.ensure_open()
         self.balance = self.balance - amount
+
+    def collect(self, amount: Money) -> None:
+        """RF-01: cash received on a payment. Transfers never reach this point (RES-01)."""
+        self.ensure_open()
+        self.balance = self.balance + amount

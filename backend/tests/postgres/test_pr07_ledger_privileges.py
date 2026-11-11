@@ -186,6 +186,8 @@ def test_pr07_catalog_lists_no_other_grant_on_any_table():
         + [("refused_approval_attempt", "royexa_app", p) for p in ("INSERT", "SELECT")]
         # T2a: clients are registered and read, never changed or deleted by the application.
         + [("client", "royexa_app", p) for p in ("INSERT", "SELECT")]
+        # T3a: payments and their allocation are append-only (RF-01).
+        + [(t, "royexa_app", p) for t in ("payment", "payment_allocation") for p in ("INSERT", "SELECT")]
     )
 
 
@@ -227,8 +229,8 @@ def test_pr07_app_role_has_no_way_around_the_grants():
 
 def test_pr07_migrations_are_repeatable():
     """PR-07 / EV-02: applying twice leaves the same privileges and raises nothing."""
-    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql", "005_loan_order.sql"]
-    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql", "005_loan_order.sql"]
+    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql", "005_loan_order.sql", "006_payments.sql"]
+    assert apply_migrations() == ["001_ledger.sql", "002_state.sql", "003_disbursements.sql", "004_clients.sql", "005_loan_order.sql", "006_payments.sql"]
     assert _privileges() == APPEND_ONLY
 
 

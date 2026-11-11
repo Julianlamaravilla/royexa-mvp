@@ -14,7 +14,7 @@ from royexa.shared.money import Money
 
 _COLUMNS = (
     "id, disbursement_id, entry_type, amount_cents, cash_box_id, "
-    "actor_id, device_time, server_time, reason"
+    "actor_id, device_time, server_time, reason, payment_id, payment_method"
 )
 
 
@@ -31,7 +31,7 @@ class PostgresLedgerRepository:
     def append(self, entry: LedgerEntry) -> None:
         try:
             self._connection.execute(
-                f"INSERT INTO ledger_entry ({_COLUMNS}) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                f"INSERT INTO ledger_entry ({_COLUMNS}) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     entry.id,
                     entry.disbursement_id,
@@ -42,10 +42,12 @@ class PostgresLedgerRepository:
                     entry.device_time,
                     entry.server_time,
                     entry.reason,
+                    entry.payment_id,
+                    entry.payment_method,
                 ),
             )
         except errors.UniqueViolation as error:
-            raise DuplicateLedgerEntry(entry.disbursement_id) from error
+            raise DuplicateLedgerEntry(entry.operation_id) from error
 
     def for_disbursement(self, disbursement_id: str) -> list[LedgerEntry]:
         rows = self._connection.execute(
