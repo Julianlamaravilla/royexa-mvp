@@ -35,8 +35,8 @@ docker compose up -d --wait postgres
 Después, desde `backend/`:
 
 ```bash
-uv run pytest -m postgres    # las 105 pruebas con PostgreSQL
-uv run pytest -m ""          # las 190 pruebas
+uv run pytest -m postgres    # las 118 pruebas con PostgreSQL
+uv run pytest -m ""          # las 215 pruebas
 ```
 
 Las pruebas aplican la migración por sí mismas.
@@ -70,7 +70,7 @@ Las credenciales de `docker-compose.yml` y de la migración son valores de demos
 
 ## Limitaciones
 
-Con `ROYEXA_LEDGER_URL`, todo el estado se guarda en PostgreSQL y sobrevive a un reinicio: libro, cajas, clientes, préstamos con su calendario, excepciones de renovación, avisos y desembolsos. Sin esa variable todo vive en memoria y se pierde al apagar el servidor. Los usuarios y las rutas siguen sembrados en código; los clientes se dan de alta con `POST /v1/clients` (solo el administrador) y se leen con `GET /v1/clients` y `GET /v1/clients/{id}`. Los préstamos, con su calendario de cuotas, se leen con `GET /v1/loans/{id}` y `GET /v1/clients/{id}/loans`; nacen al confirmar un desembolso (RN-03). El cobrador de la ruta registra un pago con `POST /v1/loans/{id}/payments` (efectivo o transferencia; se imputa a las cuotas más antiguas y no puede exceder el saldo) y se leen con `GET /v1/loans/{id}/payments`. El contador `remaining_installments` es exacto: `19.5`, o una fracción como `113/6` cuando no tiene decimal finito. Cada pago deja su asiento `PAGO` en el libro; solo el efectivo suma a la caja. La lista completa está en la sección 10 del documento de diseño.
+Con `ROYEXA_LEDGER_URL`, todo el estado se guarda en PostgreSQL y sobrevive a un reinicio: libro, cajas, clientes, préstamos con su calendario, excepciones de renovación, avisos y desembolsos. Sin esa variable todo vive en memoria y se pierde al apagar el servidor. Los usuarios y las rutas siguen sembrados en código; los clientes se dan de alta con `POST /v1/clients` (solo el administrador) y se leen con `GET /v1/clients` y `GET /v1/clients/{id}`. Los préstamos, con su calendario de cuotas, se leen con `GET /v1/loans/{id}` y `GET /v1/clients/{id}/loans`; nacen al confirmar un desembolso (RN-03). El cobrador de la ruta registra un pago con `POST /v1/loans/{id}/payments` (efectivo o transferencia; se imputa a las cuotas más antiguas y no puede exceder el saldo) y se leen con `GET /v1/loans/{id}/payments`. El contador `remaining_installments` es exacto: `19.5`, o una fracción como `113/6` cuando no tiene decimal finito. Cada pago deja su asiento `PAGO` en el libro; solo el efectivo suma a la caja. Si el cliente no paga, el cobrador lo registra con `POST /v1/loans/{id}/non-payments` (motivo y fecha de compromiso posterior al día del registro; no cambia el saldo) y se lee con `GET /v1/loans/{id}/non-payments`. `GET /v1/routes/{id}/pending-visits?date=AAAA-MM-DD` lista los clientes pendientes de visita: de lunes a sábado, todo cliente de la ruta con un préstamo activo sin pago ni no pago ese día; el domingo no hay pendientes. Lo lee el cobrador de la ruta o un administrador. El día se cuenta en UTC. La lista completa está en la sección 10 del documento de diseño.
 
 Cada unidad de trabajo usa el aislamiento `REPEATABLE READ`: lee una copia consistente y, si otra transacción cambió antes la misma fila, pierde con un conflicto de escritura y reintenta (ADR-004).
 

@@ -19,6 +19,7 @@ from royexa.loans.domain import (
     Installment,
     Loan,
     LoanTerms,
+    NonPayment,
     Payment,
     RenewalException,
 )
@@ -258,6 +259,35 @@ class PostgresPaymentRepository:
         return payments
 
 
+class PostgresNonPaymentRepository:
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+
+    def add(self, item: NonPayment) -> None:
+        self._connection.execute(
+            "INSERT INTO non_payment (id, loan_id, client_id, collector_id, reason, "
+            "commitment_date, device_time, server_time) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                item.id,
+                item.loan_id,
+                item.client_id,
+                item.collector_id,
+                item.reason,
+                item.commitment_date,
+                item.device_time,
+                item.server_time,
+            ),
+        )
+
+    def for_loan(self, loan_id: str) -> list[NonPayment]:
+        rows = self._connection.execute(
+            "SELECT id, loan_id, client_id, collector_id, reason, commitment_date, device_time, "
+            "server_time FROM non_payment WHERE loan_id = %s ORDER BY seq",
+            (loan_id,),
+        )
+        return [NonPayment(*row) for row in rows]
+
+
 class PostgresOutbox:
     def __init__(self, connection: psycopg.Connection) -> None:
         self._connection = connection
@@ -460,6 +490,7 @@ class PostgresSession(PostgresLedgerSession):
         self.cash = PostgresCashRepository(self._connection)
         self.loans = PostgresLoanRepository(self._connection)
         self.payments = PostgresPaymentRepository(self._connection)
+        self.non_payments = PostgresNonPaymentRepository(self._connection)
         self.outbox = PostgresOutbox(self._connection)
 
 

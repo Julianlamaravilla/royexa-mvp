@@ -147,3 +147,27 @@ class Flow:
         response = self.confirm(disbursement["id"], self.issued_code(disbursement["id"]))
         assert response.status_code == 200, response.text
         return response.json()
+
+    def non_pay(
+        self,
+        loan_id: str,
+        reason: str = "no tiene dinero",
+        commitment_date: str | None = "2026-10-31",
+        actor: str = COLLECTOR,
+        device_time: str = DEVICE_TIME,
+    ) -> Response:
+        body = {"reason": reason, "device_time": device_time}
+        if commitment_date is not None:
+            body["commitment_date"] = commitment_date
+        return self._post(f"/v1/loans/{loan_id}/non-payments", actor, body)
+
+    def pending(self, route: str = "ruta-1", day: str | None = None, actor: str = COLLECTOR):
+        suffix = f"?date={day}" if day else ""
+        return self._get(f"/v1/routes/{route}/pending-visits{suffix}", actor)
+
+    def pending_clients(
+        self, route: str = "ruta-1", day: str | None = None, actor: str = COLLECTOR
+    ) -> list[str]:
+        response = self.pending(route, day, actor)
+        assert response.status_code == 200, response.text
+        return [row["client_id"] for row in response.json()]
