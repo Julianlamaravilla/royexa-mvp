@@ -32,7 +32,7 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: solo el administrador da de alta; una ruta inexistente o un nombre vacío se rechazan; un cliente nuevo puede recibir un desembolso; tras reiniciar el servidor el cliente sigue consultable.
 - [x] **T2b Préstamos y calendario (RF-05, CA-09, CA-10).** Consulta de un préstamo con su calendario de cuotas y de los préstamos de un cliente.
   - Acepta: CA-09 y CA-10 tienen una prueba cada uno, con un cliente dado de alta por la API.
-- [ ] **T3 Pago y no pago en ruta (RF-01, RN-01).** Registro de pago con contador fraccionario y de no pago con motivo y compromiso de pago; cada pago genera su asiento en el libro.
+- [ ] **T3 Pago y no pago en ruta (RF-01, RN-01).** *Detenida: faltan las decisiones T3-P1 y T3-P2 de «Preguntas abiertas».* Registro de pago con contador fraccionario y de no pago con motivo y compromiso de pago; cada pago genera su asiento en el libro.
   - Acepta: los criterios de RF-01 tienen prueba; 25 sobre una cuota de 50 deja 19,5 cuotas de 20, como exige RN-01.
 - [ ] **T4 Comprobante del pago (RF-06).** Cada pago emite un aviso con importe, saldo restante y próximo vencimiento, por el notificador simulado y con el mismo patrón de bandeja de salida del desembolso.
   - Acepta: los criterios de RF-06 tienen prueba; un fallo del notificador no pierde el aviso.
@@ -50,7 +50,14 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
 
 ## Preguntas abiertas
 
-- Ninguna por ahora.
+- **T3-P1. ¿Quién está «pendiente de visita»?** CA-02 pide que, al registrar un no pago, el cliente «deje de estar pendiente de visita», y RN-02 (T5) solo permite cerrar la caja sin pendientes, pero ningún documento define cuándo un cliente está pendiente ni quién forma la ruta del día. Bloquea T3 (CA-02), T5 y T7.
+  - Propuesta recomendada: cada día de cobranza (lunes a sábado) es pendiente todo cliente de la ruta con un préstamo `ACTIVO`, hasta que el cobrador registra un pago o un no pago ese día. Un cliente sin préstamo activo nunca es pendiente.
+  - Alternativa: solo son pendientes los clientes con una cuota vencida o con un compromiso de pago para ese día. Reduce la ruta, pero un cliente al día no se visita.
+- **T3-P2. Fecha de compromiso del no pago.** CA-02 pide «una fecha de compromiso» sin más reglas.
+  - Propuesta recomendada: obligatoria y posterior al día del registro; solo se guarda y se consulta, no vuelve pendiente a nadie ni cambia el saldo.
+  - Alternativa: opcional, o con un límite máximo de días.
+
+Resuelto con los documentos, sin pregunta: el medio de pago es efectivo o transferencia y solo el efectivo suma a la caja (arquitectura, «Caja»); el pago se imputa a las cuotas más antiguas primero y nunca excede el saldo (RN-01, «Pago»); cada pago genera su asiento en el libro.
 
 ## Evidencia
 
