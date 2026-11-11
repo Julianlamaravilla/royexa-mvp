@@ -69,6 +69,9 @@ class PostgresLedgerSession:
 
     def __init__(self, url: str) -> None:
         self._connection = psycopg.connect(url)
+        # Like the in-memory snapshot: each unit of work reads a private, consistent copy,
+        # so the loser of a race never sees half of the winner's commit (ADR-004).
+        self._connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         self.repository = PostgresLedgerRepository(self._connection)
 
     def commit(self) -> None:

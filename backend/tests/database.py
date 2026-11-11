@@ -6,6 +6,8 @@ from royexa.migrate import MIGRATOR_URL, apply_migrations
 
 _TABLES = (
     "ledger_entry",
+    "refused_approval_attempt",
+    "disbursement",
     "outbox_message",
     "renewal_exception",
     "loan_installment",
