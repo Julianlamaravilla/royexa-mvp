@@ -170,16 +170,19 @@ class InMemoryUnitOfWork:
         with self._store.lock:
             self._base = deepcopy(self._store.tables)
         self._work = deepcopy(self._base)
-        self.disbursements = InMemoryDisbursementRepository(self._work)
         if self._ledger_session_factory is None:
             self.ledger = InMemoryLedgerRepository(self._work.ledger)
+            self.disbursements = InMemoryDisbursementRepository(self._work)
             self.loans = InMemoryLoanRepository(self._work)
             self.cash = InMemoryCashRepository(self._work)
             self.outbox = InMemoryOutbox(self._work)
         else:
             self._session = self._ledger_session_factory()
             self.ledger = self._session.repository
-            # T1a: a session that carries the mutable state replaces the in-memory copies.
+            # T1a, T1b: a session that carries the state replaces the in-memory copies.
+            self.disbursements = getattr(
+                self._session, "disbursements", None
+            ) or InMemoryDisbursementRepository(self._work)
             self.loans = getattr(self._session, "loans", None) or InMemoryLoanRepository(self._work)
             self.cash = getattr(self._session, "cash", None) or InMemoryCashRepository(self._work)
             self.outbox = getattr(self._session, "outbox", None) or InMemoryOutbox(self._work)
