@@ -14,7 +14,12 @@ from pydantic import BaseModel, Field
 
 from royexa.bootstrap import Container
 from royexa.cash_box.domain import CashBox, CashBoxClosed, NoOpenCashBox
-from royexa.clients.domain import ClientNotFound
+from royexa.clients.domain import (
+    Client,
+    ClientNotFound,
+    ClientRegistrationNotAllowed,
+    InvalidClient,
+)
 from royexa.identity_access.domain import RouteNotFound, UnknownActor, User
 from royexa.ledger.domain import LedgerEntry
 from royexa.loans.domain import (
@@ -58,6 +63,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     DeciderRoleRequired: (403, "rol-aprobador-requerido", "Solo un administrador rechaza"),
     ValidatorNotAllowed: (403, "validador-no-autorizado", "Solo el cobrador de la ruta valida"),
     ClientOutsideRoute: (403, "cliente-fuera-de-ruta", "El cliente no pertenece a la ruta"),
+    ClientRegistrationNotAllowed: (403, "rol-administrador-requerido", "Solo un administrador da de alta clientes"),
     ExceptionNotAllowed: (403, "excepcion-no-permitida", "Excepcion no permitida"),
     DisbursementNotFound: (404, "desembolso-no-encontrado", "Desembolso no encontrado"),
     ClientNotFound: (404, "cliente-no-encontrado", "Cliente no encontrado"),
@@ -70,6 +76,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     WriteConflict: (409, "conflicto-de-escritura", "Operacion concurrente; reintente"),
     InvalidConfirmationCode: (422, "codigo-invalido", "Codigo de confirmacion invalido"),
     AmountExceedsRouteLimit: (422, "monto-sobre-limite-de-ruta", "Monto sobre el limite de ruta"),
+    InvalidClient: (422, "cliente-invalido", "Cliente invalido"),
     InvalidLoanTerms: (422, "condiciones-invalidas", "Condiciones de prestamo invalidas"),
     InvalidAmount: (422, "monto-invalido", "Monto invalido"),
     ReasonRequired: (422, "motivo-requerido", "Se requiere un motivo"),
@@ -98,6 +105,17 @@ class DecisionBody(BaseModel):
 class ConfirmBody(BaseModel):
     code: str
     device_time: datetime
+
+
+class ClientBody(BaseModel):
+    name: str
+    route_id: str
+
+
+class ClientOut(BaseModel):
+    id: str
+    name: str
+    route_id: str
 
 
 class ExceptionBody(BaseModel):
@@ -289,6 +307,10 @@ def _box_out(box: CashBox) -> CashBoxOut:
     )
 
 
+def _client_out(client: Client) -> ClientOut:
+    return ClientOut(id=client.id, name=client.name, route_id=client.route_id)
+
+
 def create_app(container: Container) -> FastAPI:
     app = FastAPI(title="ROYEXA API", version="0.3.0")
 
@@ -357,6 +379,18 @@ def create_app(container: Container) -> FastAPI:
     @app.get("/v1/cash-boxes/{collector_id}", response_model=CashBoxOut)
     def read_cash_box(collector_id: str, _: Actor) -> CashBoxOut:
         return _box_out(container.queries.cash_box(collector_id))
+
+    @app.post("/v1/clients", status_code=201, response_model=ClientOut)
+    def register_client(body: ClientBody, actor: Actor) -> ClientOut:
+        return _client_out(container.register_client.execute(actor, body.name, body.route_id))
+
+    @app.get("/v1/clients", response_model=list[ClientOut])
+    def list_clients(_: Actor) -> list[ClientOut]:
+        return [_client_out(client) for client in container.client_queries.all()]
+
+    @app.get("/v1/clients/{client_id}", response_model=ClientOut)
+    def read_client(client_id: str, _: Actor) -> ClientOut:
+        return _client_out(container.client_queries.get(client_id))
 
     @app.post(
         "/v1/clients/{client_id}/renewal-exceptions",

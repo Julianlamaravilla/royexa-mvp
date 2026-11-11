@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from royexa.cash_box.domain import CashBox, NoOpenCashBox
-from royexa.clients.domain import ClientCatalog
+from royexa.clients.domain import ClientNotFound
 from royexa.identity_access.domain import Directory, User
 from royexa.ledger.domain import LedgerEntry
 from royexa.ledger.posting import LedgerPosting
@@ -38,9 +38,15 @@ class SalesContext:
     uow: Callable[[], SalesUnitOfWork]
     clock: Clock
     directory: Directory
-    clients: ClientCatalog
     code_ttl: timedelta
     new_code: Callable[[], str] = generate_code
+
+
+def _client(uow: SalesUnitOfWork, client_id: str):
+    client = uow.clients.get(client_id)
+    if client is None:
+        raise ClientNotFound(client_id)
+    return client
 
 
 def _load(uow: SalesUnitOfWork, disbursement_id: str) -> Disbursement:
@@ -58,10 +64,10 @@ class RequestDisbursement:
 
     def execute(self, actor: User, client_id: str, terms: LoanTerms) -> Disbursement:
         context = self._context
-        client = context.clients.get(client_id)
-        route = context.directory.route(client.route_id)
-        collector = context.directory.user(route.collector_id)
         with context.uow() as uow:
+            client = _client(uow, client_id)
+            route = context.directory.route(client.route_id)
+            collector = context.directory.user(route.collector_id)
             prior = uow.loans.unsettled_for_client(client.id)
             exception = uow.loans.open_exception_for(client.id) if prior else None
             disbursement = Disbursement.request(
@@ -231,8 +237,8 @@ class GrantRenewalException:
 
     def execute(self, actor: User, client_id: str, reason: str) -> RenewalException:
         context = self._context
-        client = context.clients.get(client_id)
         with context.uow() as uow:
+            client = _client(uow, client_id)
             prior = uow.loans.unsettled_for_client(client.id)
             exception = RenewalException.grant(actor, prior, reason, context.clock.now())
             uow.loans.add_exception(exception)

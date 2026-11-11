@@ -12,6 +12,7 @@ from psycopg.types.json import Jsonb
 
 from royexa.adapters.postgres_ledger import PostgresLedgerSession
 from royexa.cash_box.domain import CashBox
+from royexa.clients.domain import Client
 from royexa.identity_access.domain import Role
 from royexa.loans.domain import Installment, Loan, LoanTerms, RenewalException
 from royexa.sales.domain import (
@@ -76,6 +77,27 @@ class PostgresCashRepository:
                 (*values, box.collector_id),
             )
             self._versions[box.id] = 0
+
+
+class PostgresClientRepository:
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+
+    def add(self, client: Client) -> None:
+        self._connection.execute(
+            "INSERT INTO client (id, name, route_id) VALUES (%s, %s, %s)",
+            (client.id, client.name, client.route_id),
+        )
+
+    def get(self, client_id: str) -> Client | None:
+        row = self._connection.execute(
+            "SELECT id, name, route_id FROM client WHERE id = %s", (client_id,)
+        ).fetchone()
+        return Client(*row) if row else None
+
+    def all(self) -> list[Client]:
+        rows = self._connection.execute("SELECT id, name, route_id FROM client ORDER BY seq")
+        return [Client(*row) for row in rows]
 
 
 class PostgresLoanRepository:
@@ -362,15 +384,23 @@ class PostgresSession(PostgresLedgerSession):
 
     def __init__(self, url: str) -> None:
         super().__init__(url)
+        self.clients = PostgresClientRepository(self._connection)
         self.disbursements = PostgresDisbursementRepository(self._connection)
         self.cash = PostgresCashRepository(self._connection)
         self.loans = PostgresLoanRepository(self._connection)
         self.outbox = PostgresOutbox(self._connection)
 
 
-def seed_database(url: str, boxes: list[CashBox], loans: list[Loan]) -> None:
+def seed_database(
+    url: str, boxes: list[CashBox], loans: list[Loan], clients: list[Client]
+) -> None:
     """Demo data (RES-02). Rows that already exist are left as they are."""
     with psycopg.connect(url) as connection:
+        for client in clients:
+            connection.execute(
+                "INSERT INTO client (id, name, route_id) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                (client.id, client.name, client.route_id),
+            )
         for box in boxes:
             connection.execute(
                 "INSERT INTO cash_box (id, collector_id, opening_balance_cents, balance_cents, "
