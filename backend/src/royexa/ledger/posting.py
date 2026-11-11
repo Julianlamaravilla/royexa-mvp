@@ -10,6 +10,7 @@ from royexa.ledger.domain import CODE_EXPIRED_REASON, LedgerEntry, LedgerEntryTy
 from royexa.ledger.ports import LedgerRepository
 from royexa.shared.ids import new_id
 from royexa.shared.money import Money
+from royexa.shared.payments import PaymentMethod
 
 
 class LedgerPosting:
@@ -64,6 +65,36 @@ class LedgerPosting:
             device_time,
             server_time,
             CODE_EXPIRED_REASON,
+        )
+        self._ledger.append(entry)
+        return entry
+
+    def post_payment(
+        self,
+        payment_id: str,
+        collector_id: str,
+        amount: Money,
+        method: PaymentMethod,
+        actor_id: str,
+        device_time: datetime,
+        server_time: datetime,
+    ) -> LedgerEntry:
+        """RF-01: every payment leaves its entry; only cash moves the box (RES-01)."""
+        box = self._box_of(collector_id)
+        if method is PaymentMethod.CASH:
+            box.collect(amount)
+            self._cash.save(box)
+        entry = LedgerEntry(
+            new_id(),
+            None,
+            LedgerEntryType.PAYMENT,
+            amount,
+            box.id,
+            actor_id,
+            device_time,
+            server_time,
+            payment_id=payment_id,
+            payment_method=method.value,
         )
         self._ledger.append(entry)
         return entry
