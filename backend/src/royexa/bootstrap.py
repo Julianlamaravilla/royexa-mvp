@@ -60,6 +60,7 @@ class Settings:
     session_ttl: timedelta = DEFAULT_SESSION_TTL
     currency_symbol: str = ""
     require_changed_passwords: bool = False
+    dispatch_seconds: float = 30.0
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -71,6 +72,7 @@ class Settings:
             timezone=os.environ.get("ROYEXA_TIMEZONE", DEFAULT_TIMEZONE),
             require_changed_passwords=os.environ.get("ROYEXA_REQUIRE_CHANGED_PASSWORDS") == "1",
             currency_symbol=os.environ.get("ROYEXA_CURRENCY_SYMBOL", ""),
+            dispatch_seconds=float(os.environ.get("ROYEXA_DISPATCH_SECONDS", "30")),
             session_ttl=timedelta(
                 hours=float(os.environ.get("ROYEXA_SESSION_HOURS", DEFAULT_SESSION_TTL.total_seconds() / 3600))
             ),

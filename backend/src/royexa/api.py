@@ -5,6 +5,8 @@ The actor is the user of a valid session (T6): a token from POST /v1/auth/login,
 still seeded (ALT-06B). Errors follow RFC 9457 problem details.
 """
 
+import asyncio
+from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Annotated
 
@@ -61,10 +63,12 @@ from royexa.loans.domain import (
     exact_decimal,
 )
 from royexa.sales.application import DisbursementDetail
+from royexa.background import dispatch_forever
 from royexa.sales.domain import (
     AmountExceedsRouteLimit,
     ApproverRoleRequired,
     ClientOutsideRoute,
+    CodeLocked,
     ConfirmationCodeExpired,
     DeciderRoleRequired,
     DisbursementNotFound,
@@ -122,6 +126,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     InvalidTransition: (409, "transicion-invalida", "Transicion de estado no permitida"),
     ConfirmationCodeExpired: (409, "codigo-caducado", "El codigo de confirmacion caduco"),
     WriteConflict: (409, "conflicto-de-escritura", "Operacion concurrente; reintente"),
+    CodeLocked: (423, "codigo-bloqueado", "Demasiados codigos incorrectos; espere 15 minutos"),
     InvalidConfirmationCode: (422, "codigo-invalido", "Codigo de confirmacion invalido"),
     AmountExceedsRouteLimit: (422, "monto-sobre-limite-de-ruta", "Monto sobre el limite de ruta"),
     InvalidCommitmentDate: (422, "compromiso-invalido", "El compromiso debe ser posterior al dia del registro"),
@@ -384,6 +389,8 @@ class DisbursementOut(BaseModel):
     confirmed_by: str | None
     resolved_at: datetime | None
     renewal_exception_id: str | None
+    failed_code_attempts: int
+    code_locked_until: datetime | None
     rejected_approval_attempts: list[AttemptOut]
     loan: LoanOut | None
     ledger_entries: list[LedgerEntryOut]
@@ -575,6 +582,8 @@ def _disbursement_out(detail: DisbursementDetail) -> DisbursementOut:
         confirmed_by=item.confirmed_by,
         resolved_at=item.resolved_at,
         renewal_exception_id=item.renewal_exception_id,
+        failed_code_attempts=item.failed_code_attempts,
+        code_locked_until=item.code_locked_until,
         rejected_approval_attempts=[
             AttemptOut(
                 actor_id=attempt.actor_id,
@@ -619,8 +628,26 @@ def _client_out(client: Client) -> ClientOut:
     return ClientOut(id=client.id, name=client.name, route_id=client.route_id)
 
 
-def create_app(container: Container) -> FastAPI:
-    app = FastAPI(title="ROYEXA API", version="0.3.0")
+def create_app(container: Container, dispatch_every: float = 0.0) -> FastAPI:
+    """`dispatch_every` > 0 starts the notice dispatcher loop with the app (T10-P2); the
+    production entry point asks for it, the tests do not."""
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        if dispatch_every <= 0:
+            yield
+            return
+        stop = asyncio.Event()
+        task = asyncio.create_task(
+            dispatch_forever(container.dispatcher.dispatch, dispatch_every, stop)
+        )
+        try:
+            yield
+        finally:
+            stop.set()
+            await task
+
+    app = FastAPI(title="ROYEXA API", version="0.3.0", lifespan=lifespan)
 
     def session_token(request: Request) -> str:
         """T6-P1: the Authorization header wins and is never mixed with the cookie, so a
