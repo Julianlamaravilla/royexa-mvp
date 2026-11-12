@@ -151,12 +151,46 @@ class PostgresAuthRepository:
     def __init__(self, connection: psycopg.Connection) -> None:
         self._connection = connection
 
+    _CREDENTIAL = (
+        "user_id, password_hash, is_demo, failed_attempts, locked_until, changed_at"
+    )
+
     def credential(self, user_id: str) -> Credential | None:
         row = self._connection.execute(
-            "SELECT user_id, password_hash, is_demo FROM credential WHERE user_id = %s",
-            (user_id,),
+            f"SELECT {self._CREDENTIAL} FROM credential WHERE user_id = %s", (user_id,)
         ).fetchone()
         return Credential(*row) if row else None
+
+    def save_credential(self, credential: Credential) -> None:
+        """Two failures that race lose with a serialization failure and are counted again."""
+        _update(
+            self._connection,
+            "UPDATE credential SET password_hash = %s, is_demo = %s, failed_attempts = %s, "
+            "locked_until = %s, changed_at = %s WHERE user_id = %s",
+            (
+                credential.password_hash,
+                credential.is_demo,
+                credential.failed_attempts,
+                credential.locked_until,
+                credential.changed_at,
+                credential.user_id,
+            ),
+            f"credential/{credential.user_id}",
+        )
+
+    def demo_users(self) -> list[str]:
+        rows = self._connection.execute(
+            "SELECT user_id FROM credential WHERE is_demo ORDER BY user_id"
+        )
+        return [user for (user,) in rows]
+
+    def sessions_of(self, user_id: str) -> list[Session]:
+        rows = self._connection.execute(
+            "SELECT token_hash, user_id, created_at, expires_at, revoked_at FROM session "
+            "WHERE user_id = %s",
+            (user_id,),
+        )
+        return [Session(*row) for row in rows]
 
     def add_session(self, session: Session) -> None:
         self._connection.execute(
