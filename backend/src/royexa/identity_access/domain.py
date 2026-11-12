@@ -58,6 +58,12 @@ class Directory:
     def opening_cash(self, collector_id: str) -> Money | None:
         return self.user(collector_id).opening_cash
 
+    def route_of_collector(self, collector_id: str) -> Route:
+        for route in self._routes.values():
+            if route.collector_id == collector_id:
+                return route
+        raise RouteNotFound(collector_id)
+
     def route(self, route_id: str) -> Route:
         try:
             return self._routes[route_id]
