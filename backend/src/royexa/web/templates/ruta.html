@@ -1,59 +1,78 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Ruta del día · ROYEXA{% endblock %}
-{% block body %}
+{% block bodyclass %}has-tabs{% endblock %}
+{% block header %}
 <header class="bar">
-  <div>
-    <strong>{{ user.name }}</strong>
-    <span class="muted">{{ day }}</span>
+  <div class="who">
+    {{ ui.mark() }}
+    <div>
+      <strong>{{ user.name }}</strong>
+      <span class="muted">{{ day }}</span>
+    </div>
   </div>
   <form method="post" action="/web/logout">
     <input type="hidden" name="ficha" value="{{ logout_token }}">
-    <button type="submit" class="link">Salir</button>
+    <button type="submit" class="link">{{ ui.icon("exit") }} Salir</button>
   </form>
 </header>
+{% endblock %}
+{% block body %}
 <main>
   <h1>Ruta del día</h1>
 
   {% if box %}
-  <section class="card">
-    <h2>{{ "Caja cerrada" if box.closed else "Caja abierta" }}</h2>
-    <p class="amount">Saldo {{ box.balance.cents | money }}</p>
-    {% if close_text %}<p>{{ close_text }}</p>{% endif %}
-    <p class="muted">Cobrado en efectivo hoy {{ panels.cash_total.cents | money }}
-      · por transferencia {{ panels.transfer_total.cents | money }}</p>
+  <section class="card hero">
+    <h2>{{ ui.icon("wallet") }}{{ "Caja cerrada" if box.closed else "Caja abierta" }}</h2>
+    <p class="amount"><span class="kicker">Saldo</span>{{ box.balance.cents | money }}</p>
+    {% if close_text %}<p class="note">{{ close_text }}</p>{% endif %}
+    <div class="chips">
+      <span class="chip">Efectivo hoy {{ panels.cash_total.cents | money }}</span>
+      <span class="chip">Transferencias {{ panels.transfer_total.cents | money }}</span>
+    </div>
   </section>
-  {% if not box.closed %}<p><a class="button" href="/web/cierre">Cerrar caja</a></p>{% endif %}
+  <div class="tiles">
+    <div class="tile t-wait"><strong>{{ panels.pending | length }}</strong><span>por visitar</span></div>
+    <div class="tile t-ok"><strong>{{ panels.paid | length }}</strong><span>pagaron</span></div>
+    <div class="tile t-bad"><strong>{{ panels.unpaid | length }}</strong><span>no pagaron</span></div>
+  </div>
+  {% if not box.closed %}<p class="cta"><a class="button" href="/web/cierre">{{ ui.icon("box") }} Cerrar caja</a></p>{% endif %}
   {% else %}
   <section class="card">
-    <h2>Sin caja hoy</h2>
+    <h2>{{ ui.icon("clock") }}Sin caja hoy</h2>
     <p class="muted">Hoy no es día de cobranza: no hay caja ni visitas.</p>
   </section>
   {% endif %}
 
   <section>
-    <h2>Desembolsos ({{ disbursements | length }})</h2>
+    <h2>{{ ui.icon("send") }}Desembolsos ({{ disbursements | length }})</h2>
     <ul class="list">
       {% for item in disbursements %}
       <li class="card">
-        <strong>{{ item.client_name }}</strong>
-        <span>{{ item.terms.principal.cents | money }}</span>
+        <div class="row">
+          <span class="avatar">{{ item.client_name | initials }}</span>
+          <span class="grow"><strong>{{ item.client_name }}</strong>{{ ui.badge(item.status_kind, item.status_short) }}</span>
+          <span class="right">{{ item.terms.principal.cents | money }}</span>
+        </div>
         <a href="/web/desembolso/{{ item.id }}">{{ item.status_text }}</a>
       </li>
       {% else %}
       <li class="muted">Sin desembolsos en curso ni de hoy.</li>
       {% endfor %}
     </ul>
-    <p><a class="button" href="/web/desembolso/nuevo">Solicitar desembolso</a></p>
+    <p class="cta"><a class="button" href="/web/desembolso/nuevo">{{ ui.icon("plus") }} Solicitar desembolso</a></p>
   </section>
 
   <section>
-    <h2>Pendientes ({{ panels.pending | length }})</h2>
+    <h2>{{ ui.icon("pin") }}Pendientes ({{ panels.pending | length }})</h2>
     <ul class="list">
       {% for item in panels.pending %}
       <li class="card">
-        <strong>{{ item.client_name }}</strong>
-        <span>Saldo {{ item.outstanding.cents | money }}</span>
-        <span class="muted">Cuotas restantes {{ item.remaining_installments | exact }}</span>
+        <div class="row">
+          <span class="avatar">{{ item.client_name | initials }}</span>
+          <span class="grow"><strong>{{ item.client_name }}</strong><span class="muted">Cuotas restantes {{ item.remaining_installments | exact }}</span></span>
+          <span class="right"><small>Saldo</small>{{ item.outstanding.cents | money }}</span>
+        </div>
         <span class="actions">
           <a class="button" href="/web/pago/{{ item.loan_id }}">Registrar pago</a>
           <a class="button" href="/web/no-pago/{{ item.loan_id }}">No pagó</a>
@@ -66,13 +85,14 @@
   </section>
 
   <section>
-    <h2>Pagaron ({{ panels.paid | length }})</h2>
+    <h2>{{ ui.icon("check") }}Pagaron ({{ panels.paid | length }})</h2>
     <ul class="list">
       {% for item in panels.paid %}
       <li class="card">
-        <strong>{{ item.client_name }}</strong>
-        <span>Efectivo {{ item.cash.cents | money }}</span>
-        <span>Transferencia {{ item.transfer.cents | money }}</span>
+        <div class="row">
+          <span class="avatar">{{ item.client_name | initials }}</span>
+          <span class="grow"><strong>{{ item.client_name }}</strong><span class="muted">{% if item.cash.cents %}Efectivo {{ item.cash.cents | money }}{% endif %}{% if item.cash.cents and item.transfer.cents %} · {% endif %}{% if item.transfer.cents %}Transferencia {{ item.transfer.cents | money }}{% endif %}</span></span>
+        </div>
       </li>
       {% else %}
       <li class="muted">Todavía nadie.</li>
@@ -81,13 +101,14 @@
   </section>
 
   <section>
-    <h2>No pagaron ({{ panels.unpaid | length }})</h2>
+    <h2>{{ ui.icon("x") }}No pagaron ({{ panels.unpaid | length }})</h2>
     <ul class="list">
       {% for item in panels.unpaid %}
       <li class="card">
-        <strong>{{ item.client_name }}</strong>
-        <span>{{ item.reason }}</span>
-        <span class="muted">Compromiso {{ item.commitment_date | short_date }}</span>
+        <div class="row">
+          <span class="avatar">{{ item.client_name | initials }}</span>
+          <span class="grow"><strong>{{ item.client_name }}</strong><span>{{ item.reason }}</span><span class="muted">Compromiso {{ item.commitment_date | short_date }}</span></span>
+        </div>
       </li>
       {% else %}
       <li class="muted">Todavía nadie.</li>
@@ -95,4 +116,5 @@
     </ul>
   </section>
 </main>
+{{ ui.nav("ruta", "closed" if box and box.closed else "open") }}
 {% endblock %}

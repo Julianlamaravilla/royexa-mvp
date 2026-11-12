@@ -1,17 +1,26 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Ingresar · ROYEXA{% endblock %}
+{% block bodyclass %}login{% endblock %}
+{% block header %}{% endblock %}
 {% block body %}
 <main class="narrow">
-  <h1>ROYEXA</h1>
-  {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
-  <form method="post" action="/web/login" class="stack">
-    <label>Usuario
-      <input name="user_id" value="{{ user_id }}" autocomplete="username" autocapitalize="none" required>
-    </label>
-    <label>Contraseña
-      <input name="password" type="password" autocomplete="current-password" required>
-    </label>
-    <button type="submit" class="primary">Ingresar</button>
-  </form>
+  <div class="hello">
+    {{ ui.mark() }}
+    <h1>ROYEXA</h1>
+    <p>Cobranza diaria, cuentas claras.</p>
+  </div>
+  <section class="card sheet">
+    {% if error %}<p class="notice error" role="alert">{{ ui.icon("alert") }}<span>{{ error }}</span></p>{% endif %}
+    <form method="post" action="/web/login" class="stack">
+      <label>Usuario
+        <input name="user_id" value="{{ user_id }}" autocomplete="username" autocapitalize="none" required>
+      </label>
+      <label>Contraseña
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="primary">{{ ui.icon("lock") }} Ingresar</button>
+    </form>
+  </section>
 </main>
 {% endblock %}
