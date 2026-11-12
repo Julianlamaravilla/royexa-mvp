@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
+from datetime import date
 from threading import Lock
 from typing import Protocol, Self
 
@@ -167,9 +168,9 @@ class InMemoryCashRepository:
     def __init__(self, tables: Tables) -> None:
         self._boxes = tables.cash_boxes
 
-    def open_box_of(self, collector_id: str) -> CashBox | None:
+    def box_of_day(self, collector_id: str, day: date) -> CashBox | None:
         for box in self._boxes.values():
-            if box.collector_id == collector_id and not box.closed:
+            if box.collector_id == collector_id and box.day == day:
                 return box
         return None
 

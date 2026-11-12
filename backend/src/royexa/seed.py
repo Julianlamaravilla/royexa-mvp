@@ -3,7 +3,6 @@
 from datetime import date
 
 from royexa.adapters.memory import InMemoryStore, Tables
-from royexa.cash_box.domain import CashBox
 from royexa.clients.domain import Client
 from royexa.identity_access.domain import Directory, Role, Route, User
 from royexa.loans.domain import Installment, Loan
@@ -20,8 +19,8 @@ FIXED_INTEREST_BPS = 2_000
 def seed_directory() -> Directory:
     return Directory(
         users=[
-            User(COLLECTOR_ID, "Cobrador uno", Role.COLLECTOR, COLLECTOR_LIMIT),
-            User("cobrador-2", "Cobrador dos", Role.COLLECTOR, COLLECTOR_LIMIT),
+            User(COLLECTOR_ID, "Cobrador uno", Role.COLLECTOR, COLLECTOR_LIMIT, OPENING_CASH),
+            User("cobrador-2", "Cobrador dos", Role.COLLECTOR, COLLECTOR_LIMIT, OPENING_CASH),
             User("admin-1", "Administrador uno", Role.ADMIN),
             User("admin-2", "Administrador dos", Role.ADMIN),
         ],
@@ -59,18 +58,10 @@ def seed_loans() -> list[Loan]:
     ]
 
 
-def seed_boxes() -> list[CashBox]:
-    return [
-        CashBox(f"caja-{collector}", collector, OPENING_CASH, OPENING_CASH)
-        for collector in (COLLECTOR_ID, "cobrador-2")
-    ]
-
-
 def seed_store() -> InMemoryStore:
     return InMemoryStore(
         Tables(
             clients={client.id: client for client in seed_clients()},
             loans={loan.id: loan for loan in seed_loans()},
-            cash_boxes={box.id: box for box in seed_boxes()},
         )
     )
