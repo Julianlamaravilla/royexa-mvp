@@ -27,6 +27,10 @@ class AdjustmentNotAllowed(DomainError):
     """CA-08: only an administrator corrects an entry."""
 
 
+class InvalidPeriod(DomainError):
+    """T9-P1: the period of a report runs forward and spans at most a year."""
+
+
 class PendingVisitsRemain(DomainError):
     """CA-04, RN-02: a box with clients still pending a visit does not close."""
 

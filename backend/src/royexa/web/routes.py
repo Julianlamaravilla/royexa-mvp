@@ -59,6 +59,7 @@ class WebContainer(Protocol):
     dispatcher: object
     close_cash_box: object
     cash_close_queries: object
+    discrepancy_queries: object
     register_payment: object
     register_non_payment: object
     currency_symbol: str
@@ -591,6 +592,29 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
             return guard
         return _render(
             container, "clientes.html", clients=await run_in_threadpool(container.client_queries.all)
+        )
+
+    @router.get("/admin/descuadres")
+    async def discrepancies_page(request: Request) -> Response:
+        """T9 (RF-07, CA-13): the same report as the API, for a period chosen in the page."""
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        asked = request.query_params
+        error = report = None
+        try:
+            since, until = (
+                date.fromisoformat(asked[name]) if asked.get(name) else None
+                for name in ("desde", "hasta")
+            )
+            report = await run_in_threadpool(container.discrepancy_queries.report, since, until)
+        except ValueError:
+            error = "Escribe las fechas del período completas (año, mes y día)."
+        except DomainError as problem:
+            error = messages.describe(problem)
+        return _render(
+            container, "descuadres.html", report=report, error=error,
+            since=asked.get("desde", ""), until=asked.get("hasta", ""),
         )
 
     @router.get("/admin/cajas")

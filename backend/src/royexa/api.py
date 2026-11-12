@@ -20,6 +20,7 @@ from royexa.cash_box.domain import (
     CashBoxClosed,
     CashCloseNotAllowed,
     CashClose,
+    InvalidPeriod,
     NoOpenCashBox,
     PendingVisitsRemain,
 )
@@ -113,6 +114,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     LoanNotFound: (404, "prestamo-no-encontrado", "Prestamo no encontrado"),
     RouteNotFound: (404, "ruta-no-encontrada", "Ruta no encontrada"),
     NoOpenCashBox: (409, "caja-no-disponible", "El cobrador no tiene caja abierta"),
+    InvalidPeriod: (422, "periodo-invalido", "Periodo invalido"),
     PendingVisitsRemain: (409, "visitas-pendientes", "Existen visitas pendientes"),
     CashBoxClosed: (409, "caja-cerrada", "La caja esta cerrada"),
     LoanAlreadySettled: (409, "prestamo-liquidado", "El prestamo ya esta liquidado"),
@@ -244,6 +246,29 @@ class CashCloseOut(BaseModel):
     closed_by: str
     device_time: datetime
     server_time: datetime
+
+
+class DiscrepancyDayOut(BaseModel):
+    day: date
+    count: int
+    net_cents: int
+
+
+class UnclosedBoxOut(BaseModel):
+    day: date
+    collector_id: str
+    cash_box_id: str
+
+
+class DiscrepancyReportOut(BaseModel):
+    desde: date
+    hasta: date
+    count: int
+    shortage_cents: int
+    surplus_cents: int
+    items: list[CashCloseOut]
+    days: list[DiscrepancyDayOut]
+    unclosed: list[UnclosedBoxOut]
 
 
 class PaidClientOut(BaseModel):
@@ -786,6 +811,30 @@ def create_app(container: Container) -> FastAPI:
         day: Annotated[date | None, Query(alias="date")] = None,
     ) -> list[CashCloseOut]:
         return [_close_out(c) for c in container.cash_close_queries.all(collector_id, day)]
+
+    @app.get("/v1/cash-discrepancies", response_model=DiscrepancyReportOut)
+    def read_cash_discrepancies(
+        _: Admin,
+        since: Annotated[date | None, Query(alias="desde")] = None,
+        until: Annotated[date | None, Query(alias="hasta")] = None,
+    ) -> DiscrepancyReportOut:
+        report = container.discrepancy_queries.report(since, until)
+        return DiscrepancyReportOut(
+            desde=report.since,
+            hasta=report.until,
+            count=report.count,
+            shortage_cents=report.shortage.cents,
+            surplus_cents=report.surplus.cents,
+            items=[_close_out(item) for item in report.items],
+            days=[
+                DiscrepancyDayOut(day=d.day, count=d.count, net_cents=d.net.cents)
+                for d in report.days
+            ],
+            unclosed=[
+                UnclosedBoxOut(day=b.day, collector_id=b.collector_id, cash_box_id=b.id)
+                for b in report.unclosed
+            ],
+        )
 
     @app.post(
         "/v1/clients/{client_id}/renewal-exceptions",

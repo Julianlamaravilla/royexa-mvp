@@ -7,14 +7,17 @@ neither may depend on the other.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, datetime
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from typing import Protocol
 
 from royexa.cash_box.desk import CashDesk
 from royexa.cash_box.domain import (
     AdjustmentNotAllowed,
     CashClose,
+    CashBox,
     CashCloseNotAllowed,
+    InvalidPeriod,
     NoOpenCashBox,
     PendingVisitsRemain,
 )
@@ -114,6 +117,7 @@ class RegisterAdjustment:
 
 
 class ClosesUnitOfWork(Protocol):
+    cash: CashRepository
     cash_closes: CashCloseRepository
 
     def __enter__(self) -> ClosesUnitOfWork: ...
@@ -129,3 +133,73 @@ class CashCloseQueries:
     def all(self, collector_id: str | None = None, day: date | None = None) -> list[CashClose]:
         with self._uow() as uow:
             return uow.cash_closes.all(collector_id, day)
+
+
+MAX_PERIOD_DAYS = 366
+
+
+@dataclass(frozen=True)
+class DayEvolution:
+    day: date
+    count: int
+    net: Money
+
+
+@dataclass(frozen=True)
+class DiscrepancyReport:
+    since: date
+    until: date
+    items: list[CashClose]
+    shortage: Money
+    surplus: Money
+    days: list[DayEvolution]
+    unclosed: list[CashBox]
+
+    @property
+    def count(self) -> int:
+        return len(self.items)
+
+
+class DiscrepancyQueries:
+    """UC-09 (RF-07, CA-13, T9-P1 to T9-P3): the closes of a period with a difference, their
+    evolution by collection day, and the boxes of past days that were never closed."""
+
+    def __init__(
+        self, uow: Callable[[], ClosesUnitOfWork], clock: Clock, calendar: BusinessCalendar
+    ) -> None:
+        self._uow = uow
+        self._clock = clock
+        self._calendar = calendar
+
+    def report(self, since: date | None = None, until: date | None = None) -> DiscrepancyReport:
+        today = self._calendar.day_of(self._clock.now())
+        since = since or today.replace(day=1)
+        until = until or today
+        if since > until:
+            raise InvalidPeriod("the period starts after it ends")
+        if (until - since).days >= MAX_PERIOD_DAYS:
+            raise InvalidPeriod(f"the period spans more than {MAX_PERIOD_DAYS} days")
+        with self._uow() as uow:
+            closes = [c for c in uow.cash_closes.all() if since <= c.day <= until]
+            # Today's box is still being worked; only past days can have been left open.
+            unclosed = uow.cash.open_between(since, min(until, today - timedelta(days=1)))
+        items = [close for close in closes if close.discrepancy.cents != 0]
+        gaps = [item.discrepancy.cents for item in items]
+        days = [
+            DayEvolution(
+                day,
+                sum(1 for item in items if item.day == day),
+                Money(sum(item.discrepancy.cents for item in items if item.day == day)),
+            )
+            for day in (since + timedelta(days=n) for n in range((until - since).days + 1))
+            if self._calendar.is_collection_day(day)
+        ]
+        return DiscrepancyReport(
+            since,
+            until,
+            items,
+            Money(-sum(gap for gap in gaps if gap < 0)),
+            Money(sum(gap for gap in gaps if gap > 0)),
+            days,
+            unclosed,
+        )
