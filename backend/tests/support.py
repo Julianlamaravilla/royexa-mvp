@@ -195,3 +195,19 @@ class Flow:
 
     def panels(self, collector: str = COLLECTOR, actor: str = COLLECTOR) -> Response:
         return self._get(f"/v1/cash-boxes/{collector}/panels", actor)
+
+    def adjust(
+        self,
+        entry_id: str,
+        amount_cents: int,
+        reason: str | None = "error de captura del importe",
+        actor: str = ADMIN,
+        device_time: str = DEVICE_TIME,
+    ) -> Response:
+        body: dict = {"amount_cents": amount_cents, "device_time": device_time}
+        if reason is not None:
+            body["reason"] = reason
+        return self._post(f"/v1/ledger/{entry_id}/adjustments", actor, body)
+
+    def payment_entry(self, payment_id: str) -> dict:
+        return next(e for e in self.ledger() if e["payment_id"] == payment_id)

@@ -73,6 +73,9 @@ class InMemoryLedgerRepository:
     def for_disbursement(self, disbursement_id: str) -> list[LedgerEntry]:
         return [entry for entry in self._entries if entry.disbursement_id == disbursement_id]
 
+    def get(self, entry_id: str) -> LedgerEntry | None:
+        return next((entry for entry in self._entries if entry.id == entry_id), None)
+
     def for_cash_box(self, cash_box_id: str) -> list[LedgerEntry]:
         return [entry for entry in self._entries if entry.cash_box_id == cash_box_id]
 
@@ -172,6 +175,9 @@ class InMemoryNonPaymentRepository:
 class InMemoryCashRepository:
     def __init__(self, tables: Tables) -> None:
         self._boxes = tables.cash_boxes
+
+    def get(self, box_id: str) -> CashBox | None:
+        return self._boxes.get(box_id)
 
     def box_of_day(self, collector_id: str, day: date) -> CashBox | None:
         for box in self._boxes.values():

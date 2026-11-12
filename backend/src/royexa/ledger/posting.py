@@ -99,5 +99,35 @@ class LedgerPosting:
         self._ledger.append(entry)
         return entry
 
+    def post_adjustment(
+        self,
+        adjusts_entry_id: str,
+        collector_id: str,
+        amount: Money,
+        reason: str,
+        actor_id: str,
+        device_time: datetime,
+        server_time: datetime,
+    ) -> LedgerEntry:
+        """CA-08, RN-04: the correction is a new entry in the box of the day it is made
+        (T5-P4); the entry it corrects is never touched."""
+        box = self._box_of(collector_id, server_time)
+        box.adjust(amount)
+        self._cash.save(box)
+        entry = LedgerEntry(
+            new_id(),
+            None,
+            LedgerEntryType.ADJUSTMENT,
+            amount,
+            box.id,
+            actor_id,
+            device_time,
+            server_time,
+            reason.strip(),
+            adjusts_entry_id=adjusts_entry_id,
+        )
+        self._ledger.append(entry)
+        return entry
+
     def _box_of(self, collector_id: str, now: datetime) -> CashBox:
         return self._cash.box_of(collector_id, now)
