@@ -545,6 +545,7 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
                     "collector_id": item.collector_id,
                     "terms": item.terms,
                     "waiting_text": messages.waiting_text(item),
+                    "over_limit": item.status is DisbursementStatus.PENDING_AUTHORIZATION,
                     "approve_token": approve,
                     "reject_token": reject,
                 }
@@ -560,7 +561,9 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
             def decide(user: User, form: dict[str, str]) -> Outcome:
                 try:
                     if verb == "aprobar":
-                        container.approve.execute(user, disbursement_id, None)
+                        container.approve.execute(
+                            user, disbursement_id, form.get("motivo", "").strip() or None
+                        )
                         container.dispatcher.dispatch()  # the client gets the code now
                     else:
                         container.reject.execute(user, disbursement_id, form.get("motivo", ""))
