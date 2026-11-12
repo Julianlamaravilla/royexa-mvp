@@ -35,8 +35,8 @@ docker compose up -d --wait postgres
 Después, desde `backend/`:
 
 ```bash
-uv run pytest -m postgres    # las 166 pruebas con PostgreSQL
-uv run pytest -m ""          # las 310 pruebas
+uv run pytest -m postgres    # las 169 pruebas con PostgreSQL
+uv run pytest -m ""          # las 313 pruebas
 ```
 
 Las pruebas aplican la migración por sí mismas.
