@@ -22,7 +22,7 @@ uv sync
 Desde `backend/`. El comando por defecto no necesita Docker:
 
 ```bash
-uv run pytest                # 189 pruebas, sin PostgreSQL
+uv run pytest                # 210 pruebas, sin PostgreSQL
 ```
 
 Las pruebas de privilegios del libro necesitan PostgreSQL. Levántelo desde la raíz del repositorio:
@@ -34,8 +34,8 @@ docker compose up -d --wait postgres
 Después, desde `backend/`:
 
 ```bash
-uv run pytest -m postgres    # las 213 pruebas con PostgreSQL (1 se omite a propósito)
-uv run pytest -m ""          # las 402 pruebas
+uv run pytest -m postgres    # las 238 pruebas con PostgreSQL (1 se omite a propósito)
+uv run pytest -m ""          # las 448 pruebas
 ```
 
 Las pruebas aplican la migración por sí mismas.
@@ -64,6 +64,7 @@ La documentación OpenAPI queda en <http://localhost:8000/docs>. El recorrido co
 | `ROYEXA_CODE_TTL_MINUTES` | `60` | Vigencia del código de confirmación |
 | `ROYEXA_NOTIFIER_FAILING` | Sin definir | Con `1`, el notificador simulado falla |
 | `ROYEXA_TIMEZONE` | `UTC` | Zona horaria del piloto (por ejemplo `America/Bogota`): fija el día de la caja y de los pendientes de visita. Un nombre desconocido impide arrancar |
+| `ROYEXA_REQUIRE_CHANGED_PASSWORDS` | Sin definir | Con `1`, no se siembra ninguna contraseña de demostración y el servidor se niega a arrancar si queda alguna, o si no hay base de datos. Se aprovisionan con `python -m royexa.set_password` |
 | `ROYEXA_SESSION_HOURS` | `12` | Duración de una sesión desde el inicio de sesión, sin renovación |
 | `ROYEXA_SCRYPT_N` | `16384` | Coste del hash de contraseñas. Solo las pruebas lo bajan; el hash guarda su coste, así que cambiarlo no invalida los existentes |
 | `ROYEXA_MIGRATOR_URL` | Rol `royexa_migrator` en `localhost:55432` | Conexión del rol propietario |
@@ -84,7 +85,14 @@ curl -X POST localhost:8000/v1/auth/logout -H "Authorization: Bearer $TOKEN"
 - El token es opaco y aleatorio (256 bits) y solo se guarda su huella SHA-256. Viaja en `Authorization: Bearer`; el mismo token se entrega también en la cookie `royexa_session` (`HttpOnly`, `SameSite=Lax`, y `Secure` bajo HTTPS) para las páginas del servidor. Si hay cabecera `Authorization` manda ella y nunca se mezcla con la cookie.
 - Dura 12 horas sin renovación, sobrevive a un reinicio, un usuario puede tener varias sesiones y `POST /v1/auth/logout` revoca solo la que se usa. Sin sesión válida (ausente, inválida, vencida o revocada) el API responde 401 `sesion-requerida`.
 - Usuario inexistente y contraseña errónea dan la misma respuesta 401 `credenciales-invalidas`.
-- Las contraseñas se guardan con `scrypt` y sal propia; nunca en claro. Los cuatro usuarios sembrados traen contraseñas de **demostración**, válidas solo para desarrollo y pruebas: `demo-<usuario>-royexa` (por ejemplo `demo-cobrador-1-royexa`). El cambio de contraseña, el bloqueo por intentos fallidos y el arranque que se niega a usar las de demostración llegan con T6b.
+- Las contraseñas se guardan con `scrypt` y sal propia; nunca en claro. Los cuatro usuarios sembrados traen contraseñas de **demostración**, válidas solo para desarrollo y pruebas: `demo-<usuario>-royexa` (por ejemplo `demo-cobrador-1-royexa`). 
+- **Cambio de contraseña:** `POST /v1/auth/password` con la actual y la nueva (de 12 a 256 caracteres y distinta de la actual). Termina las demás sesiones de ese usuario y deja la que se usa. Una contraseña actual errónea responde 403 y cuenta como un intento fallido.
+- **Bloqueo:** 5 intentos fallidos seguidos bloquean al usuario 15 minutos, también para la contraseña correcta, con la misma respuesta 401 que un usuario inexistente o una contraseña errónea (no se revela cuál fue). El bloqueo no cierra las sesiones que ya tenga abiertas. Un usuario bloqueado por error espera los 15 minutos o recibe una contraseña nueva con `set_password`. Riesgo aceptado: un tercero puede bloquear temporalmente a un cobrador conociendo su usuario.
+- **Despliegue:** con `ROYEXA_REQUIRE_CHANGED_PASSWORDS=1` el servidor no arranca mientras algún usuario conserve la contraseña de demostración. Como tampoco se siembran, las reales se ponen antes de arrancar:
+
+```bash
+ROYEXA_LEDGER_URL=postgresql://royexa_app:...@host/royexa python -m royexa.set_password admin-1
+```
 
 ## Limitaciones
 
