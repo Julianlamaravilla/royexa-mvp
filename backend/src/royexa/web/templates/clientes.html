@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Clientes · ROYEXA{% endblock %}
+{% block body %}
+<main>
+  <h1>Clientes</h1>
+  <ul class="list">
+    {% for client in clients %}
+    <li class="card">
+      <strong>{{ client.name }}</strong>
+      <span class="muted">{{ client.route_id }} · {{ client.id }}</span>
+    </li>
+    {% else %}
+    <li class="muted">No hay clientes.</li>
+    {% endfor %}
+  </ul>
+  <p><a href="/web/admin">Volver</a></p>
+</main>
+{% endblock %}

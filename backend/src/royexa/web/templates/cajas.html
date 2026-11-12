@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Cajas cerradas · ROYEXA{% endblock %}
+{% block body %}
+<main>
+  <h1>Cajas cerradas</h1>
+  <ul class="list">
+    {% for row in rows %}
+    <li class="card">
+      <strong>{{ row.collector_id }} · {{ row.day | short_date }}</strong>
+      <span>{{ row.summary }}</span>
+    </li>
+    {% else %}
+    <li class="muted">Todavía no hay cajas cerradas.</li>
+    {% endfor %}
+  </ul>
+  <p><a href="/web/admin">Volver</a></p>
+</main>
+{% endblock %}
