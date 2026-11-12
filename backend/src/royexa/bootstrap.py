@@ -11,7 +11,7 @@ from royexa.adapters.simulated_notifier import SimulatedNotifier
 from royexa.closing.application import CashCloseQueries, CloseCashBox, RegisterAdjustment
 from royexa.clients.application import ClientQueries, RegisterClient
 from royexa.identity_access.application import DEFAULT_SESSION_TTL, Authenticator
-from royexa.identity_access.domain import Directory
+from royexa.identity_access.domain import DemoPasswordsInUse, Directory
 from royexa.identity_access.passwords import PasswordHasher
 from royexa.loans.application import (
     LoanQueries,
@@ -52,6 +52,7 @@ class Settings:
     ledger_url: str | None = None
     timezone: str = DEFAULT_TIMEZONE
     session_ttl: timedelta = DEFAULT_SESSION_TTL
+    require_changed_passwords: bool = False
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -61,6 +62,7 @@ class Settings:
             notifier_failing=os.environ.get("ROYEXA_NOTIFIER_FAILING") == "1",
             ledger_url=os.environ.get("ROYEXA_LEDGER_URL"),
             timezone=os.environ.get("ROYEXA_TIMEZONE", DEFAULT_TIMEZONE),
+            require_changed_passwords=os.environ.get("ROYEXA_REQUIRE_CHANGED_PASSWORDS") == "1",
             session_ttl=timedelta(
                 hours=float(os.environ.get("ROYEXA_SESSION_HOURS", DEFAULT_SESSION_TTL.total_seconds() / 3600))
             ),
@@ -104,12 +106,18 @@ def build_container(
     notifier = notifier or SimulatedNotifier(
         sink=lambda line: print(line, flush=True), failing=settings.notifier_failing
     )
+    if settings.require_changed_passwords and not settings.ledger_url:
+        raise DemoPasswordsInUse(
+            "the strict mode keeps passwords in the database: set ROYEXA_LEDGER_URL"
+        )
     hasher = PasswordHasher()
     store = seed_store(hasher)
     if settings.ledger_url:
         from royexa.adapters.postgres_state import seed_database
 
-        seed_database(settings.ledger_url, seed_loans(), seed_clients(), seed_credentials(hasher))
+        # T6-P2: the strict mode seeds no demonstration password at all.
+        demo = [] if settings.require_changed_passwords else seed_credentials(hasher)
+        seed_database(settings.ledger_url, seed_loans(), seed_clients(), demo)
     directory = seed_directory()
     calendar = BusinessCalendar.in_zone(settings.timezone)
 
@@ -121,6 +129,15 @@ def build_container(
 
     def unit_of_work() -> InMemoryUnitOfWork:
         return InMemoryUnitOfWork(store, ledger_session if settings.ledger_url else None)
+
+    if settings.require_changed_passwords:
+        with unit_of_work() as uow:
+            remaining = uow.auth.demo_users()
+        if remaining:
+            raise DemoPasswordsInUse(
+                "the strict mode refuses demonstration passwords; set the real ones with "
+                "python -m royexa.set_password for: " + ", ".join(remaining)
+            )
 
     context = SalesContext(unit_of_work, clock, directory, settings.code_ttl, calendar=calendar)
     return Container(
