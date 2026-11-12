@@ -62,11 +62,30 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: una prueba de extremo a extremo cubre la aprobación de un desembolso.
 - [x] **T9 Descuadres del periodo (RF-07).** Consulta del número de descuadres del periodo y su evolución.
   - Acepta: los criterios de RF-07 tienen prueba; esta es la métrica de éxito propuesta para el piloto.
-- [ ] **T10 Despliegue.** Pendiente de autorización del usuario: proveedor de base de datos, hospedaje, cuenta y secretos. No empezar sin ella.
+- [ ] **T10a Endurecer antes de desplegar (T10-P2, T10-P3).** *Detenida: faltan las decisiones T10-P2 y T10-P3 de «Preguntas abiertas».* Límite de 5 intentos con un código de confirmación incorrecto y despacho de avisos en segundo plano.
+  - Acepta: tras 5 códigos incorrectos seguidos la confirmación se rechaza según T10-P3, incluso con el código correcto; un aviso pendiente o fallido se envía sin que nadie llame al API.
+- [ ] **T10b Preparar el despliegue (T10-P4, T10-P5).** *Detenida: faltan T10-P4 y T10-P5.* Imagen de contenedor, arranque con `PORT`, ruta de salud, conexión a Supabase (agrupador de conexiones en modo sesión, `sslmode=require`), cierre del acceso de `anon` y `authenticated` a las tablas, configuración del hospedaje y guía de operación.
+  - Acepta: la imagen arranca contra PostgreSQL con `ROYEXA_REQUIRE_CHANGED_PASSWORDS=1` y responde en la ruta de salud; ningún rol de Supabase distinto del de la aplicación puede leer las tablas; las migraciones se reaplican sin error.
+- [ ] **T10c Desplegar.** *Detenida: exige la autorización del usuario (cuenta, secretos y coste, T10-P4).* Crear el proyecto de Supabase y el servicio de hospedaje, cargar los secretos, ejecutar `set_password` para los usuarios reales y comprobar el recorrido desde un celular.
+  - Acepta: la dirección pública responde; un cobrador de verdad inicia sesión con su contraseña propia; el servidor no arranca con contraseñas de demostración.
 
 ## Preguntas abiertas
 
-- Ninguna por ahora.
+Bloquean T10. Se parte T10 en T10a (endurecer), T10b (preparar) y T10c (desplegar) por la regla 10. Respondiste con Supabase como base de datos, 5 intentos para el código y que el hospedaje lo recomiendo yo y lo hago desde la sesión.
+
+- **T10-P2. ¿Cómo se despachan los avisos en producción?** Hoy un aviso fallido solo se reintenta si alguien llama a `POST /v1/notifications/dispatch`; T8 ya despacha en el acto al aprobar.
+  - Recomendada: un ciclo en segundo plano dentro del mismo proceso, cada 30 segundos, con el despachador existente (reintentos y fallo al quinto intento, T4). Exige un hospedaje que no se duerma (ver T10-P4).
+  - Alternativa: un cron externo que llame a un punto del API protegido con un token de servicio; añade un secreto y otra pieza que vigilar.
+- **T10-P3. ¿Qué pasa tras los 5 intentos?** Decidiste 5 intentos; falta la consecuencia. El código tiene 8 caracteres hexadecimales y dura 60 minutos.
+  - Recomendada: 5 códigos incorrectos seguidos sobre la misma solicitud la bloquean 15 minutos (como el inicio de sesión, T6-P3); en ese lapso hasta el código correcto se rechaza, y el cliente que se equivocó al dictar no pierde la solicitud. Cuesta una migración (contador y fin del bloqueo) y se cuentan solo los códigos incorrectos.
+  - Alternativa: bloqueo definitivo: la solicitud queda inservible y el cobrador pide otra. Es más estricto, pero un error de dictado cuesta una solicitud nueva y otra aprobación.
+- **T10-P4. ¿Qué hospedaje y con qué cuenta?** Supabase solo aporta PostgreSQL; el servidor de Python necesita su propio hospedaje.
+  - Recomendada: **Render** como servicio web con la imagen del repositorio, en un plan **de pago pequeño que no se duerme** (unos 7 dólares al mes, a verificar al contratar), porque el plan gratuito se duerme tras 15 minutos sin tráfico y detendría el ciclo de avisos y la primera visita del día. Supabase en su plan gratuito (con 500 MB basta para el piloto; se pausa tras una semana sin actividad). Yo lo creo desde la sesión con una llave de API de cada uno, que me das por el formulario seguro de la sesión (nunca por el chat), y autorizas la aplicación de Render en este repositorio. Lo que necesito de ti: cuenta de Supabase y llave personal, cuenta de Render con medio de pago y llave, y que confirmes el gasto mensual.
+  - Alternativa: Fly.io o Google Cloud Run (pagan por uso y se duermen o cobran por mantenerse encendidos); sirven, pero necesitan más pasos desde la sesión.
+  - Las contraseñas reales las pones tú: `python -m royexa.set_password <usuario>` en la consola del hospedaje, para cada usuario; yo nunca las veo. En el modo exigente no se siembra ninguna, así que hasta ese paso nadie puede entrar.
+- **T10-P5. ¿Qué datos hay en producción?**
+  - Recomendada: no sembrar clientes ni préstamos de demostración (hoy se siembran los cuatro clientes y dos préstamos); sembrar solo los usuarios, rutas y límites reales del piloto, que me dictas (nombre, rol, ruta, límite del cobrador, límite de la ruta, fondo y tasa), y dar de alta los clientes reales por el administrador. Hace falta un interruptor de siembra (`ROYEXA_SEED=demo` o `pilot`). También me dices la zona horaria real (`ROYEXA_TIMEZONE`, hoy `UTC`) y el símbolo de moneda (`ROYEXA_CURRENCY_SYMBOL`, hoy vacío).
+  - Alternativa: desplegar primero con los datos de demostración para ensayar, en un proyecto desechable, y sembrar los reales después.
 
 ## Decisiones resueltas
 
@@ -96,6 +115,9 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - T9-P2: la evolución es una fila por día de cobranza del rango (cantidad e importe neto con signo), más el total (cantidad, faltantes y sobrantes por separado) y el detalle de cada diferencia (día, cobrador, importe con signo, esperado y entregado).
   - T9-P3: una caja que no se cerró su día no es un descuadre; se muestra aparte como «cajas sin cerrar» (día y cobrador). No se cambia el cierre.
   - T9-P4: se consulta en el API (`GET /v1/cash-discrepancies?desde=&hasta=`, solo administrador) y en `/web/admin/descuadres`, sobre la misma consulta.
+
+- **T10-P1** (decidida por el usuario): activar `ROYEXA_REQUIRE_CHANGED_PASSWORDS=1` en producción y poner contraseñas reales a los usuarios con `set_password` antes del primer ingreso (T6b).
+- **T10-P3, parte resuelta** (decidida por el usuario): el límite es de **5 intentos** con un código de confirmación incorrecto; la consecuencia sigue abierta.
 
 ## Evidencia
 
