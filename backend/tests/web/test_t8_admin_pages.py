@@ -210,3 +210,42 @@ def test_t8_the_closed_boxes_page_shows_each_close_with_its_discrepancy(flow, co
 
     assert "cobrador-1" in html and "30/10/2026" in html
     assert "Esperado 700,00" in html and "Entregado 650,50" in html and "Faltan 49,50" in html
+
+
+def test_t8_the_approve_form_has_a_field_for_the_reason_of_an_authorization(flow, container):
+    flow.requested(client="cliente-3", amount_cents=60_000_000)
+
+    html = _browser(container).get("/web/admin/solicitudes").text
+    form = re.search(r'action="[^"]*/aprobar".*?</form>', html, re.S).group(0)
+
+    assert 'name="motivo"' in form and "autorización" in form
+
+
+def test_t8_authorizing_an_amount_over_the_collector_limit_needs_a_reason(flow, container):
+    disbursement = flow.requested(client="cliente-3", amount_cents=60_000_000)
+    browser = _browser(container)
+
+    for reason in (None, "", "   "):
+        page = _outcome(browser, _decide(browser, disbursement["id"], "aprobar", reason))
+        assert "motivo" in page and "No se pudo completar" in page
+
+    assert flow.read(disbursement["id"])["status"] == "EN_ESPERA_AUTORIZACION"
+
+
+def test_t8_authorizing_with_a_reason_approves_and_keeps_the_reason(flow, container):
+    disbursement = flow.requested(client="cliente-3", amount_cents=60_000_000)
+    browser = _browser(container)
+
+    page = _outcome(browser, _decide(browser, disbursement["id"], "aprobar", "cliente de confianza"))
+
+    assert "Solicitud aprobada" in page
+    stored = flow.read(disbursement["id"])
+    assert stored["status"] == "APROBADO" and stored["decision_reason"] == "cliente de confianza"
+    assert len([s for s in flow.notifier.delivered if "code" in s.payload]) == 1
+
+
+def test_t8_a_normal_approval_still_needs_no_reason(flow, container):
+    disbursement = flow.requested()
+    browser = _browser(container)
+
+    assert "Solicitud aprobada" in _outcome(browser, _decide(browser, disbursement["id"], "aprobar"))
