@@ -18,9 +18,11 @@
   <section class="card">
     <h2>{{ "Caja cerrada" if box.closed else "Caja abierta" }}</h2>
     <p class="amount">Saldo {{ box.balance.cents | money }}</p>
+    {% if close_text %}<p>{{ close_text }}</p>{% endif %}
     <p class="muted">Cobrado en efectivo hoy {{ panels.cash_total.cents | money }}
       · por transferencia {{ panels.transfer_total.cents | money }}</p>
   </section>
+  {% if not box.closed %}<p><a class="button" href="/web/cierre">Cerrar caja</a></p>{% endif %}
   {% else %}
   <section class="card">
     <h2>Sin caja hoy</h2>

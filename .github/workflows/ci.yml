@@ -33,4 +33,8 @@ jobs:
         with:
           version: "0.11.32"
       - run: uv sync --locked
+      - name: Install Chromium for the end-to-end test (T7d)
+        run: uv run playwright install --with-deps chromium
       - run: uv run pytest -m ""
+        env:
+          ROYEXA_REQUIRE_E2E: "1"

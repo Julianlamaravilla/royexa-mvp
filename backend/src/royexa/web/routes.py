@@ -40,6 +40,7 @@ CONTENT_POLICY = (
 LOGIN_PATH = "/web/login"
 ROUTE_PATH = "/web/ruta"
 ADMIN_PATH = "/web/admin"
+CLOSE_PATH = "/web/cierre"
 NEW_DISBURSEMENT_PATH = "/web/desembolso/nuevo"
 
 
@@ -51,6 +52,8 @@ class WebContainer(Protocol):
     client_queries: object
     request: object
     confirm: object
+    close_cash_box: object
+    cash_close_queries: object
     register_payment: object
     register_non_payment: object
     currency_symbol: str
@@ -260,6 +263,7 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         return _render(
             container,
             "ruta.html",
+            close_text=await close_text(user, box),
             disbursements=disbursements,
             user=user,
             day=long_date(panels.day),
@@ -289,6 +293,13 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
     async def client_names() -> dict[str, str]:
         clients = await run_in_threadpool(container.client_queries.all)
         return {client.id: client.name for client in clients}
+
+    async def close_text(user: User, box) -> str | None:
+        """The close of today's box, written for the page, once the box is closed."""
+        if box is None or not box.closed:
+            return None
+        found = await run_in_threadpool(container.cash_close_queries.all, user.id, box.day)
+        return messages.close_summary(found[0], container.currency_symbol) if found else None
 
     def device_time(form: dict[str, str]) -> datetime:
         """The device clock when it sent one, the server clock when it did not (no script)."""
@@ -449,6 +460,47 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
             )
 
         return await run_once(container, request, f"codigo:{disbursement_id}", confirm)
+
+    @router.get("/cierre")
+    async def close_page(request: Request) -> Response:
+        token, user = await current(request)
+        if user.is_admin:
+            return _redirect(ADMIN_PATH)
+        panels = await run_in_threadpool(container.visit_queries.panels, user, user.id)
+        try:
+            box = await run_in_threadpool(container.queries.cash_box, user.id)
+        except NoOpenCashBox:
+            box = None
+        form_token = None
+        if box is not None and not box.closed and not panels.pending:
+            form_token = await run_in_threadpool(container.form_tokens.issue, token, "cierre")
+        return _render(
+            container,
+            "cierre.html",
+            box=box,
+            pending=panels.pending,
+            token=form_token,
+            close_text=await close_text(user, box),
+        )
+
+    @router.post("/cierre")
+    async def close_box(request: Request) -> Response:
+        def close(user: User, form: dict[str, str]) -> Outcome:
+            cents = parse_amount(form.get("entregado", ""))
+            if cents is None:
+                return Outcome(
+                    "error", "El importe entregado no es válido. Escríbelo como 1.234,56.", CLOSE_PATH
+                )
+            try:
+                done = container.close_cash_box.execute(
+                    user, user.id, Money(cents), device_time(form)
+                )
+            except DomainError as error:
+                return Outcome("error", messages.describe(error), CLOSE_PATH)
+            text = "Caja cerrada. " + messages.close_summary(done, container.currency_symbol)
+            return Outcome("ok", text, ROUTE_PATH)
+
+        return await run_once(container, request, "cierre", close)
 
     @router.get("/admin")
     async def admin_page(request: Request) -> Response:
