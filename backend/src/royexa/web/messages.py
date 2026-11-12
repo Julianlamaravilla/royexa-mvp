@@ -22,6 +22,7 @@ from royexa.loans.domain import (
 )
 from royexa.sales.domain import (
     ApproverRoleRequired,
+    CodeLocked,
     DeciderRoleRequired,
     SelfApprovalForbidden,
     AmountExceedsRouteLimit,
@@ -67,6 +68,7 @@ _MESSAGES: dict[type[DomainError], str] = {
     RequesterNotAllowed: "Tu usuario no puede solicitar desembolsos.",
     PriorLoanNotSettled: "El cliente tiene un préstamo anterior sin liquidar. Debe pagarlo antes de recibir otro.",
     InvalidLoanTerms: "El plazo debe tener al menos un día de cobro por cuota, y las cuotas y el monto deben ser mayores que cero.",
+    CodeLocked: "Se escribieron 5 códigos incorrectos seguidos: la solicitud queda bloqueada 15 minutos. Vuelve a intentarlo después.",
     InvalidConfirmationCode: "El código no es correcto. Revisa que sea el que recibió el cliente.",
     ConfirmationCodeExpired: (
         "El código caducó. La solicitud quedó caducada y el intento quedó registrado en el libro; "

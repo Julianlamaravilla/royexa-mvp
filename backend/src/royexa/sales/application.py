@@ -16,10 +16,12 @@ from royexa.ledger.posting import LedgerPosting
 from royexa.loans.domain import Loan, LoanTerms, RenewalException, ensure_renewal_allowed
 from royexa.sales.domain import (
     ApprovalRefused,
+    CodeLocked,
     ConfirmationCodeExpired,
     ConfirmationOutcome,
     Disbursement,
     DisbursementNotFound,
+    InvalidConfirmationCode,
 )
 from royexa.sales.ports import SalesUnitOfWork
 from royexa.shared.calendar import BusinessCalendar
@@ -166,7 +168,15 @@ class ConfirmDisbursement:
         with context.uow() as uow:
             disbursement = _load(uow, disbursement_id)
             now = context.clock.now()
-            outcome = disbursement.confirm(plain_code, actor, now)
+            before = (disbursement.failed_code_attempts, disbursement.code_locked_until)
+            try:
+                outcome = disbursement.confirm(plain_code, actor, now)
+            except (InvalidConfirmationCode, CodeLocked):
+                # T10-P3: a wrong code is a fact to keep (the count), not a failure to roll back.
+                if (disbursement.failed_code_attempts, disbursement.code_locked_until) != before:
+                    uow.disbursements.save(disbursement)
+                    uow.commit()
+                raise
             if outcome is ConfirmationOutcome.CONFIRMED:
                 self._settle(uow, disbursement, actor, device_time, now)
             elif outcome is ConfirmationOutcome.EXPIRED:
