@@ -28,6 +28,8 @@ AWAITING_DECISION = frozenset(
     {DisbursementStatus.REQUESTED, DisbursementStatus.PENDING_AUTHORIZATION}
 )
 
+MAX_CODE_ATTEMPTS = 5
+CODE_LOCK = timedelta(minutes=15)
 IN_PROGRESS = AWAITING_DECISION | {DisbursementStatus.APPROVED}
 
 
@@ -84,6 +86,10 @@ class DeciderRoleRequired(DomainError):
 
 class ValidatorNotAllowed(DomainError):
     """CA-05: the collector of the route validates the code."""
+
+
+class CodeLocked(DomainError):
+    """T10-P3: too many wrong codes in a row; the request waits before it takes another."""
 
 
 class InvalidConfirmationCode(DomainError):
@@ -157,6 +163,8 @@ class Disbursement:
     confirmed_by: str | None = None
     resolved_at: datetime | None = None
     loan_id: str | None = None
+    failed_code_attempts: int = 0
+    code_locked_until: datetime | None = None
     refused_approval_attempts: list[RefusedApprovalAttempt] = field(default_factory=list)
 
     def __setattr__(self, name: str, value: object) -> None:
@@ -243,8 +251,14 @@ class Disbursement:
             raise ValidatorNotAllowed(actor.id)
         if self.code is None or self.status is DisbursementStatus.REJECTED:
             raise InvalidTransition(self.status)
+        awaiting = self.status is DisbursementStatus.APPROVED
+        if awaiting and self.code_locked_until and now < self.code_locked_until:
+            raise CodeLocked(self.id)  # before looking at the code: a locked request learns nothing
         if not self.code.matches(plain_code, self.id, self.client_id):
+            if awaiting:
+                self._count_wrong_code(now)
             raise InvalidConfirmationCode(self.id)
+        self.failed_code_attempts = 0
         if self.status is DisbursementStatus.CONFIRMED:
             return ConfirmationOutcome.ALREADY_CONFIRMED
         if self.status is DisbursementStatus.EXPIRED:
@@ -257,6 +271,14 @@ class Disbursement:
         self.confirmed_by = actor.id
         self.resolved_at = now
         return ConfirmationOutcome.CONFIRMED
+
+    def _count_wrong_code(self, now: datetime) -> None:
+        """T10-P3: the fifth wrong code in a row locks the request and starts the count over."""
+        self.failed_code_attempts += 1
+        if self.failed_code_attempts >= MAX_CODE_ATTEMPTS:
+            self.failed_code_attempts = 0
+            self.code_locked_until = now + CODE_LOCK
+            raise CodeLocked(self.id)
 
     def attach_loan(self, loan_id: str) -> None:
         if self.status is not DisbursementStatus.CONFIRMED:

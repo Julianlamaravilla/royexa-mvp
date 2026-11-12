@@ -54,6 +54,7 @@ ALL_MIGRATIONS = [
     "012_auth.sql",
     "013_password_policy.sql",
     "014_form_token.sql",
+    "015_code_attempts.sql",
 ]
 NOW = datetime(2026, 10, 30, 14, 0, tzinfo=UTC)
 RECEIPT = "COMPROBANTE_DESEMBOLSO"
