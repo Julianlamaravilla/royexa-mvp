@@ -192,3 +192,6 @@ class Flow:
         """Ends every pending visit of route 1 with a non-payment, so the box can close."""
         for row in self.pending().json():
             assert self.non_pay(row["loan_id"], commitment_date="2026-11-30").status_code == 201
+
+    def panels(self, collector: str = COLLECTOR, actor: str = COLLECTOR) -> Response:
+        return self._get(f"/v1/cash-boxes/{collector}/panels", actor)

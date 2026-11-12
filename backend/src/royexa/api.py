@@ -29,6 +29,7 @@ from royexa.clients.domain import (
 )
 from royexa.identity_access.domain import RouteNotFound, UnknownActor, User
 from royexa.ledger.domain import LedgerEntry
+from royexa.loans.application import DayPanels, PendingVisit
 from royexa.loans.domain import (
     ExceptionNotAllowed,
     InvalidCommitmentDate,
@@ -201,6 +202,37 @@ class CashCloseOut(BaseModel):
     closed_by: str
     device_time: datetime
     server_time: datetime
+
+
+class PaidClientOut(BaseModel):
+    client_id: str
+    client_name: str
+    cash_cents: int
+    transfer_cents: int
+    payments: int
+
+
+class UnpaidClientOut(BaseModel):
+    client_id: str
+    client_name: str
+    loan_id: str
+    reason: str
+    commitment_date: date
+
+
+class PanelTotalsOut(BaseModel):
+    cash_cents: int
+    transfer_cents: int
+
+
+class PanelsOut(BaseModel):
+    day: date
+    collector_id: str
+    route_id: str
+    pending: list[PendingVisitOut]
+    paid: list[PaidClientOut]
+    unpaid: list[UnpaidClientOut]
+    totals: PanelTotalsOut
 
 
 class AllocationOut(BaseModel):
@@ -395,6 +427,38 @@ def _close_out(close: CashClose) -> CashCloseOut:
         closed_by=close.closed_by,
         device_time=close.device_time,
         server_time=close.server_time,
+    )
+
+
+def _panels_out(panels: DayPanels) -> PanelsOut:
+    return PanelsOut(
+        day=panels.day,
+        collector_id=panels.collector_id,
+        route_id=panels.route_id,
+        pending=[_pending_out(item) for item in panels.pending],
+        paid=[
+            PaidClientOut(
+                client_id=item.client_id,
+                client_name=item.client_name,
+                cash_cents=item.cash.cents,
+                transfer_cents=item.transfer.cents,
+                payments=item.payments,
+            )
+            for item in panels.paid
+        ],
+        unpaid=[
+            UnpaidClientOut(
+                client_id=item.client_id,
+                client_name=item.client_name,
+                loan_id=item.loan_id,
+                reason=item.reason,
+                commitment_date=item.commitment_date,
+            )
+            for item in panels.unpaid
+        ],
+        totals=PanelTotalsOut(
+            cash_cents=panels.cash_total.cents, transfer_cents=panels.transfer_total.cents
+        ),
     )
 
 
@@ -599,6 +663,10 @@ def create_app(container: Container) -> FastAPI:
     @app.get("/v1/loans/{loan_id}", response_model=LoanOut)
     def read_loan(loan_id: str, _: Actor) -> LoanOut:
         return _loan_out(container.loan_queries.get(loan_id))
+
+    @app.get("/v1/cash-boxes/{collector_id}/panels", response_model=PanelsOut)
+    def read_panels(collector_id: str, actor: Actor) -> PanelsOut:
+        return _panels_out(container.visit_queries.panels(actor, collector_id))
 
     @app.post(
         "/v1/cash-boxes/{collector_id}/close", status_code=201, response_model=CashCloseOut
