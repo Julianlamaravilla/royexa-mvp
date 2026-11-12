@@ -20,6 +20,9 @@ from royexa.loans.domain import (
     VisitNotAllowed,
 )
 from royexa.sales.domain import (
+    ApproverRoleRequired,
+    DeciderRoleRequired,
+    SelfApprovalForbidden,
     AmountExceedsRouteLimit,
     ClientOutsideRoute,
     ConfirmationCodeExpired,
@@ -44,7 +47,10 @@ _MESSAGES: dict[type[DomainError], str] = {
     VisitNotAllowed: "Este cliente no es de tu ruta: solo su cobrador registra visitas.",
     LoanAlreadySettled: "El préstamo ya está liquidado: no hay saldo por cobrar.",
     InvalidCommitmentDate: "La fecha de compromiso debe ser posterior a hoy.",
-    ReasonRequired: "Escribe el motivo del no pago.",
+    ReasonRequired: "Escribe el motivo.",
+    SelfApprovalForbidden: "No puedes aprobar una solicitud que tú mismo originaste: la aprueba otro administrador.",
+    ApproverRoleRequired: "Solo un administrador aprueba.",
+    DeciderRoleRequired: "Solo un administrador rechaza.",
     PendingVisitsRemain: (
         "Quedan clientes pendientes de visita: registra su pago o su no pago antes de cerrar la caja."
     ),
@@ -87,6 +93,13 @@ _STATUS = {
 
 def status_text(disbursement: Disbursement) -> str:
     return _STATUS[disbursement.status]
+
+
+def waiting_text(disbursement: Disbursement) -> str:
+    """For the administrator: what the request is waiting for."""
+    if disbursement.status is DisbursementStatus.PENDING_AUTHORIZATION:
+        return "Esperando la autorización: supera el límite del cobrador."
+    return "Esperando la aprobación."
 
 
 def close_summary(close: CashClose, symbol: str = "") -> str:
