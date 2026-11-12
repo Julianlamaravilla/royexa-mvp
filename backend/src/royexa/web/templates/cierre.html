@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Cerrar caja · ROYEXA{% endblock %}
+{% block body %}
+<main class="narrow">
+  <h1>Cerrar caja</h1>
+  {% if box is none %}
+  <p class="notice error">Hoy no es día de cobranza: no hay caja que cerrar.</p>
+  {% elif box.closed %}
+  <p class="notice ok">La caja de hoy ya está cerrada.</p>
+  {% if close_text %}<p>{{ close_text }}</p>{% endif %}
+  {% elif pending %}
+  <p class="notice error">Aún hay clientes pendientes de visita. Registra su pago o su no pago antes de cerrar:</p>
+  <ul class="list">
+    {% for item in pending %}<li class="card"><strong>{{ item.client_name }}</strong></li>{% endfor %}
+  </ul>
+  {% else %}
+  <p class="notice">El cierre es irreversible. Cuenta el efectivo que entregas y escríbelo: el sistema calcula el descuadre.</p>
+  <form method="post" action="/web/cierre" class="stack">
+    <input type="hidden" name="ficha" value="{{ token }}">
+    <input type="hidden" name="device_time" value="">
+    <label>Efectivo entregado
+      <input type="text" name="entregado" inputmode="decimal" autocomplete="off" required placeholder="0,00">
+    </label>
+    <button type="submit" class="primary">Cerrar caja</button>
+  </form>
+  {% endif %}
+  <p><a href="/web/ruta">Volver a la ruta</a></p>
+</main>
+{% endblock %}
