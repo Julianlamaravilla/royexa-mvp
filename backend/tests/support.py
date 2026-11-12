@@ -171,3 +171,24 @@ class Flow:
         response = self.pending(route, day, actor)
         assert response.status_code == 200, response.text
         return [row["client_id"] for row in response.json()]
+
+    def close_box(
+        self,
+        delivered_cents: int,
+        actor: str = COLLECTOR,
+        collector: str = COLLECTOR,
+        device_time: str = DEVICE_TIME,
+    ) -> Response:
+        return self._post(
+            f"/v1/cash-boxes/{collector}/close",
+            actor,
+            {"delivered_cents": delivered_cents, "device_time": device_time},
+        )
+
+    def cash_closes(self, suffix: str = "", actor: str = ADMIN) -> Response:
+        return self._get(f"/v1/cash-closes{suffix}", actor)
+
+    def visit_everyone(self) -> None:
+        """Ends every pending visit of route 1 with a non-payment, so the box can close."""
+        for row in self.pending().json():
+            assert self.non_pay(row["loan_id"], commitment_date="2026-11-30").status_code == 201

@@ -57,6 +57,13 @@ class PostgresLedgerRepository:
         )
         return [_entry(row) for row in rows]
 
+    def for_cash_box(self, cash_box_id: str) -> list[LedgerEntry]:
+        rows = self._connection.execute(
+            f"SELECT {_COLUMNS} FROM ledger_entry WHERE cash_box_id = %s ORDER BY server_time, id",
+            (cash_box_id,),
+        )
+        return [_entry(row) for row in rows]
+
     def all(self) -> list[LedgerEntry]:
         rows = self._connection.execute(
             f"SELECT {_COLUMNS} FROM ledger_entry ORDER BY server_time, id"

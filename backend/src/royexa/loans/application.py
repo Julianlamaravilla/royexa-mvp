@@ -186,9 +186,40 @@ class PendingVisit:
     remaining_installments: Fraction
 
 
-class VisitQueries:
+def pending_visits(
+    uow: VisitsUnitOfWork, calendar: BusinessCalendar, route_id: str, day: date
+) -> list[PendingVisit]:
     """T3-P1: on a collection day, every client of the route with an active loan is pending
-    until a payment or a non-payment is registered for that day."""
+    until a payment or a non-payment is registered for that day. Reads inside the caller's
+    transaction, so the close of a box and its pending check see the same data."""
+    if not calendar.is_collection_day(day):
+        return []
+
+    def visited(loan_id: str) -> bool:
+        return any(
+            calendar.day_of(p.server_time) == day for p in uow.payments.for_loan(loan_id)
+        ) or any(
+            calendar.day_of(n.server_time) == day for n in uow.non_payments.for_loan(loan_id)
+        )
+
+    pending = []
+    for client in uow.clients.all():
+        if client.route_id != route_id:
+            continue
+        active = [loan for loan in uow.loans.for_client(client.id) if not loan.is_settled]
+        if not active or any(visited(loan.id) for loan in active):
+            continue
+        loan = active[0]
+        pending.append(
+            PendingVisit(
+                client.id, client.name, loan.id, loan.outstanding, loan.remaining_installments
+            )
+        )
+    return pending
+
+
+class VisitQueries:
+    """T3-P1: who is pending a visit on a day, read for the collector or an administrator."""
 
     def __init__(
         self,
@@ -213,35 +244,8 @@ class VisitQueries:
         if not actor.is_admin and actor.id != route.collector_id:
             raise VisitNotAllowed(actor.id)
         day = day or self._calendar.day_of(self._clock.now())
-        if not self._calendar.is_collection_day(day):
-            return []
-        pending = []
         with self._uow() as uow:
-            for client in uow.clients.all():
-                if client.route_id != route_id:
-                    continue
-                active = [loan for loan in uow.loans.for_client(client.id) if not loan.is_settled]
-                if not active or any(self._visited(uow, loan.id, day) for loan in active):
-                    continue
-                loan = active[0]
-                pending.append(
-                    PendingVisit(
-                        client.id,
-                        client.name,
-                        loan.id,
-                        loan.outstanding,
-                        loan.remaining_installments,
-                    )
-                )
-        return pending
-
-    def _visited(self, uow: VisitsUnitOfWork, loan_id: str, day: date) -> bool:
-        return any(
-            self._calendar.day_of(p.server_time) == day for p in uow.payments.for_loan(loan_id)
-        ) or any(
-            self._calendar.day_of(n.server_time) == day
-            for n in uow.non_payments.for_loan(loan_id)
-        )
+            return pending_visits(uow, self._calendar, route_id, day)
 
 
 class LoanQueries:

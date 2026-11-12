@@ -49,6 +49,7 @@ ALL_MIGRATIONS = [
     "007_non_payments.sql",
     "008_payment_receipt.sql",
     "009_daily_box.sql",
+    "010_cash_close.sql",
 ]
 NOW = datetime(2026, 10, 30, 14, 0, tzinfo=UTC)
 RECEIPT = "COMPROBANTE_DESEMBOLSO"
@@ -202,6 +203,8 @@ def test_pr07_catalog_lists_no_other_grant_on_any_table():
         + [(t, "royexa_app", p) for t in ("payment", "payment_allocation") for p in ("INSERT", "SELECT")]
         # T3b: a non-payment is a visit that happened and is never edited.
         + [("non_payment", "royexa_app", p) for p in ("INSERT", "SELECT")]
+        # T5b: a close is append-only (RN-02, RF-02).
+        + [("cash_close", "royexa_app", p) for p in ("INSERT", "SELECT")]
     )
 
 
