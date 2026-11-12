@@ -186,6 +186,45 @@ class PendingVisit:
     remaining_installments: Fraction
 
 
+@dataclass(frozen=True)
+class PaidClient:
+    client_id: str
+    client_name: str
+    cash: Money
+    transfer: Money
+    payments: int
+
+
+@dataclass(frozen=True)
+class UnpaidClient:
+    client_id: str
+    client_name: str
+    loan_id: str
+    reason: str
+    commitment_date: date
+
+
+@dataclass(frozen=True)
+class DayPanels:
+    """RF-02: the three panels of a collector's day. A client is in one panel at most:
+    paid wins over did-not-pay, and either ends his pending visit."""
+
+    day: date
+    collector_id: str
+    route_id: str
+    pending: list[PendingVisit]
+    paid: list[PaidClient]
+    unpaid: list[UnpaidClient]
+
+    @property
+    def cash_total(self) -> Money:
+        return sum((item.cash for item in self.paid), Money(0))
+
+    @property
+    def transfer_total(self) -> Money:
+        return sum((item.transfer for item in self.paid), Money(0))
+
+
 def pending_visits(
     uow: VisitsUnitOfWork, calendar: BusinessCalendar, route_id: str, day: date
 ) -> list[PendingVisit]:
@@ -195,19 +234,25 @@ def pending_visits(
     if not calendar.is_collection_day(day):
         return []
 
-    def visited(loan_id: str) -> bool:
+    def visited(loans: list[Loan]) -> bool:
+        """A payment or a non-payment on any loan of the client ends his visit (T3-P1)."""
         return any(
-            calendar.day_of(p.server_time) == day for p in uow.payments.for_loan(loan_id)
+            calendar.day_of(p.server_time) == day
+            for loan in loans
+            for p in uow.payments.for_loan(loan.id)
         ) or any(
-            calendar.day_of(n.server_time) == day for n in uow.non_payments.for_loan(loan_id)
+            calendar.day_of(n.server_time) == day
+            for loan in loans
+            for n in uow.non_payments.for_loan(loan.id)
         )
 
     pending = []
     for client in uow.clients.all():
         if client.route_id != route_id:
             continue
-        active = [loan for loan in uow.loans.for_client(client.id) if not loan.is_settled]
-        if not active or any(visited(loan.id) for loan in active):
+        loans = uow.loans.for_client(client.id)
+        active = [loan for loan in loans if not loan.is_settled]
+        if not active or visited(loans):
             continue
         loan = active[0]
         pending.append(
@@ -246,6 +291,56 @@ class VisitQueries:
         day = day or self._calendar.day_of(self._clock.now())
         with self._uow() as uow:
             return pending_visits(uow, self._calendar, route_id, day)
+
+    def panels(self, actor: User, collector_id: str) -> DayPanels:
+        """The panels of today for the collector's route; read by the collector or an
+        administrator. Only today: a past day's pending list would need that day's state."""
+        if not actor.is_admin and actor.id != collector_id:
+            raise VisitNotAllowed(actor.id)
+        route = self._directory.route_of_collector(collector_id)
+        day = self._calendar.day_of(self._clock.now())
+        if not self._calendar.is_collection_day(day):
+            return DayPanels(day, collector_id, route.id, [], [], [])
+        paid: list[PaidClient] = []
+        unpaid: list[UnpaidClient] = []
+        with self._uow() as uow:
+            pending = pending_visits(uow, self._calendar, route.id, day)
+            for client in uow.clients.all():
+                if client.route_id != route.id:
+                    continue
+                loans = uow.loans.for_client(client.id)
+                payments = [
+                    p
+                    for loan in loans
+                    for p in uow.payments.for_loan(loan.id)
+                    if self._calendar.day_of(p.server_time) == day
+                ]
+                if payments:
+                    paid.append(self._paid(client.id, client.name, payments))
+                    continue
+                refusals = [
+                    (loan, n)
+                    for loan in loans
+                    for n in uow.non_payments.for_loan(loan.id)
+                    if self._calendar.day_of(n.server_time) == day
+                ]
+                if refusals:
+                    loan, last = refusals[-1]
+                    unpaid.append(
+                        UnpaidClient(
+                            client.id, client.name, loan.id, last.reason, last.commitment_date
+                        )
+                    )
+        return DayPanels(day, collector_id, route.id, pending, paid, unpaid)
+
+    @staticmethod
+    def _paid(client_id: str, name: str, payments: list[Payment]) -> PaidClient:
+        def total(method: PaymentMethod) -> Money:
+            return sum((p.amount for p in payments if p.method is method), Money(0))
+
+        return PaidClient(
+            client_id, name, total(PaymentMethod.CASH), total(PaymentMethod.TRANSFER), len(payments)
+        )
 
 
 class LoanQueries:
