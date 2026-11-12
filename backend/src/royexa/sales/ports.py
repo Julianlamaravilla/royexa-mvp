@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol, Self
 
 from royexa.cash_box.ports import CashRepository
@@ -14,6 +15,9 @@ class DisbursementRepository(Protocol):
     def add(self, disbursement: Disbursement) -> None: ...
     def get(self, disbursement_id: str) -> Disbursement | None: ...
     def save(self, disbursement: Disbursement) -> None: ...
+    def for_collector(self, collector_id: str, since: datetime) -> list[Disbursement]:
+        """Those still in progress and those requested since `since`, newest first."""
+        ...
 
 
 class SalesUnitOfWork(Protocol):

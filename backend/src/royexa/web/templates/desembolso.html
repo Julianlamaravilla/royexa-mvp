@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Desembolso · ROYEXA{% endblock %}
+{% block body %}
+<main class="narrow">
+  <h1>Desembolso</h1>
+  <section class="card">
+    <strong>{{ client_name }}</strong>
+    <span class="amount">{{ item.terms.principal.cents | money }}</span>
+    <span class="muted">{{ item.terms.installment_count }} cuotas en {{ item.terms.term_days }} días</span>
+    <span>{{ status_text }}</span>
+    {% if item.decision_reason %}<span class="muted">Motivo: {{ item.decision_reason }}</span>{% endif %}
+  </section>
+  {% if token %}
+  <form method="post" action="/web/desembolso/{{ item.id }}/codigo" class="stack">
+    <input type="hidden" name="ficha" value="{{ token }}">
+    <input type="hidden" name="device_time" value="">
+    <label>Código que dicta el cliente
+      <input type="text" name="codigo" autocomplete="off" autocapitalize="characters" required>
+    </label>
+    <button type="submit" class="primary">Validar y entregar</button>
+  </form>
+  {% endif %}
+  <p><a href="/web/ruta">Volver a la ruta</a></p>
+</main>
+{% endblock %}

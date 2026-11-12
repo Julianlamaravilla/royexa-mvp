@@ -28,6 +28,8 @@ AWAITING_DECISION = frozenset(
     {DisbursementStatus.REQUESTED, DisbursementStatus.PENDING_AUTHORIZATION}
 )
 
+IN_PROGRESS = AWAITING_DECISION | {DisbursementStatus.APPROVED}
+
 
 class ConfirmationOutcome(Enum):
     CONFIRMED = "confirmed"

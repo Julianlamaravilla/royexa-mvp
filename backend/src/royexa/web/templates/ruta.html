@@ -29,6 +29,22 @@
   {% endif %}
 
   <section>
+    <h2>Desembolsos ({{ disbursements | length }})</h2>
+    <ul class="list">
+      {% for item in disbursements %}
+      <li class="card">
+        <strong>{{ item.client_name }}</strong>
+        <span>{{ item.terms.principal.cents | money }}</span>
+        <a href="/web/desembolso/{{ item.id }}">{{ item.status_text }}</a>
+      </li>
+      {% else %}
+      <li class="muted">Sin desembolsos en curso ni de hoy.</li>
+      {% endfor %}
+    </ul>
+    <p><a class="button" href="/web/desembolso/nuevo">Solicitar desembolso</a></p>
+  </section>
+
+  <section>
     <h2>Pendientes ({{ panels.pending | length }})</h2>
     <ul class="list">
       {% for item in panels.pending %}

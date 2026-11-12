@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Solicitar desembolso · ROYEXA{% endblock %}
+{% block body %}
+<main class="narrow">
+  <h1>Solicitar desembolso</h1>
+  <form method="post" action="/web/desembolso/nuevo" class="stack">
+    <input type="hidden" name="ficha" value="{{ token }}">
+    <label>Cliente
+      <select name="cliente" required>
+        {% for client in clients %}
+        <option value="{{ client.id }}">{{ client.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Monto
+      <input type="text" name="monto" inputmode="decimal" autocomplete="off" required placeholder="0,00">
+    </label>
+    <label>Plazo en días
+      <input type="text" name="plazo" inputmode="numeric" autocomplete="off" required value="20">
+    </label>
+    <label>Número de cuotas
+      <input type="text" name="cuotas" inputmode="numeric" autocomplete="off" required value="20">
+    </label>
+    <button type="submit" class="primary">Solicitar</button>
+  </form>
+  <p><a href="/web/ruta">Volver a la ruta</a></p>
+</main>
+{% endblock %}

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from threading import Lock
 from typing import Protocol, Self
 
@@ -20,7 +20,7 @@ from royexa.web.forms import FormToken
 from royexa.ledger.domain import DuplicateLedgerEntry, LedgerEntry
 from royexa.ledger.ports import LedgerRepository
 from royexa.loans.domain import Loan, NonPayment, Payment, RenewalException
-from royexa.sales.domain import Disbursement
+from royexa.sales.domain import IN_PROGRESS, Disbursement
 from royexa.shared.errors import StaleWrite
 from royexa.shared.outbox import NoticeStatus, OutboxMessage
 
@@ -117,6 +117,15 @@ class InMemoryDisbursementRepository:
 
     def save(self, disbursement: Disbursement) -> None:
         self._rows[disbursement.id] = disbursement
+
+    def for_collector(self, collector_id: str, since: datetime) -> list[Disbursement]:
+        mine = [
+            item
+            for item in self._rows.values()
+            if item.collector_id == collector_id
+            and (item.status in IN_PROGRESS or item.requested_at >= since)
+        ]
+        return sorted(mine, key=lambda item: item.requested_at, reverse=True)
 
 
 class InMemoryLoanRepository:
