@@ -6,6 +6,7 @@ it, so the composition root can import the web without a cycle."""
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -20,7 +21,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from royexa.cash_box.domain import NoOpenCashBox
 from royexa.identity_access.domain import InvalidCredentials, SessionRequired, User
-from royexa.loans.domain import exact_decimal
+from royexa.loans.domain import LoanTerms, exact_decimal
+from royexa.sales.domain import DisbursementNotFound, DisbursementStatus
 from royexa.shared.money import Money
 from royexa.shared.payments import PaymentMethod
 from royexa.shared.errors import DomainError
@@ -38,6 +40,7 @@ CONTENT_POLICY = (
 LOGIN_PATH = "/web/login"
 ROUTE_PATH = "/web/ruta"
 ADMIN_PATH = "/web/admin"
+NEW_DISBURSEMENT_PATH = "/web/desembolso/nuevo"
 
 
 class WebContainer(Protocol):
@@ -45,6 +48,9 @@ class WebContainer(Protocol):
     form_tokens: object
     visit_queries: object
     queries: object
+    client_queries: object
+    request: object
+    confirm: object
     register_payment: object
     register_non_payment: object
     currency_symbol: str
@@ -240,9 +246,21 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         except NoOpenCashBox:
             box = None  # a day without collection has no box (T5a)
         logout_token = await run_in_threadpool(container.form_tokens.issue, token, "salir")
+        names = await client_names()
+        mine = await run_in_threadpool(container.queries.for_collector, user.id)
+        disbursements = [
+            {
+                "id": item.id,
+                "client_name": names.get(item.client_id, item.client_id),
+                "terms": item.terms,
+                "status_text": messages.status_text(item),
+            }
+            for item in mine
+        ]
         return _render(
             container,
             "ruta.html",
+            disbursements=disbursements,
             user=user,
             day=long_date(panels.day),
             panels=panels,
@@ -267,6 +285,10 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         form_token = await run_in_threadpool(container.form_tokens.issue, token, purpose)
         earliest = (panels.day + timedelta(days=1)).isoformat()
         return _render(container, template, visit=visit, token=form_token, earliest=earliest)
+
+    async def client_names() -> dict[str, str]:
+        clients = await run_in_threadpool(container.client_queries.all)
+        return {client.id: client.name for client in clients}
 
     def device_time(form: dict[str, str]) -> datetime:
         """The device clock when it sent one, the server clock when it did not (no script)."""
@@ -332,6 +354,101 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
             )
 
         return await run_once(container, request, f"no-pago:{loan_id}", register)
+
+    def whole_number(text: str) -> int | None:
+        return int(text.strip()) if re.fullmatch(r"\s*\d{1,3}\s*", text) else None
+
+    @router.get("/desembolso/nuevo")
+    async def new_disbursement_page(request: Request) -> Response:
+        token, user = await current(request)
+        if user.is_admin:
+            return _redirect(ADMIN_PATH)
+        panels = await run_in_threadpool(container.visit_queries.panels, user, user.id)
+        clients = await run_in_threadpool(container.client_queries.all)
+        form_token = await run_in_threadpool(container.form_tokens.issue, token, "desembolso")
+        return _render(
+            container,
+            "desembolso_nuevo.html",
+            clients=[c for c in clients if c.route_id == panels.route_id],
+            token=form_token,
+        )
+
+    @router.post("/desembolso/nuevo")
+    async def new_disbursement(request: Request) -> Response:
+        def register(user: User, form: dict[str, str]) -> Outcome:
+            back = NEW_DISBURSEMENT_PATH
+            cents = parse_amount(form.get("monto", ""))
+            days = whole_number(form.get("plazo", ""))
+            count = whole_number(form.get("cuotas", ""))
+            if not cents:
+                text = "El importe no es válido. Escríbelo como 1.234,56 y mayor que cero."
+            elif days is None:
+                text = "El plazo debe ser un número entero de días."
+            elif count is None:
+                text = "El número de cuotas debe ser un número entero."
+            else:
+                try:
+                    terms = LoanTerms(Money(cents), days, count)
+                    asked = container.request.execute(user, form.get("cliente", ""), terms)
+                except DomainError as error:
+                    return Outcome("error", messages.describe(error), back)
+                text = "Solicitud registrada. " + (
+                    "Supera tu límite: necesita la autorización de un administrador."
+                    if asked.status is DisbursementStatus.PENDING_AUTHORIZATION
+                    else "Espera la aprobación del administrador."
+                )
+                return Outcome("ok", text, f"/web/desembolso/{asked.id}")
+            return Outcome("error", text, back)
+
+        return await run_once(container, request, "desembolso", register)
+
+    @router.get("/desembolso/{disbursement_id}")
+    async def disbursement_page(disbursement_id: str, request: Request) -> Response:
+        token, user = await current(request)
+        if user.is_admin:
+            return _redirect(ADMIN_PATH)
+        try:
+            detail = await run_in_threadpool(container.queries.detail, disbursement_id)
+        except DisbursementNotFound:
+            detail = None
+        if detail is None or detail.disbursement.collector_id != user.id:
+            return _message(
+                container, 404, "Sin solicitud", "No se encontró esa solicitud en tu ruta.",
+                ROUTE_PATH, "Volver a la ruta",
+            )
+        item = detail.disbursement
+        form_token = None
+        if item.status is DisbursementStatus.APPROVED:
+            form_token = await run_in_threadpool(
+                container.form_tokens.issue, token, f"codigo:{disbursement_id}"
+            )
+        names = await client_names()
+        return _render(
+            container,
+            "desembolso.html",
+            item=item,
+            client_name=names.get(item.client_id, item.client_id),
+            status_text=messages.status_text(item),
+            token=form_token,
+        )
+
+    @router.post("/desembolso/{disbursement_id}/codigo")
+    async def confirm_disbursement(disbursement_id: str, request: Request) -> Response:
+        back = f"/web/desembolso/{disbursement_id}"
+
+        def confirm(user: User, form: dict[str, str]) -> Outcome:
+            code = "".join(form.get("codigo", "").split()).upper()
+            try:
+                done = container.confirm.execute(user, disbursement_id, code, device_time(form))
+            except DomainError as error:
+                return Outcome("error", messages.describe(error), back)
+            client = container.client_queries.get(done.client_id)
+            amount = money(done.terms.principal.cents, container.currency_symbol)
+            return Outcome(
+                "ok", f"Desembolso confirmado: entregaste {amount} a {client.name}.", ROUTE_PATH
+            )
+
+        return await run_once(container, request, f"codigo:{disbursement_id}", confirm)
 
     @router.get("/admin")
     async def admin_page(request: Request) -> Response:

@@ -6,7 +6,7 @@ loan and notice commit together or not at all.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 import psycopg
 from psycopg import errors
@@ -30,6 +30,7 @@ from royexa.loans.domain import (
 from royexa.sales.domain import (
     ConfirmationCode,
     Disbursement,
+    IN_PROGRESS,
     DisbursementStatus,
     RefusedApprovalAttempt,
 )
@@ -639,6 +640,17 @@ class PostgresDisbursementRepository:
             loan_id=row[20],
             refused_approval_attempts=attempts,
         )
+
+    def for_collector(self, collector_id: str, since: datetime) -> list[Disbursement]:
+        ids = [
+            row[0]
+            for row in self._connection.execute(
+                "SELECT id FROM disbursement WHERE collector_id = %s "
+                "AND (status = ANY(%s) OR requested_at >= %s) ORDER BY requested_at DESC, id",
+                (collector_id, [status.value for status in IN_PROGRESS], since),
+            )
+        ]
+        return [item for item in (self.get(i) for i in ids) if item is not None]
 
     def save(self, item: Disbursement) -> None:
         version, stored = self._read[item.id]
