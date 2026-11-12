@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from royexa.cash_box.desk import CashDesk
 from royexa.cash_box.domain import CashBox
@@ -281,6 +281,13 @@ class SalesQueries:
             return DisbursementDetail(
                 disbursement, loan, uow.ledger.for_disbursement(disbursement_id)
             )
+
+    def for_collector(self, collector_id: str) -> list[Disbursement]:
+        """T7c: what the collector has in progress plus whatever was requested today."""
+        today = self._calendar.day_of(self._clock.now())
+        since = datetime.combine(today, time.min, tzinfo=self._calendar.zone)
+        with self._uow() as uow:
+            return uow.disbursements.for_collector(collector_id, since)
 
     def ledger(self, disbursement_id: str | None = None) -> list[LedgerEntry]:
         with self._uow() as uow:
