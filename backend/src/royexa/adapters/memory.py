@@ -220,6 +220,15 @@ class InMemoryAuthRepository:
     def credential(self, user_id: str) -> Credential | None:
         return self._credentials.get(user_id)
 
+    def save_credential(self, credential: Credential) -> None:
+        self._credentials[credential.user_id] = credential
+
+    def demo_users(self) -> list[str]:
+        return [c.user_id for c in self._credentials.values() if c.is_demo]
+
+    def sessions_of(self, user_id: str) -> list[Session]:
+        return [s for s in self._sessions.values() if s.user_id == user_id]
+
     def add_session(self, session: Session) -> None:
         self._sessions[session.token_hash] = session
 

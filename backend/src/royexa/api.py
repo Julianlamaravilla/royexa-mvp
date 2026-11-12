@@ -30,11 +30,13 @@ from royexa.clients.domain import (
     InvalidClient,
 )
 from royexa.identity_access.domain import (
+    CurrentPasswordIncorrect,
     InvalidCredentials,
     RouteNotFound,
     SessionRequired,
     UnknownActor,
     User,
+    WeakPassword,
 )
 from royexa.ledger.domain import InvalidLedgerEntry, LedgerEntry, LedgerEntryNotFound
 from royexa.loans.application import DayPanels, PendingVisit
@@ -86,6 +88,12 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     UnknownActor: (401, "actor-desconocido", "Actor desconocido"),
     InvalidCredentials: (401, "credenciales-invalidas", "Usuario o contrasena incorrectos"),
     SessionRequired: (401, "sesion-requerida", "Se requiere una sesion valida"),
+    CurrentPasswordIncorrect: (
+        403,
+        "contrasena-actual-incorrecta",
+        "La contrasena actual es incorrecta",
+    ),
+    WeakPassword: (422, "contrasena-debil", "La contrasena nueva no cumple la politica"),
     AdminRoleRequired: (403, "rol-administrador-requerido", "Se requiere rol de administrador"),
     SelfApprovalForbidden: (403, "autoaprobacion-prohibida", "Quien origina no puede aprobar"),
     ApproverRoleRequired: (403, "rol-aprobador-requerido", "Solo un administrador aprueba"),
@@ -204,6 +212,11 @@ class PendingVisitOut(BaseModel):
 class LoginBody(BaseModel):
     user_id: str
     password: str
+
+
+class PasswordBody(BaseModel):
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(max_length=1024)
 
 
 class LoginOut(BaseModel):
@@ -646,6 +659,11 @@ def create_app(container: Container) -> FastAPI:
             role=result.user.role.value,
             expires_at=result.expires_at,
         )
+
+    @app.post("/v1/auth/password", status_code=204)
+    def change_password(body: PasswordBody, token: Token) -> Response:
+        container.authenticator.change_password(token, body.current_password, body.new_password)
+        return Response(status_code=204)
 
     @app.post("/v1/auth/logout", status_code=204)
     def logout(token: Token, request: Request) -> Response:
