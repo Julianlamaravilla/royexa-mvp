@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Descuadres · ROYEXA{% endblock %}
+{% block body %}
+<main>
+  <h1>Descuadres del periodo</h1>
+  <form method="get" action="/web/admin/descuadres" class="stack">
+    <label>Desde
+      <input type="date" name="desde" value="{{ report.since.isoformat() if report else since }}">
+    </label>
+    <label>Hasta
+      <input type="date" name="hasta" value="{{ report.until.isoformat() if report else until }}">
+    </label>
+    <button type="submit" class="primary">Consultar</button>
+  </form>
+  {% if error %}
+  <p class="notice error" role="alert">{{ error }}</p>
+  {% elif report %}
+  <section class="card">
+    {% if report.count %}
+    <h2>{{ report.count }} descuadre{{ "" if report.count == 1 else "s" }}</h2>
+    <p>Faltantes {{ report.shortage.cents | money }} · Sobrantes {{ report.surplus.cents | money }}</p>
+    {% else %}
+    <h2>No hubo descuadres en el periodo</h2>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Detalle</h2>
+    <ul class="list">
+      {% for item in report.items %}
+      <li class="card">
+        <strong>{{ item.day | short_date }} · {{ item.collector_id }}</strong>
+        <span class="amount">{{ item.discrepancy.cents | money }}</span>
+        <span class="muted">Esperado {{ item.expected.cents | money }} · Entregado {{ item.delivered.cents | money }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Ninguno.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section>
+    <h2>Evolución</h2>
+    <ul class="list">
+      {% for day in report.days %}
+      <li class="card">
+        <strong>{{ day.day | short_date }}</strong>
+        <span>{{ day.count }} descuadre{{ "" if day.count == 1 else "s" }} · neto {{ day.net.cents | money }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section>
+    <h2>Cajas sin cerrar</h2>
+    <ul class="list">
+      {% for box in report.unclosed %}
+      <li class="card"><strong>{{ box.day | short_date }} · {{ box.collector_id }}</strong></li>
+      {% else %}
+      <li class="muted">Ninguna.</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+  <p><a href="/web/admin">Volver</a></p>
+</main>
+{% endblock %}
