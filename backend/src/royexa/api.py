@@ -676,6 +676,15 @@ def create_app(container: Container, dispatch_every: float = 0.0) -> FastAPI:
     Actor = Annotated[User, Depends(current_actor)]
     Admin = Annotated[User, Depends(current_admin)]
 
+    @app.get("/health")
+    def health() -> JSONResponse:
+        """For the host and for the keep-alive ping (T10b): the process and its database."""
+        try:
+            container.ping()
+        except Exception:  # noqa: BLE001 - any failure of the database is "degraded"
+            return JSONResponse({"status": "degraded"}, status_code=503)
+        return JSONResponse({"status": "ok"})
+
     @app.exception_handler(DomainError)
     def domain_error(_: Request, error: DomainError) -> JSONResponse:
         for kind in type(error).__mro__:
