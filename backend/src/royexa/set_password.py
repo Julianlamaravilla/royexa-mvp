@@ -11,19 +11,22 @@ from __future__ import annotations
 import getpass
 import os
 import sys
+from pathlib import Path
 from datetime import UTC, datetime
 
 import psycopg
 
 from royexa.identity_access.domain import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from royexa.identity_access.passwords import PasswordHasher
-from royexa.seed import seed_directory
+from royexa.seed import directory_for
 
 
 def provision_password(
     url: str, user_id: str, password: str, hasher: PasswordHasher | None = None
 ) -> None:
-    if user_id not in {user.id for user in seed_directory().users()}:
+    seed = os.environ.get("ROYEXA_SEED", "demo")
+    directory_file = os.environ.get("ROYEXA_DIRECTORY_FILE")
+    if user_id not in {u.id for u in directory_for(seed, Path(directory_file) if directory_file else None).users()}:
         raise ValueError(f"unknown user: {user_id}")
     if not MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH:
         raise ValueError(f"the password needs at least {MIN_PASSWORD_LENGTH} characters")

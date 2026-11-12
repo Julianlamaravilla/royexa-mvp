@@ -1,0 +1,13 @@
+{
+  "_nota": "Datos de ejemplo del piloto (T10-P5), inventados: cambiar nombres, límites, fondos y tasa por los reales antes de manejar dinero. Los importes están en centavos.",
+  "users": [
+    {"id": "admin-1", "name": "Administrador del piloto", "role": "ADMINISTRADOR"},
+    {"id": "admin-2", "name": "Administrador de respaldo", "role": "ADMINISTRADOR"},
+    {"id": "cobrador-1", "name": "Cobrador Norte", "role": "COBRADOR", "disbursement_limit_cents": 50000000, "opening_cash_cents": 100000000},
+    {"id": "cobrador-2", "name": "Cobrador Sur", "role": "COBRADOR", "disbursement_limit_cents": 50000000, "opening_cash_cents": 100000000}
+  ],
+  "routes": [
+    {"id": "ruta-1", "collector_id": "cobrador-1", "max_disbursement_cents": 80000000, "interest_bps": 2000},
+    {"id": "ruta-2", "collector_id": "cobrador-2", "max_disbursement_cents": 80000000, "interest_bps": 2000}
+  ]
+}
