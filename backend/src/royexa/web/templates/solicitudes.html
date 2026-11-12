@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Solicitudes · ROYEXA{% endblock %}
+{% block body %}
+<main>
+  <h1>Solicitudes en espera</h1>
+  <ul class="list">
+    {% for row in rows %}
+    <li class="card">
+      <strong>{{ row.client_name }}</strong>
+      <span class="amount">{{ row.terms.principal.cents | money }}</span>
+      <span class="muted">{{ row.terms.installment_count }} cuotas en {{ row.terms.term_days }} días · {{ row.collector_id }}</span>
+      <span>{{ row.waiting_text }}</span>
+      <form method="post" action="/web/admin/solicitudes/{{ row.id }}/aprobar">
+        <input type="hidden" name="ficha" value="{{ row.approve_token }}">
+        <button type="submit" class="primary">Aprobar</button>
+      </form>
+      <form method="post" action="/web/admin/solicitudes/{{ row.id }}/rechazar" class="stack">
+        <input type="hidden" name="ficha" value="{{ row.reject_token }}">
+        <label>Motivo del rechazo
+          <input type="text" name="motivo" autocomplete="off" maxlength="300">
+        </label>
+        <button type="submit">Rechazar</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="muted">No hay solicitudes en espera.</li>
+    {% endfor %}
+  </ul>
+  <p><a href="/web/admin">Volver</a></p>
+</main>
+{% endblock %}

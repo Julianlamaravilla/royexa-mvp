@@ -10,6 +10,7 @@ COLLECTOR = "cobrador-1"
 ADMIN = "admin-1"
 OTHER_ADMIN = "admin-2"
 CLIENT = "cliente-1"
+PHONE = {"width": 360, "height": 740}
 DEVICE_TIME = "2026-10-30T13:59:00+00:00"
 
 
@@ -242,3 +243,9 @@ class Flow:
 
     def payment_entry(self, payment_id: str) -> dict:
         return next(e for e in self.ledger() if e["payment_id"] == payment_id)
+
+
+def assert_fits_phone(page) -> None:
+    """T7-P3: the page does not scroll sideways at the phone's width."""
+    widths = page.evaluate("[document.documentElement.scrollWidth, window.innerWidth]")
+    assert widths[0] <= widths[1] == PHONE["width"], f"horizontal scroll on {page.url}: {widths}"
