@@ -561,11 +561,12 @@ _DISBURSEMENT = (
     "id, client_id, route_id, collector_id, requested_by, requested_at, principal_cents, "
     "term_days, installment_count, interest_cents, status, renewal_exception_id, approved_by, "
     "decided_by, decided_at, decision_reason, code_digest, code_expires_at, confirmed_by, "
-    "resolved_at, loan_id"
+    "resolved_at, loan_id, failed_code_attempts, code_locked_until"
 )
 _MUTABLE = (
     "status, renewal_exception_id, approved_by, decided_by, decided_at, decision_reason, "
-    "code_digest, code_expires_at, confirmed_by, resolved_at, loan_id"
+    "code_digest, code_expires_at, confirmed_by, resolved_at, loan_id, failed_code_attempts, "
+    "code_locked_until"
 ).split(", ")
 
 
@@ -582,6 +583,8 @@ def _mutable_values(item: Disbursement) -> tuple:
         item.confirmed_by,
         item.resolved_at,
         item.loan_id,
+        item.failed_code_attempts,
+        item.code_locked_until,
     )
 
 
@@ -594,7 +597,7 @@ class PostgresDisbursementRepository:
 
     def add(self, item: Disbursement) -> None:
         self._connection.execute(
-            f"INSERT INTO disbursement ({_DISBURSEMENT}) VALUES ({', '.join(['%s'] * 21)})",
+            f"INSERT INTO disbursement ({_DISBURSEMENT}) VALUES ({', '.join(['%s'] * 23)})",
             (
                 item.id,
                 item.client_id,
@@ -626,7 +629,7 @@ class PostgresDisbursementRepository:
                 (disbursement_id,),
             )
         ]
-        self._read[disbursement_id] = (row[21], len(attempts))
+        self._read[disbursement_id] = (row[23], len(attempts))
         code = ConfirmationCode(row[16], row[17]) if row[16] else None
         return Disbursement(
             id=row[0],
@@ -647,6 +650,8 @@ class PostgresDisbursementRepository:
             confirmed_by=row[18],
             resolved_at=row[19],
             loan_id=row[20],
+            failed_code_attempts=row[21],
+            code_locked_until=row[22],
             refused_approval_attempts=attempts,
         )
 
