@@ -1,13 +1,14 @@
 """HTTP entry (CON-03). Resolves the actor, checks the role, and hands over to use cases.
 
-Identity comes from the X-Actor-Id header against seeded users: declared limitation of
-ALT-06B. Errors follow RFC 9457 problem details.
+The actor is the user of a valid session (T6): a token from POST /v1/auth/login, sent as
+`Authorization: Bearer` or, for the server-rendered pages, in an HttpOnly cookie. Users are
+still seeded (ALT-06B). Errors follow RFC 9457 problem details.
 """
 
 from datetime import date, datetime
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, Query, Request
+from fastapi import Depends, FastAPI, Header, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -28,7 +29,13 @@ from royexa.clients.domain import (
     ClientRegistrationNotAllowed,
     InvalidClient,
 )
-from royexa.identity_access.domain import RouteNotFound, UnknownActor, User
+from royexa.identity_access.domain import (
+    InvalidCredentials,
+    RouteNotFound,
+    SessionRequired,
+    UnknownActor,
+    User,
+)
 from royexa.ledger.domain import InvalidLedgerEntry, LedgerEntry, LedgerEntryNotFound
 from royexa.loans.application import DayPanels, PendingVisit
 from royexa.loans.domain import (
@@ -67,6 +74,7 @@ from royexa.shared.outbox import OutboxMessage
 from royexa.shared.payments import PaymentMethod
 
 PROBLEM_BASE = "https://royexa.local/problemas/"
+SESSION_COOKIE = "royexa_session"
 PROBLEM_MEDIA_TYPE = "application/problem+json"
 
 
@@ -76,6 +84,8 @@ class AdminRoleRequired(DomainError):
 
 _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     UnknownActor: (401, "actor-desconocido", "Actor desconocido"),
+    InvalidCredentials: (401, "credenciales-invalidas", "Usuario o contrasena incorrectos"),
+    SessionRequired: (401, "sesion-requerida", "Se requiere una sesion valida"),
     AdminRoleRequired: (403, "rol-administrador-requerido", "Se requiere rol de administrador"),
     SelfApprovalForbidden: (403, "autoaprobacion-prohibida", "Quien origina no puede aprobar"),
     ApproverRoleRequired: (403, "rol-aprobador-requerido", "Solo un administrador aprueba"),
@@ -118,6 +128,7 @@ def _problem(status: int, slug: str, title: str, detail: str) -> JSONResponse:
         status_code=status,
         media_type=PROBLEM_MEDIA_TYPE,
         content={"type": PROBLEM_BASE + slug, "title": title, "status": status, "detail": detail},
+        headers={"WWW-Authenticate": "Bearer"} if slug == "sesion-requerida" else None,
     )
 
 
@@ -188,6 +199,19 @@ class PendingVisitOut(BaseModel):
     loan_id: str
     outstanding_cents: int
     remaining_installments: str
+
+
+class LoginBody(BaseModel):
+    user_id: str
+    password: str
+
+
+class LoginOut(BaseModel):
+    token: str
+    token_type: str
+    user_id: str
+    role: str
+    expires_at: datetime
 
 
 class CloseBody(BaseModel):
@@ -559,8 +583,24 @@ def _client_out(client: Client) -> ClientOut:
 def create_app(container: Container) -> FastAPI:
     app = FastAPI(title="ROYEXA API", version="0.3.0")
 
-    def current_actor(x_actor_id: Annotated[str, Header()]) -> User:
-        return container.directory.user(x_actor_id)
+    def session_token(request: Request) -> str:
+        """T6-P1: the Authorization header wins and is never mixed with the cookie, so a
+        bad token is refused instead of silently falling back to a cookie."""
+        header = request.headers.get("authorization")
+        if header is not None:
+            scheme, _, token = header.partition(" ")
+            if scheme.lower() != "bearer" or not token.strip():
+                raise SessionRequired("malformed Authorization header")
+            return token.strip()
+        cookie = request.cookies.get(SESSION_COOKIE)
+        if not cookie:
+            raise SessionRequired("no session")
+        return cookie
+
+    Token = Annotated[str, Depends(session_token)]
+
+    def current_actor(token: Token) -> User:
+        return container.authenticator.authenticate(token)
 
     def current_admin(actor: Annotated[User, Depends(current_actor)]) -> User:
         if not actor.is_admin:
@@ -585,6 +625,34 @@ def create_app(container: Container) -> FastAPI:
 
     def detail(disbursement_id: str) -> DisbursementOut:
         return _disbursement_out(container.queries.detail(disbursement_id))
+
+    @app.post("/v1/auth/login", response_model=LoginOut)
+    def login(body: LoginBody, request: Request, response: Response) -> LoginOut:
+        result = container.authenticator.login(body.user_id, body.password)
+        lifetime = int((result.expires_at - container.authenticator.clock_now()).total_seconds())
+        response.set_cookie(
+            SESSION_COOKIE,
+            result.token,
+            max_age=lifetime,
+            httponly=True,
+            samesite="lax",
+            secure=request.url.scheme == "https",
+            path="/",
+        )
+        return LoginOut(
+            token=result.token,
+            token_type="Bearer",
+            user_id=result.user.id,
+            role=result.user.role.value,
+            expires_at=result.expires_at,
+        )
+
+    @app.post("/v1/auth/logout", status_code=204)
+    def logout(token: Token, request: Request) -> Response:
+        container.authenticator.logout(token)
+        reply = Response(status_code=204)
+        reply.delete_cookie(SESSION_COOKIE, path="/", httponly=True, samesite="lax")
+        return reply
 
     @app.post("/v1/disbursements", status_code=201, response_model=DisbursementOut)
     def request_disbursement(body: RequestBody, actor: Actor) -> DisbursementOut:
