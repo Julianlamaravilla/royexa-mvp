@@ -59,34 +59,42 @@ def test_t1a_seeded_state_is_in_the_database_and_seeding_twice_changes_nothing()
     build_container(Settings(ledger_url=APP_URL))
 
     session = _session()
-    box = session.cash.open_box_of("cobrador-1")
     unpaid = session.loans.get("prestamo-impago")
+    clients = session.clients.all()
     session.rollback()
 
-    assert box.balance == Money(1_000_000_00)
     assert unpaid.outstanding == Money(70_000)
+    assert len(clients) == 4
+
+
+DAY = date(2026, 10, 30)
+
+
+def _open_box() -> None:
+    """The box the first movement of the day would open (T5a)."""
+    _committed(lambda session: session.cash.save(CashBox.open("cobrador-1", DAY, Money(1_000_000_00))))
 
 
 def test_t1a_cash_box_survives_a_restart_with_its_balance():
-    build_container(Settings(ledger_url=APP_URL))
+    _open_box()
 
     def deduct(session: PostgresSession) -> None:
-        box = session.cash.open_box_of("cobrador-1")
+        box = session.cash.box_of_day("cobrador-1", DAY)
         box.deduct(Money(100_000))
         session.cash.save(box)
 
     _committed(deduct)
 
     session = _session()
-    assert session.cash.open_box_of("cobrador-1").balance == Money(1_000_000_00 - 100_000)
+    assert session.cash.box_of_day("cobrador-1", DAY).balance == Money(1_000_000_00 - 100_000)
     session.rollback()
 
 
 def test_t1a_two_transactions_changing_the_same_box_do_not_overwrite_each_other():
-    build_container(Settings(ledger_url=APP_URL))
+    _open_box()
     loser, winner = _session(), _session()
-    box = loser.cash.open_box_of("cobrador-1")
-    other = winner.cash.open_box_of("cobrador-1")
+    box = loser.cash.box_of_day("cobrador-1", DAY)
+    other = winner.cash.box_of_day("cobrador-1", DAY)
     other.deduct(Money(2))
     winner.cash.save(other)
     winner.commit()
@@ -97,17 +105,17 @@ def test_t1a_two_transactions_changing_the_same_box_do_not_overwrite_each_other(
     loser.rollback()
 
     session = _session()
-    assert session.cash.open_box_of("cobrador-1").balance == Money(1_000_000_00 - 2)
+    assert session.cash.box_of_day("cobrador-1", DAY).balance == Money(1_000_000_00 - 2)
     session.rollback()
 
 
-def test_t1a_a_closed_box_is_no_longer_the_open_box_of_its_collector():
-    build_container(Settings(ledger_url=APP_URL))
-    box = CashBox("caja-nueva", "cobrador-9", Money(500), Money(500), closed=True)
+def test_t1a_a_closed_box_stays_the_box_of_its_day():
+    box = CashBox("caja-nueva", "cobrador-9", DAY, Money(500), Money(500), closed=True)
     _committed(lambda session: session.cash.save(box))
 
     session = _session()
-    assert session.cash.open_box_of("cobrador-9") is None
+    assert session.cash.box_of_day("cobrador-9", DAY).closed is True
+    assert session.cash.box_of_day("cobrador-9", date(2026, 10, 31)) is None
     session.rollback()
 
 

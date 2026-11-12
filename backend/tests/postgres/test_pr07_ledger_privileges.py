@@ -6,7 +6,7 @@ Needs PostgreSQL: docker compose up -d --wait postgres, then uv run pytest -m po
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from threading import Barrier
 from uuid import uuid4
 
@@ -22,6 +22,7 @@ from royexa.adapters.postgres_ledger import PostgresLedgerRepository, PostgresLe
 from royexa.adapters.simulated_notifier import SimulatedNotifier
 from royexa.api import create_app
 from royexa.bootstrap import Settings, build_container
+from royexa.cash_box.domain import CashBox
 from royexa.ledger.domain import DuplicateLedgerEntry, LedgerEntry, LedgerEntryType
 from royexa.migrate import MIGRATOR_URL, apply_migrations
 from royexa.seed import COLLECTOR_ID, seed_store
@@ -47,6 +48,7 @@ ALL_MIGRATIONS = [
     "006_payments.sql",
     "007_non_payments.sql",
     "008_payment_receipt.sql",
+    "009_daily_box.sql",
 ]
 NOW = datetime(2026, 10, 30, 14, 0, tzinfo=UTC)
 RECEIPT = "COMPROBANTE_DESEMBOLSO"
@@ -298,19 +300,30 @@ def test_pr07_two_simultaneous_confirmations_settle_once_on_the_real_ledger(flow
     assert [n["kind"] for n in flow.notices(disbursement["id"])].count(RECEIPT) == 1
 
 
+BOX_DAY = date(2026, 10, 30)
+
+
+def _store_with_open_box():
+    """An in-memory store holding the box of the day, as its first movement would open it."""
+    store = seed_store()
+    box = CashBox.open(COLLECTOR_ID, BOX_DAY, Money(1_000_000_00))
+    store.tables.cash_boxes[box.id] = box
+    return store
+
+
 def test_pr07_stale_commit_leaves_no_entry_on_the_real_ledger():
     """PR-07 / ADR-002: entry and deduction commit together, so losing drops the entry."""
-    store = seed_store()
+    store = _store_with_open_box()
     lost = _entry(str(uuid4()))
 
     with pytest.raises(StaleWrite):
         with InMemoryUnitOfWork(store, _session) as loser:
-            box = loser.cash.open_box_of(COLLECTOR_ID)
+            box = loser.cash.box_of_day(COLLECTOR_ID, BOX_DAY)
             box.deduct(Money(1))
             loser.cash.save(box)
             loser.ledger.append(lost)
             with InMemoryUnitOfWork(store, _session) as winner:
-                other = winner.cash.open_box_of(COLLECTOR_ID)
+                other = winner.cash.box_of_day(COLLECTOR_ID, BOX_DAY)
                 other.deduct(Money(2))
                 winner.cash.save(other)
                 winner.commit()
@@ -322,13 +335,13 @@ def test_pr07_stale_commit_leaves_no_entry_on_the_real_ledger():
 
 def test_pr07_failed_ledger_commit_changes_nothing_and_surfaces_its_error():
     """PR-07 / ADR-002: if the database goes, neither side commits."""
-    store = seed_store()
+    store = _store_with_open_box()
     opening = store.tables.cash_boxes.copy()
     lost = _entry(str(uuid4()))
 
     with pytest.raises(psycopg.OperationalError):
         with InMemoryUnitOfWork(store, _session) as uow:
-            box = uow.cash.open_box_of(COLLECTOR_ID)
+            box = uow.cash.box_of_day(COLLECTOR_ID, BOX_DAY)
             box.deduct(Money(1))
             uow.cash.save(box)
             uow.ledger.append(lost)

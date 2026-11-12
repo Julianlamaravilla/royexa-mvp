@@ -28,10 +28,12 @@ from royexa.sales.application import (
     SalesContext,
     SalesQueries,
 )
-from royexa.seed import seed_boxes, seed_clients, seed_directory, seed_loans, seed_store
+from royexa.seed import seed_clients, seed_directory, seed_loans, seed_store
+from royexa.shared.calendar import BusinessCalendar
 from royexa.shared.clock import Clock, SystemClock
 
 DEFAULT_CODE_TTL_MINUTES = 60
+DEFAULT_TIMEZONE = "UTC"
 
 
 @dataclass(frozen=True)
@@ -39,6 +41,7 @@ class Settings:
     code_ttl: timedelta = timedelta(minutes=DEFAULT_CODE_TTL_MINUTES)
     notifier_failing: bool = False
     ledger_url: str | None = None
+    timezone: str = DEFAULT_TIMEZONE
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -47,6 +50,7 @@ class Settings:
             code_ttl=timedelta(minutes=minutes),
             notifier_failing=os.environ.get("ROYEXA_NOTIFIER_FAILING") == "1",
             ledger_url=os.environ.get("ROYEXA_LEDGER_URL"),
+            timezone=os.environ.get("ROYEXA_TIMEZONE", DEFAULT_TIMEZONE),
         )
 
 
@@ -87,8 +91,9 @@ def build_container(
     if settings.ledger_url:
         from royexa.adapters.postgres_state import seed_database
 
-        seed_database(settings.ledger_url, seed_boxes(), seed_loans(), seed_clients())
+        seed_database(settings.ledger_url, seed_loans(), seed_clients())
     directory = seed_directory()
+    calendar = BusinessCalendar.in_zone(settings.timezone)
 
     def ledger_session():
         # Imported here so the in-memory demo and its tests need no database driver.
@@ -99,16 +104,16 @@ def build_container(
     def unit_of_work() -> InMemoryUnitOfWork:
         return InMemoryUnitOfWork(store, ledger_session if settings.ledger_url else None)
 
-    context = SalesContext(unit_of_work, clock, directory, settings.code_ttl)
+    context = SalesContext(unit_of_work, clock, directory, settings.code_ttl, calendar=calendar)
     return Container(
         directory=directory,
         register_client=RegisterClient(unit_of_work, directory),
         client_queries=ClientQueries(unit_of_work),
         loan_queries=LoanQueries(unit_of_work),
-        register_payment=RegisterPayment(unit_of_work, clock, directory),
+        register_payment=RegisterPayment(unit_of_work, clock, directory, calendar),
         payment_queries=PaymentQueries(unit_of_work),
-        register_non_payment=RegisterNonPayment(unit_of_work, clock, directory),
-        visit_queries=VisitQueries(unit_of_work, clock, directory),
+        register_non_payment=RegisterNonPayment(unit_of_work, clock, directory, calendar),
+        visit_queries=VisitQueries(unit_of_work, clock, directory, calendar),
         store=store,
         notifier=notifier,
         request=RequestDisbursement(context),
@@ -116,7 +121,7 @@ def build_container(
         reject=RejectDisbursement(context),
         confirm=ConfirmDisbursement(context),
         grant_exception=GrantRenewalException(context),
-        queries=SalesQueries(unit_of_work),
+        queries=SalesQueries(unit_of_work, clock, directory, calendar),
         dispatcher=NotificationDispatcher(unit_of_work, notifier, clock),
         notices=NoticeQueries(unit_of_work),
         context=context,

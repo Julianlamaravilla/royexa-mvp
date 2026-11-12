@@ -11,9 +11,9 @@ CREATE TABLE IF NOT EXISTS cash_box (
     version               integer NOT NULL DEFAULT 0
 );
 
--- RN-02: a collector has at most one open box.
-CREATE UNIQUE INDEX IF NOT EXISTS cash_box_one_open_per_collector
-    ON cash_box (collector_id) WHERE NOT closed;
+-- RN-02 (a box per collector and day) is enforced by 009_daily_box.sql. This file used to
+-- create "one open box per collector" here; every migration is reapplied on each start, so
+-- keeping it would bring that index back after 009 dropped it.
 
 CREATE TABLE IF NOT EXISTS loan (
     id              text PRIMARY KEY,

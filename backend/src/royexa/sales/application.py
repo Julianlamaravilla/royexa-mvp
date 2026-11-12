@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 
-from royexa.cash_box.domain import CashBox, NoOpenCashBox
+from royexa.cash_box.desk import CashDesk
+from royexa.cash_box.domain import CashBox
 from royexa.clients.domain import ClientNotFound
 from royexa.identity_access.domain import Directory, User
 from royexa.ledger.domain import LedgerEntry
@@ -21,6 +22,7 @@ from royexa.sales.domain import (
     DisbursementNotFound,
 )
 from royexa.sales.ports import SalesUnitOfWork
+from royexa.shared.calendar import BusinessCalendar
 from royexa.shared.clock import Clock
 from royexa.shared.errors import WriteConflict
 from royexa.shared.ids import new_id
@@ -40,6 +42,10 @@ class SalesContext:
     directory: Directory
     code_ttl: timedelta
     new_code: Callable[[], str] = generate_code
+    calendar: BusinessCalendar = field(default_factory=lambda: BusinessCalendar.in_zone("UTC"))
+
+    def cash_desk(self, uow: SalesUnitOfWork) -> CashDesk:
+        return CashDesk(uow.cash, self.directory, self.calendar)
 
 
 def _client(uow: SalesUnitOfWork, client_id: str):
@@ -172,8 +178,8 @@ class ConfirmDisbursement:
             raise ConfirmationCodeExpired(disbursement_id)
         return disbursement
 
-    @staticmethod
     def _settle(
+        self,
         uow: SalesUnitOfWork,
         disbursement: Disbursement,
         actor: User,
@@ -196,7 +202,7 @@ class ConfirmDisbursement:
         )
         uow.loans.add(loan)
         disbursement.attach_loan(loan.id)
-        LedgerPosting(uow.ledger, uow.cash).post_disbursement(
+        LedgerPosting(uow.ledger, self._context.cash_desk(uow)).post_disbursement(
             disbursement.id,
             disbursement.collector_id,
             disbursement.terms.principal,
@@ -210,8 +216,8 @@ class ConfirmDisbursement:
             )
         )
 
-    @staticmethod
     def _record_expiry(
+        self,
         uow: SalesUnitOfWork,
         disbursement: Disbursement,
         actor: User,
@@ -219,7 +225,7 @@ class ConfirmDisbursement:
         now: datetime,
     ) -> None:
         """CA-06: the attempt stays on record with its reason and no money moves."""
-        LedgerPosting(uow.ledger, uow.cash).post_expired_attempt(
+        LedgerPosting(uow.ledger, self._context.cash_desk(uow)).post_expired_attempt(
             disbursement.id,
             disbursement.collector_id,
             disbursement.terms.principal,
@@ -256,8 +262,17 @@ class DisbursementDetail:
 class SalesQueries:
     """Read side of the slice: CA-05, CA-07 and CA-06 are observed through it."""
 
-    def __init__(self, uow: Callable[[], SalesUnitOfWork]) -> None:
+    def __init__(
+        self,
+        uow: Callable[[], SalesUnitOfWork],
+        clock: Clock,
+        directory: Directory,
+        calendar: BusinessCalendar,
+    ) -> None:
         self._uow = uow
+        self._clock = clock
+        self._directory = directory
+        self._calendar = calendar
 
     def detail(self, disbursement_id: str) -> DisbursementDetail:
         with self._uow() as uow:
@@ -273,10 +288,11 @@ class SalesQueries:
                 return uow.ledger.all()
             return uow.ledger.for_disbursement(disbursement_id)
 
-    def cash_box(self, collector_id: str) -> CashBox:
+    def cash_box(self, collector_id: str, day: date | None = None) -> CashBox:
+        """The box of a day (today by default). T5-P2: today's box shows its opening state
+        before the first movement; a day without movements has no box."""
+        now = self._clock.now()
         with self._uow() as uow:
-            box = uow.cash.open_box_of(collector_id)
-        if box is None:
-            raise NoOpenCashBox(collector_id)
-        return box
+            desk = CashDesk(uow.cash, self._directory, self._calendar)
+            return desk.view(collector_id, day or self._calendar.day_of(now), now)
 
