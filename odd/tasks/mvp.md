@@ -60,13 +60,28 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: el flujo completo funciona en un ancho de 360 px; la prueba de extremo a extremo cubre pago y cierre.
 - [x] **T8 Web del administrador.** Aprobar o rechazar desembolsos, consultar el libro, los clientes y las cajas cerradas.
   - Acepta: una prueba de extremo a extremo cubre la aprobación de un desembolso.
-- [ ] **T9 Descuadres del periodo (RF-07).** Consulta del número de descuadres del periodo y su evolución.
+- [ ] **T9 Descuadres del periodo (RF-07).** *Detenida: faltan las decisiones T9-P1 a T9-P4 de «Preguntas abiertas».* Consulta del número de descuadres del periodo y su evolución.
   - Acepta: los criterios de RF-07 tienen prueba; esta es la métrica de éxito propuesta para el piloto.
 - [ ] **T10 Despliegue.** Pendiente de autorización del usuario: proveedor de base de datos, hospedaje, cuenta y secretos. No empezar sin ella.
 
 ## Preguntas abiertas
 
-- Ninguna por ahora.
+Bloquean T9. RF-07 y CA-13 piden «la cantidad de descuadres» y «la fecha, el cobrador y el importe de cada diferencia» «del periodo», y el plan añade «su evolución». Ningún documento define qué es el periodo ni cómo se muestra la evolución, y T5b dejó anotado que una caja que no se cierra su día queda sin cierre.
+
+- **T9-P1. ¿Qué es «el periodo»?**
+  - Recomendada: un rango explícito de fechas de cobranza, `desde` y `hasta`, ambos incluidos y en la zona de `ROYEXA_TIMEZONE`. Si no se indican, el mes calendario en curso hasta hoy. Se cuentan los cierres (T5b) con diferencia distinta de cero cuyo día cae en el rango.
+  - Alternativa: una ventana fija, por ejemplo los últimos 30 días, sin elegir fechas.
+- **T9-P2. ¿Cómo se muestra «la evolución»?**
+  - Recomendada: por cada día de cobranza del rango, la cantidad de descuadres y su importe neto con signo; más el total del rango (cantidad, suma de faltantes y suma de sobrantes por separado) y el detalle de cada diferencia (día, cobrador, importe con signo, esperado y entregado).
+  - Alternativa: agrupar por semana y por mes en lugar de por día (menos filas, menos detalle).
+- **T9-P3. ¿Cuenta una caja que no se cerró su día?** Hoy queda abierta y sin cierre, así que no tiene diferencia (T5b).
+  - Recomendada: no es un descuadre, porque RF-07 habla de cierres con diferencia; se muestra aparte, como «cajas sin cerrar» del rango (cantidad y cobrador y día de cada una), para que no desaparezcan de la métrica. No se cambia el cierre.
+  - Alternativa: ignorarlas en esta tarea y tratarlas en otra cuando el piloto lo pida.
+- **T9-P4. ¿Dónde se consulta?**
+  - Recomendada: en el API (`GET /v1/cash-discrepancies?desde=&hasta=`, solo administrador) y en una página del administrador (`/web/admin/descuadres`, enlazada desde su inicio), sobre la misma consulta.
+  - Alternativa: solo el API; la página queda para después.
+
+Con las respuestas recomendadas, T9 cabe en un solo pull request (la consulta, el API y la página, unas 250 líneas de código).
 
 ## Decisiones resueltas
 
