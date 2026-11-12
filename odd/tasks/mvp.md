@@ -68,12 +68,12 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: con `ROYEXA_SEED=pilot` el arranque no siembra clientes, préstamos ni contraseñas; la contraseña del rol `royexa_app` sale del entorno; ningún rol de Supabase distinto del de la aplicación puede leer las tablas; las migraciones se reaplican sin error.
 - [x] **T10b2 Empaquetar y configurar el hospedaje (T10-P4).** Imagen de contenedor con su arranque (`PORT`, migraciones, servidor), `render.yaml` con el plan gratuito, flujo programado de GitHub Actions que consulta `/health` cada 10 minutos, paso de la CI que construye la imagen y guía de operación (variables, `set_password` desde el equipo del usuario, conexión a Supabase por el agrupador en modo sesión con `sslmode=require`).
   - Acepta: la CI construye la imagen; el flujo programado y `render.yaml` están en el repositorio; la guía enumera cada variable y cada paso manual.
-- [ ] **T10c Desplegar.** *Detenida: exige la autorización del usuario (cuenta, secretos y coste, T10-P4).* Crear el proyecto de Supabase y el servicio de hospedaje, cargar los secretos, ejecutar `set_password` para los usuarios reales y comprobar el recorrido desde un celular.
+- [x] **T10c Desplegar.** *(Autorizada por el usuario el 2026-11-12.)* Crear el proyecto de Supabase y el servicio de hospedaje, cargar los secretos, ejecutar `set_password` para los usuarios reales y comprobar el recorrido desde un celular.
   - Acepta: la dirección pública responde; un cobrador de verdad inicia sesión con su contraseña propia; el servidor no arranca con contraseñas de demostración.
 
 ## Preguntas abiertas
 
-- Ninguna por ahora. T10c espera la autorización expresa del usuario.
+- Ninguna por ahora.
 
 ## Decisiones resueltas
 
@@ -224,3 +224,11 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - `uv` se instala con `pip` en la imagen (no se copia de `ghcr.io`) para depender de menos registros.
   - La guía anota como «a verificar» lo que depende de los planes de Render y Supabase (tiempo de sueño, copias de seguridad).
   - Pendiente: T10c (desplegar), que exige la autorización expresa del usuario y comprobar el conector de Supabase (el plugin falló al conectar con 403 del proxy en la sesión anterior).
+- T10c (autorizada por el usuario, que además pidió que la contraseña de la base la generara yo): desplegado el 2026-11-12, sin gasto.
+  - **Supabase** (organización «Klover», la única de la cuenta; los tres proyectos pausados que había no se tocaron): proyecto `royexa-pilot`, referencia `oidittjvzdlyadqxcqwg`, región `us-east-1`, plan gratuito (cotizó cero). Se crearon dos roles con contraseñas aleatorias de 32 caracteres: `royexa_migrator` (`CREATEROLE`, sin superusuario, con permiso de crear en `public` y de administrar a `royexa_app`) y `royexa_app` (se creó antes del primer arranque para que la clave de demostración de la migración `001` nunca existiera). La aplicación **no** usa el usuario `postgres`.
+  - **Render** (espacio «My Workspace»): servicio web `royexa-bf2v` (`srv-dbr1rilbedkc738mi790`), Docker, plan gratuito, región `virginia`, rama `mvp`, despliegue manual, creado desde `render.yaml` con el Blueprint `exs-dbr1rbs9v7es73effsbg` (sin sincronización automática). Dirección: https://royexa-bf2v.onrender.com. Primer despliegue `dep-dbr1rj5bedkc738mi8u0` en vivo en menos de un minuto; `/health` responde 200 (consulta la base). Los tres secretos (`ROYEXA_LEDGER_URL`, `ROYEXA_MIGRATOR_URL`, `ROYEXA_APP_PASSWORD`) están solo como variables de entorno de Render y en los dos roles de Supabase; no están en el repositorio. Conexión por el agrupador de conexiones en modo sesión (`aws-1-us-east-1.pooler.supabase.com:5432`, usuarios `<rol>.<referencia>`, `sslmode=require`).
+  - **Comprobado en la base de Supabase por SQL:** 16 tablas, las 16 con seguridad por filas, ninguna legible por `anon`, `authenticated` ni `service_role`; 0 clientes, 0 préstamos y 0 credenciales (modo `pilot` y modo exigente, sin datos de demostración); el consejero de seguridad de Supabase no marca nada (`lints: []`).
+  - **No comprobado desde la sesión:** la sesión no alcanza `onrender.com` (el proxy lo bloquea), así que las páginas se comprobaron por el registro de Render (`GET /health` 200 repetido, arranque sin errores) y no con un navegador.
+  - **Pasos que quedan al usuario:** (1) crear la variable de GitHub `ROYEXA_HEALTH_URL` = `https://royexa-bf2v.onrender.com/health` (el proxy de la sesión no deja crearla), con lo que arranca el aviso periódico que mantiene despierto el servicio y activo el proyecto; (2) poner las contraseñas reales con `set_password` desde su equipo (guía, paso 6), leyendo las direcciones de las variables de entorno del servicio en el panel de Render; sin eso nadie puede entrar; (3) sustituir los datos de ejemplo de `backend/pilot/directory.json`, `ROYEXA_TIMEZONE` y `ROYEXA_CURRENCY_SYMBOL` por los reales antes de manejar dinero.
+  - Las contraseñas de los dos roles se generaron en la sesión y pasaron por su contexto; conviene **rotarlas** desde el panel de Supabase (`ALTER ROLE`) y de Render cuando el piloto vaya en serio.
+  - Cierra T10. El plan del MVP (T0 a T10c) queda completo.
