@@ -60,28 +60,13 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: el flujo completo funciona en un ancho de 360 px; la prueba de extremo a extremo cubre pago y cierre.
 - [x] **T8 Web del administrador.** Aprobar o rechazar desembolsos, consultar el libro, los clientes y las cajas cerradas.
   - Acepta: una prueba de extremo a extremo cubre la aprobación de un desembolso.
-- [ ] **T9 Descuadres del periodo (RF-07).** *Detenida: faltan las decisiones T9-P1 a T9-P4 de «Preguntas abiertas».* Consulta del número de descuadres del periodo y su evolución.
+- [x] **T9 Descuadres del periodo (RF-07).** Consulta del número de descuadres del periodo y su evolución.
   - Acepta: los criterios de RF-07 tienen prueba; esta es la métrica de éxito propuesta para el piloto.
 - [ ] **T10 Despliegue.** Pendiente de autorización del usuario: proveedor de base de datos, hospedaje, cuenta y secretos. No empezar sin ella.
 
 ## Preguntas abiertas
 
-Bloquean T9. RF-07 y CA-13 piden «la cantidad de descuadres» y «la fecha, el cobrador y el importe de cada diferencia» «del periodo», y el plan añade «su evolución». Ningún documento define qué es el periodo ni cómo se muestra la evolución, y T5b dejó anotado que una caja que no se cierra su día queda sin cierre.
-
-- **T9-P1. ¿Qué es «el periodo»?**
-  - Recomendada: un rango explícito de fechas de cobranza, `desde` y `hasta`, ambos incluidos y en la zona de `ROYEXA_TIMEZONE`. Si no se indican, el mes calendario en curso hasta hoy. Se cuentan los cierres (T5b) con diferencia distinta de cero cuyo día cae en el rango.
-  - Alternativa: una ventana fija, por ejemplo los últimos 30 días, sin elegir fechas.
-- **T9-P2. ¿Cómo se muestra «la evolución»?**
-  - Recomendada: por cada día de cobranza del rango, la cantidad de descuadres y su importe neto con signo; más el total del rango (cantidad, suma de faltantes y suma de sobrantes por separado) y el detalle de cada diferencia (día, cobrador, importe con signo, esperado y entregado).
-  - Alternativa: agrupar por semana y por mes en lugar de por día (menos filas, menos detalle).
-- **T9-P3. ¿Cuenta una caja que no se cerró su día?** Hoy queda abierta y sin cierre, así que no tiene diferencia (T5b).
-  - Recomendada: no es un descuadre, porque RF-07 habla de cierres con diferencia; se muestra aparte, como «cajas sin cerrar» del rango (cantidad y cobrador y día de cada una), para que no desaparezcan de la métrica. No se cambia el cierre.
-  - Alternativa: ignorarlas en esta tarea y tratarlas en otra cuando el piloto lo pida.
-- **T9-P4. ¿Dónde se consulta?**
-  - Recomendada: en el API (`GET /v1/cash-discrepancies?desde=&hasta=`, solo administrador) y en una página del administrador (`/web/admin/descuadres`, enlazada desde su inicio), sobre la misma consulta.
-  - Alternativa: solo el API; la página queda para después.
-
-Con las respuestas recomendadas, T9 cabe en un solo pull request (la consulta, el API y la página, unas 250 líneas de código).
+- Ninguna por ahora.
 
 ## Decisiones resueltas
 
@@ -105,6 +90,12 @@ Con las respuestas recomendadas, T9 cabe en un solo pull request (la consulta, e
   - T7-P2: solicitar desembolso con cliente de la ruta, monto libre, y plazo y cuotas editables con 20 y 20 por defecto; el dominio valida.
   - T7-P3: prueba de extremo a extremo con Playwright y Chromium a 360 px (inicio de sesión, pago y cierre, sin desplazamiento horizontal), con un paso nuevo en la CI; las demás pruebas de páginas usan HTTP.
   - T7-P4: ficha de un solo uso por formulario, ligada a la sesión: evita repetir el efecto con un doble toque y defiende de CSRF, además de `SameSite=Lax`.
+
+- **T9-P1 a T9-P4** (decididas por el usuario, opciones recomendadas):
+  - T9-P1: el periodo es un rango de días de cobranza `desde` y `hasta`, ambos incluidos y en la zona de `ROYEXA_TIMEZONE`; sin fechas, el mes en curso hasta hoy. Se cuentan los cierres (T5b) con diferencia distinta de cero cuyo día cae en el rango.
+  - T9-P2: la evolución es una fila por día de cobranza del rango (cantidad e importe neto con signo), más el total (cantidad, faltantes y sobrantes por separado) y el detalle de cada diferencia (día, cobrador, importe con signo, esperado y entregado).
+  - T9-P3: una caja que no se cerró su día no es un descuadre; se muestra aparte como «cajas sin cerrar» (día y cobrador). No se cambia el cierre.
+  - T9-P4: se consulta en el API (`GET /v1/cash-discrepancies?desde=&hasta=`, solo administrador) y en `/web/admin/descuadres`, sobre la misma consulta.
 
 ## Evidencia
 
@@ -195,3 +186,9 @@ Con las respuestas recomendadas, T9 cabe en un solo pull request (la consulta, e
   - El mensaje de `ReasonRequired` pasó de «Escribe el motivo del no pago» a «Escribe el motivo» porque ahora sirve también al rechazo; las pruebas de T7b solo comprueban la palabra «motivo».
   - Solo lectura: no se da de alta clientes ni se registra ajustes desde la web (el plan pide consultar); siguen en el API.
   - Pendiente: T9 (descuadres del periodo) y T10 (despliegue, exige autorización expresa).
+- T9: `DiscrepancyQueries.report(desde, hasta)` en el módulo `closing`, `GET /v1/cash-discrepancies?desde=&hasta=` (solo administrador) y la página `/web/admin/descuadres` (enlazada desde el inicio del administrador, con un formulario de fechas), aplicando T9-P1 a T9-P4 tal como se resolvieron. El informe trae la cantidad, los faltantes y sobrantes por separado, el detalle de cada diferencia, la evolución por día de cobranza (con los días tranquilos en cero) y las cajas sin cerrar de días pasados. Un cierre exacto no cuenta (RF-07); el periodo invertido o de más de 366 días se rechaza con 422 `periodo-invalido` (y la página lo explica en español). Nuevo `CashRepository.open_between` (memoria y PostgreSQL, sin migración). CA-13 tiene prueba (`tests/vertical/test_t9_discrepancies.py` y `tests/web/test_t9_discrepancy_page.py`, con ambos adaptadores) sobre una línea de tiempo de viernes a lunes con un faltante, un sobrante, un cierre exacto, el domingo y una caja de otra ruta sin cerrar. 815 pruebas en verde y 2 omitidas a propósito con `uv run pytest -m ""` (44 nuevas). Local con PostgreSQL 16 y `ROYEXA_CHROMIUM=/opt/pw-browsers/chromium`; la CI usa 17. Rama `tasks/t9-discrepancies`.
+  - Esta es la métrica de éxito propuesta para el piloto: «número de descuadres del periodo» es el campo `count` del informe.
+  - Tamaño: unas 245 líneas de código y plantilla y 230 de pruebas; el código cabe en las 400 de la regla 10. Las pruebas se corrieron en rojo antes de implementar. Ninguna prueba existente cambió una aserción.
+  - La consulta lee todos los cierres y filtra por día en memoria: basta para el piloto (un cierre por cobrador y día); si crece, se filtra en SQL.
+  - Un cierre solo se hace el día de la caja (T5b), así que `day` del cierre es el día de cobranza; el rango se interpreta en ese mismo día.
+  - Pendiente: T10 (despliegue), que exige autorización expresa del usuario; no se empieza sin ella. Antes de desplegar: activar `ROYEXA_REQUIRE_CHANGED_PASSWORDS=1` y `set_password` para los cuatro usuarios (T6b), decidir el despacho de avisos en producción (T8) y el límite de intentos del código (T7c).
