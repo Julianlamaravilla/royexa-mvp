@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Ruta del día · ROYEXA{% endblock %}
+{% block body %}
+<header class="bar">
+  <div>
+    <strong>{{ user.name }}</strong>
+    <span class="muted">{{ day }}</span>
+  </div>
+  <form method="post" action="/web/logout">
+    <input type="hidden" name="ficha" value="{{ logout_token }}">
+    <button type="submit" class="link">Salir</button>
+  </form>
+</header>
+<main>
+  <h1>Ruta del día</h1>
+
+  {% if box %}
+  <section class="card">
+    <h2>{{ "Caja cerrada" if box.closed else "Caja abierta" }}</h2>
+    <p class="amount">Saldo {{ box.balance.cents | money }}</p>
+    <p class="muted">Cobrado en efectivo hoy {{ panels.cash_total.cents | money }}
+      · por transferencia {{ panels.transfer_total.cents | money }}</p>
+  </section>
+  {% else %}
+  <section class="card">
+    <h2>Sin caja hoy</h2>
+    <p class="muted">Hoy no es día de cobranza: no hay caja ni visitas.</p>
+  </section>
+  {% endif %}
+
+  <section>
+    <h2>Pendientes ({{ panels.pending | length }})</h2>
+    <ul class="list">
+      {% for item in panels.pending %}
+      <li class="card">
+        <strong>{{ item.client_name }}</strong>
+        <span>Saldo {{ item.outstanding.cents | money }}</span>
+        <span class="muted">Cuotas restantes {{ item.remaining_installments | exact }}</span>
+      </li>
+      {% else %}
+      <li class="muted">No quedan clientes por visitar.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section>
+    <h2>Pagaron ({{ panels.paid | length }})</h2>
+    <ul class="list">
+      {% for item in panels.paid %}
+      <li class="card">
+        <strong>{{ item.client_name }}</strong>
+        <span>Efectivo {{ item.cash.cents | money }}</span>
+        <span>Transferencia {{ item.transfer.cents | money }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Todavía nadie.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section>
+    <h2>No pagaron ({{ panels.unpaid | length }})</h2>
+    <ul class="list">
+      {% for item in panels.unpaid %}
+      <li class="card">
+        <strong>{{ item.client_name }}</strong>
+        <span>{{ item.reason }}</span>
+        <span class="muted">Compromiso {{ item.commitment_date | short_date }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Todavía nadie.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</main>
+{% endblock %}

@@ -29,6 +29,8 @@ from royexa.clients.domain import (
     ClientRegistrationNotAllowed,
     InvalidClient,
 )
+from royexa.web.routes import install_web
+from royexa.web.session import SESSION_COOKIE, clear_session_cookie, set_session_cookie
 from royexa.identity_access.domain import (
     CurrentPasswordIncorrect,
     InvalidCredentials,
@@ -76,7 +78,6 @@ from royexa.shared.outbox import OutboxMessage
 from royexa.shared.payments import PaymentMethod
 
 PROBLEM_BASE = "https://royexa.local/problemas/"
-SESSION_COOKIE = "royexa_session"
 PROBLEM_MEDIA_TYPE = "application/problem+json"
 
 
@@ -643,15 +644,7 @@ def create_app(container: Container) -> FastAPI:
     def login(body: LoginBody, request: Request, response: Response) -> LoginOut:
         result = container.authenticator.login(body.user_id, body.password)
         lifetime = int((result.expires_at - container.authenticator.clock_now()).total_seconds())
-        response.set_cookie(
-            SESSION_COOKIE,
-            result.token,
-            max_age=lifetime,
-            httponly=True,
-            samesite="lax",
-            secure=request.url.scheme == "https",
-            path="/",
-        )
+        set_session_cookie(response, result.token, lifetime, request.url.scheme == "https")
         return LoginOut(
             token=result.token,
             token_type="Bearer",
@@ -669,7 +662,7 @@ def create_app(container: Container) -> FastAPI:
     def logout(token: Token, request: Request) -> Response:
         container.authenticator.logout(token)
         reply = Response(status_code=204)
-        reply.delete_cookie(SESSION_COOKIE, path="/", httponly=True, samesite="lax")
+        clear_session_cookie(reply)
         return reply
 
     @app.post("/v1/disbursements", status_code=201, response_model=DisbursementOut)
@@ -825,4 +818,5 @@ def create_app(container: Container) -> FastAPI:
             _notice_out(message) for message in container.notices.list(disbursement_id, payment_id)
         ]
 
+    install_web(app, container)
     return app

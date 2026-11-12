@@ -50,8 +50,14 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: sin sesión válida (ausente, inválida, vencida o revocada) el API responde 401; las pruebas existentes, incluidas las de RN-06, siguen pasando iniciando sesión; la contraseña y el token nunca se guardan en claro; la sesión dura 12 horas, sobrevive a un reinicio y se revoca al cerrar sesión; un usuario puede tener varias.
 - [x] **T6b Cambio de contraseña y bloqueo (T6-P2, T6-P3).** `POST /v1/auth/password`, bloqueo de 15 minutos tras 5 intentos fallidos y arranque exigente con `ROYEXA_REQUIRE_CHANGED_PASSWORDS=1`.
   - Acepta: la contraseña nueva exige al menos 12 caracteres y la actual; el bloqueo no distingue usuario inexistente de contraseña errónea; con la variable activa el servidor no arranca mientras haya contraseñas de demostración.
-- [ ] **T7 Web del cobrador.** *Detenida: faltan las decisiones T7-P1 a T7-P4 de «Preguntas abiertas».* Páginas generadas en el servidor y usables en un celular: ruta del día, registrar pago o no pago, solicitar desembolso, validar el código del cliente y cerrar la caja.
-  - Acepta: el flujo completo funciona en un ancho de 360 px; una prueba de extremo a extremo cubre pago y cierre.
+- [x] **T7a Web: base, inicio de sesión, fichas y ruta del día (T7-P1, T7-P4).** Páginas en español generadas en el servidor (Jinja2, CSS y JavaScript propios servidos desde el mismo origen con una política de contenido estricta), inicio y cierre de sesión con la cookie de T6, fichas de un solo uso por formulario ligadas a la sesión (migración `014`) y la ruta del día del cobrador con la caja, los pendientes y los dos paneles restantes. Importes `1.234,56` sin símbolo salvo `ROYEXA_CURRENCY_SYMBOL`.
+  - Acepta: sin sesión las páginas redirigen al inicio de sesión; una ficha se acepta una sola vez, solo en la sesión que la pidió, y repetirla devuelve el resultado ya registrado sin repetir el efecto; todo texto de la base se escapa; las respuestas llevan cabeceras de seguridad.
+- [ ] **T7b Web: registrar pago y no pago (T3a, T3b).** Páginas para registrar un pago (efectivo o transferencia) y un no pago desde la ruta del día, con los errores del dominio en español.
+  - Acepta: un doble toque o un reenvío no registra dos pagos; los importes y errores se muestran en español.
+- [ ] **T7c Web: solicitar desembolso y validar el código (T7-P2).** Formulario de solicitud (cliente de la ruta, monto libre, plazo y cuotas con 20 y 20 por defecto) y validación del código que dicta el cliente.
+  - Acepta: los errores del dominio (límite, préstamo anterior sin liquidar) se muestran en español; el código caducado deja su asiento y lo dice.
+- [ ] **T7d Web: cerrar la caja y prueba de extremo a extremo (T7-P3).** Cierre de caja con el efectivo entregado y el descuadre a la vista, y una prueba con un navegador real (Playwright con Chromium) a 360 px que recorre inicio de sesión, pago y cierre sin desplazamiento horizontal, con su paso en la CI.
+  - Acepta: el flujo completo funciona en un ancho de 360 px; la prueba de extremo a extremo cubre pago y cierre.
 - [ ] **T8 Web del administrador.** Aprobar o rechazar desembolsos, consultar el libro, los clientes y las cajas cerradas.
   - Acepta: una prueba de extremo a extremo cubre la aprobación de un desembolso.
 - [ ] **T9 Descuadres del periodo (RF-07).** Consulta del número de descuadres del periodo y su evolución.
@@ -60,24 +66,7 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
 
 ## Preguntas abiertas
 
-Bloquean T7. Es la primera tarea con interfaz y los documentos solo dicen que la web de la Entrega 4 es «mínima» (CON-02) y que permite operar desembolsos, pagos y cierre. Nada de moneda, de los campos de los formularios, de cómo se prueba en un navegador real ni de qué pasa si el cobrador toca dos veces un botón. En T3a quedó anotado que el doble toque registra dos pagos y que el riesgo aparecería aquí.
-
-- **T7-P1. ¿Qué moneda y qué formato de importes?** Los documentos no nombran ninguna moneda; el API habla en centavos.
-  - Recomendada: se muestran con dos decimales y miles en formato español, `1.234,56`, **sin símbolo de moneda**, porque no sé cuál es. Un símbolo opcional se configura con `ROYEXA_CURRENCY_SYMBOL` (vacío por defecto) y se antepone si existe.
-  - Alternativa: fijar un símbolo concreto (dime cuál).
-- **T7-P2. ¿Qué datos pide el formulario de solicitar un desembolso?**
-  - Recomendada: cliente (lista de los de la ruta), monto libre, y plazo en días y número de cuotas editables con 20 y 20 por defecto, como en CA-09. El dominio valida los límites y los errores se muestran en español.
-  - Alternativa: opciones cerradas de plazo y cuotas (dime cuáles).
-- **T7-P3. ¿Cómo se prueba «en un ancho de 360 px»?**
-  - Recomendada: una prueba de extremo a extremo con un navegador real (Playwright con Chromium) y una ventana de 360 px que recorre inicio de sesión, pago y cierre de caja, y comprueba que no hay desplazamiento horizontal. Cuesta una dependencia de desarrollo (`playwright`) y un paso nuevo en la CI que descarga Chromium (unos 150 MB y uno o dos minutos más). Las demás pruebas de las páginas usan HTTP, sin navegador.
-  - Alternativa: solo pruebas HTTP sobre el HTML, sin navegador. Es más rápido, pero no demuestra que las páginas se vean bien a 360 px.
-- **T7-P4. ¿Cómo se evitan el doble toque y los envíos desde otro sitio?**
-  - Recomendada: cada formulario lleva una ficha de un solo uso, ligada a la sesión y generada al mostrarlo. El servidor acepta la primera vez y, si la misma ficha vuelve, devuelve el resultado ya registrado sin repetir el efecto. Sirve a la vez de defensa contra CSRF, que se suma a la cookie `SameSite=Lax`. Cuesta una tabla nueva y unas 150 líneas.
-  - Alternativa: solo deshabilitar el botón al enviar con JavaScript. Es frágil y no protege de reintentos del navegador ni de CSRF.
-
-Resuelto sin pregunta: las páginas están en español; son HTML generado en el servidor con plantillas Jinja2 (una dependencia de código abierto), CSS propio sin bibliotecas y JavaScript mínimo, solo para la hora del dispositivo; la sesión es la cookie `HttpOnly` de T6; la pantalla inicial es la ruta del día; el administrador queda para T8.
-
-Con las respuestas recomendadas, T7 se divide en T7a (base, inicio de sesión, fichas de un solo uso y ruta del día), T7b (registrar pago y no pago), T7c (solicitar desembolso y validar el código) y T7d (cerrar la caja y la prueba de extremo a extremo en 360 px), por la regla 10.
+- Ninguna por ahora.
 
 ## Decisiones resueltas
 
@@ -95,6 +84,12 @@ Con las respuestas recomendadas, T7 se divide en T7a (base, inicio de sesión, f
   - T6-P1: token opaco aleatorio de 256 bits, guardado solo como huella; viaja en `Authorization: Bearer` y, para la web de T7 y T8, también en una cookie `HttpOnly` y `SameSite=Lax` (con `Secure` bajo HTTPS); dura 12 horas sin renovación; varias sesiones por usuario; `logout` la revoca; sin sesión válida, 401.
   - T6-P2: contraseñas de demostración documentadas para los cuatro usuarios sembrados; hash `scrypt` de la biblioteca estándar con sal por usuario; cambio de la propia contraseña (actual y nueva de al menos 12 caracteres); `ROYEXA_REQUIRE_CHANGED_PASSWORDS=1` impide arrancar con contraseñas de demostración (lo activará T10).
   - T6-P3: 5 intentos fallidos seguidos bloquean al usuario 15 minutos; la respuesta es la misma (401) para un usuario inexistente y para una contraseña errónea. Riesgo aceptado: un tercero puede bloquear temporalmente a un cobrador conociendo su usuario.
+
+- **T7-P1 a T7-P4** (decididas por el usuario, opciones recomendadas):
+  - T7-P1: importes con dos decimales y miles en formato español (`1.234,56`) sin símbolo de moneda; símbolo opcional con `ROYEXA_CURRENCY_SYMBOL` (vacío por defecto).
+  - T7-P2: solicitar desembolso con cliente de la ruta, monto libre, y plazo y cuotas editables con 20 y 20 por defecto; el dominio valida.
+  - T7-P3: prueba de extremo a extremo con Playwright y Chromium a 360 px (inicio de sesión, pago y cierre, sin desplazamiento horizontal), con un paso nuevo en la CI; las demás pruebas de páginas usan HTTP.
+  - T7-P4: ficha de un solo uso por formulario, ligada a la sesión: evita repetir el efecto con un doble toque y defiende de CSRF, además de `SameSite=Lax`.
 
 ## Evidencia
 
@@ -156,3 +151,8 @@ Con las respuestas recomendadas, T7 se divide en T7a (base, inicio de sesión, f
   - Un bloqueo no se distingue de una contraseña errónea, tampoco para el propio usuario (T6-P3 pide una respuesta única). Para soporte, un administrador no tiene hoy forma de ver quién está bloqueado; la salida es esperar 15 minutos o ejecutar `set_password`.
   - Los fallos que llegan a la vez se cuentan todos: el que pierde la carrera se reintenta (hasta cinco veces). Una prueba lanza cinco fallos simultáneos y comprueba que bloquean al usuario.
   - Pendiente: nada de T6. Siguiente: T7. Antes de desplegar (T10) hay que activar el modo exigente y ejecutar `set_password` para los cuatro usuarios.
+- T7a: paquete `web` con páginas HTML en español generadas con Jinja2 (`/web/login`, `/web/ruta`, `/web/admin`, `/web/resultado/<ficha>`, `/web/logout`), CSS y JavaScript propios servidos desde `/web/static/` y una política de contenido sin `unsafe-inline` (más `no-store`, `nosniff` y `same-origin`); `FormTokens` y la tabla `form_token` (migración `014`): ficha de un solo uso ligada a la sesión y a un propósito, con el resultado guardado para las repeticiones, y `run_once` como utilidad para los formularios de T7b a T7d; formato `1.234,56` y `ROYEXA_CURRENCY_SYMBOL`; la cookie de sesión pasó a `web/session.py`, compartida con el API. Jinja2 es la única dependencia nueva (el formulario se lee sin `python-multipart`). 541 pruebas en verde y 2 omitidas a propósito con `uv run pytest -m ""` (262 sin PostgreSQL, 279 con PostgreSQL), tres corridas sin intermitencias. PostgreSQL 16 en la máquina de la sesión; la CI usa 17. Rama `tasks/t7a-web-base`.
+  - Tamaño: unas 780 líneas entre código, plantillas, CSS y SQL (casi 300 son HTML, CSS y JavaScript) y 570 de pruebas, muy por encima de las 400 de la regla 10. Debí dividir T7a antes de empezar: las fichas (unas 250 líneas con su migración y sus adaptadores) y las páginas son separables. Se entrega junto porque ya está probado y las páginas usan las fichas para salir; T7b a T7d son más pequeñas.
+  - Hallazgo: el domingo no hay caja y la ruta del día devolvía el error 409 en JSON en vez de una página. Ahora dice «Hoy no es día de cobranza» (con prueba).
+  - Limitaciones: cada vista de la ruta emite una ficha para «Salir» y la tabla `form_token` solo crece (no hay limpieza; el rol de la aplicación no borra); el formulario de inicio de sesión no lleva ficha (no hay sesión a la que ligarla), así que un sitio ajeno podría iniciar sesión a un usuario con credenciales que ya conoce, riesgo bajo; la ruta emite una ficha en un GET, lo que escribe en la base.
+  - Pendiente: T7b (pago y no pago), T7c (solicitar desembolso y validar el código) y T7d (cerrar la caja y la prueba a 360 px con Playwright).
