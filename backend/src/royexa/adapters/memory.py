@@ -13,7 +13,7 @@ from datetime import date
 from threading import Lock
 from typing import Protocol, Self
 
-from royexa.cash_box.domain import CashBox
+from royexa.cash_box.domain import CashBox, CashClose
 from royexa.clients.domain import Client
 from royexa.ledger.domain import DuplicateLedgerEntry, LedgerEntry
 from royexa.ledger.ports import LedgerRepository
@@ -30,6 +30,7 @@ _KEYED_TABLES = (
     "non_payments",
     "renewal_exceptions",
     "cash_boxes",
+    "cash_closes",
     "outbox",
 )
 
@@ -43,6 +44,7 @@ class Tables:
     non_payments: dict[str, NonPayment] = field(default_factory=dict)
     renewal_exceptions: dict[str, RenewalException] = field(default_factory=dict)
     cash_boxes: dict[str, CashBox] = field(default_factory=dict)
+    cash_closes: dict[str, CashClose] = field(default_factory=dict)
     outbox: dict[str, OutboxMessage] = field(default_factory=dict)
     ledger: list[LedgerEntry] = field(default_factory=list)
 
@@ -70,6 +72,9 @@ class InMemoryLedgerRepository:
 
     def for_disbursement(self, disbursement_id: str) -> list[LedgerEntry]:
         return [entry for entry in self._entries if entry.disbursement_id == disbursement_id]
+
+    def for_cash_box(self, cash_box_id: str) -> list[LedgerEntry]:
+        return [entry for entry in self._entries if entry.cash_box_id == cash_box_id]
 
     def all(self) -> list[LedgerEntry]:
         return list(self._entries)
@@ -178,6 +183,24 @@ class InMemoryCashRepository:
         self._boxes[box.id] = box
 
 
+class InMemoryCashCloseRepository:
+    def __init__(self, tables: Tables) -> None:
+        self._rows = tables.cash_closes
+
+    def add(self, close: CashClose) -> None:
+        if any(item.cash_box_id == close.cash_box_id for item in self._rows.values()):
+            raise StaleWrite(f"cash_close/{close.cash_box_id}")
+        self._rows[close.id] = close
+
+    def all(self, collector_id: str | None = None, day: date | None = None) -> list[CashClose]:
+        return [
+            item
+            for item in self._rows.values()
+            if (collector_id is None or item.collector_id == collector_id)
+            and (day is None or item.day == day)
+        ]
+
+
 class InMemoryOutbox:
     def __init__(self, tables: Tables) -> None:
         self._messages = tables.outbox
@@ -233,6 +256,7 @@ class InMemoryUnitOfWork:
             self.loans = InMemoryLoanRepository(self._work)
             self.payments = InMemoryPaymentRepository(self._work)
             self.non_payments = InMemoryNonPaymentRepository(self._work)
+            self.cash_closes = InMemoryCashCloseRepository(self._work)
             self.cash = InMemoryCashRepository(self._work)
             self.outbox = InMemoryOutbox(self._work)
         else:
@@ -254,6 +278,9 @@ class InMemoryUnitOfWork:
             self.non_payments = getattr(
                 self._session, "non_payments", None
             ) or InMemoryNonPaymentRepository(self._work)
+            self.cash_closes = getattr(
+                self._session, "cash_closes", None
+            ) or InMemoryCashCloseRepository(self._work)
         return self
 
     def __exit__(self, *exc_info: object) -> None:

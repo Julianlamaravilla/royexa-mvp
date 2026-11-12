@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
+from royexa.identity_access.domain import User
 from royexa.shared.errors import DomainError, NotFound
-from royexa.shared.money import Money
+from royexa.shared.ids import new_id
+from royexa.shared.money import InvalidAmount, Money
 
 
 class CashBoxClosed(DomainError):
@@ -15,6 +17,14 @@ class CashBoxClosed(DomainError):
 
 class NoOpenCashBox(NotFound):
     pass
+
+
+class CashCloseNotAllowed(DomainError):
+    """RF-02: the collector of the box closes it; nobody else."""
+
+
+class PendingVisitsRemain(DomainError):
+    """CA-04, RN-02: a box with clients still pending a visit does not close."""
 
 
 @dataclass
@@ -44,3 +54,48 @@ class CashBox:
         """RF-01: cash received on a payment. Transfers never reach this point (RES-01)."""
         self.ensure_open()
         self.balance = self.balance + amount
+
+    def close(self) -> None:
+        """RN-02: irreversible. A closed box is never reopened or edited."""
+        self.ensure_open()
+        self.closed = True
+
+
+@dataclass(frozen=True)
+class CashClose:
+    """The close of one day's box (RF-02, CA-03): what the ledger says should be delivered,
+    what the collector delivered, and the signed difference (T5-P1)."""
+
+    id: str
+    cash_box_id: str
+    collector_id: str
+    day: date
+    expected: Money
+    delivered: Money
+    closed_by: str
+    device_time: datetime
+    server_time: datetime
+
+    @property
+    def discrepancy(self) -> Money:
+        """Delivered minus expected; zero is not a discrepancy (RF-07)."""
+        return self.delivered - self.expected
+
+    @classmethod
+    def settle(
+        cls,
+        box: CashBox,
+        actor: User,
+        expected: Money,
+        delivered: Money,
+        device_time: datetime,
+        now: datetime,
+    ) -> CashClose:
+        if actor.id != box.collector_id:
+            raise CashCloseNotAllowed(actor.id)
+        if delivered.cents < 0:
+            raise InvalidAmount("what is delivered is never negative")
+        return cls(
+            new_id(), box.id, box.collector_id, box.day, expected, delivered, actor.id,
+            device_time, now,
+        )
