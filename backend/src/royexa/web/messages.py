@@ -95,6 +95,24 @@ _STATUS = {
 }
 
 
+_BADGES = {
+    DisbursementStatus.REQUESTED: ("wait", "En espera"),
+    DisbursementStatus.PENDING_AUTHORIZATION: ("wait", "Por autorizar"),
+    DisbursementStatus.APPROVED: ("info", "Aprobado"),
+    DisbursementStatus.REJECTED: ("bad", "Rechazado"),
+    DisbursementStatus.CONFIRMED: ("ok", "Entregado"),
+    DisbursementStatus.EXPIRED: ("bad", "Caducado"),
+}
+
+
+def status_kind(disbursement: Disbursement) -> str:
+    return _BADGES[disbursement.status][0]
+
+
+def status_short(disbursement: Disbursement) -> str:
+    return _BADGES[disbursement.status][1]
+
+
 def status_text(disbursement: Disbursement) -> str:
     return _STATUS[disbursement.status]
 

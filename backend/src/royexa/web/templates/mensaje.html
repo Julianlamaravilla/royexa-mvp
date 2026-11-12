@@ -1,9 +1,11 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}{{ heading }} · ROYEXA{% endblock %}
 {% block body %}
-<main class="narrow">
+<main class="narrow result">
+  <span class="badge-icon {{ kind }}">{{ ui.icon("check" if kind == "ok" else "alert") }}</span>
   <h1>{{ heading }}</h1>
   <p class="notice {{ kind }}" role="{{ 'alert' if kind == 'error' else 'status' }}">{{ text }}</p>
-  <p><a class="button" href="{{ next_path }}">{{ link_text }}</a></p>
+  <a class="button primary" href="{{ next_path }}">{{ link_text }}</a>
 </main>
 {% endblock %}

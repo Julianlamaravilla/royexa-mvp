@@ -69,6 +69,11 @@ class LoginRequired(Exception):
     """No valid session: the page leads to the login instead of answering 401."""
 
 
+def initials(name: str) -> str:
+    """Up to two capital letters for the round avatar of a client or a user."""
+    return "".join(word[0] for word in name.split()[:2]).upper() or "?"
+
+
 def _environment(symbol: str) -> Environment:
     environment = Environment(
         loader=FileSystemLoader(HERE / "templates"),
@@ -77,6 +82,7 @@ def _environment(symbol: str) -> Environment:
     environment.filters["money"] = lambda cents: money(cents, symbol)
     environment.filters["short_date"] = short_date
     environment.filters["exact"] = exact_decimal
+    environment.filters["initials"] = initials
     return environment
 
 
@@ -263,6 +269,8 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
                 "client_name": names.get(item.client_id, item.client_id),
                 "terms": item.terms,
                 "status_text": messages.status_text(item),
+                "status_short": messages.status_short(item),
+                "status_kind": messages.status_kind(item),
             }
             for item in mine
         ]
