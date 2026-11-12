@@ -41,6 +41,8 @@ LOGIN_PATH = "/web/login"
 ROUTE_PATH = "/web/ruta"
 ADMIN_PATH = "/web/admin"
 CLOSE_PATH = "/web/cierre"
+REQUESTS_PATH = "/web/admin/solicitudes"
+LEDGER_LIMIT = 200
 NEW_DISBURSEMENT_PATH = "/web/desembolso/nuevo"
 
 
@@ -52,6 +54,9 @@ class WebContainer(Protocol):
     client_queries: object
     request: object
     confirm: object
+    approve: object
+    reject: object
+    dispatcher: object
     close_cash_box: object
     cash_close_queries: object
     register_payment: object
@@ -502,13 +507,107 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
 
         return await run_once(container, request, "cierre", close)
 
+    async def admin_only(request: Request) -> tuple[str, User] | Response:
+        """T8: the administrator's pages; anyone else is sent to their own."""
+        token, user = await current(request)
+        return (token, user) if user.is_admin else _redirect(ROUTE_PATH)
+
     @router.get("/admin")
     async def admin_page(request: Request) -> Response:
-        token, user = await current(request)
-        if not user.is_admin:
-            return _redirect(ROUTE_PATH)
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        token, user = guard
         logout_token = await run_in_threadpool(container.form_tokens.issue, token, "salir")
-        return _render(container, "admin.html", user=user, logout_token=logout_token)
+        waiting = await run_in_threadpool(container.queries.awaiting_decision)
+        return _render(
+            container, "admin.html", user=user, logout_token=logout_token, waiting=len(waiting)
+        )
+
+    @router.get("/admin/solicitudes")
+    async def requests_page(request: Request) -> Response:
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        token, _ = guard
+        names = await client_names()
+        rows = []
+        for item in await run_in_threadpool(container.queries.awaiting_decision):
+            approve, reject = [
+                await run_in_threadpool(container.form_tokens.issue, token, f"{verb}:{item.id}")
+                for verb in ("aprobar", "rechazar")
+            ]
+            rows.append(
+                {
+                    "id": item.id,
+                    "client_name": names.get(item.client_id, item.client_id),
+                    "collector_id": item.collector_id,
+                    "terms": item.terms,
+                    "waiting_text": messages.waiting_text(item),
+                    "approve_token": approve,
+                    "reject_token": reject,
+                }
+            )
+        return _render(container, "solicitudes.html", rows=rows)
+
+    def decision(verb: str, past: str) -> Callable:
+        async def handler(disbursement_id: str, request: Request) -> Response:
+            guard = await admin_only(request)
+            if isinstance(guard, Response):
+                return guard
+
+            def decide(user: User, form: dict[str, str]) -> Outcome:
+                try:
+                    if verb == "aprobar":
+                        container.approve.execute(user, disbursement_id, None)
+                        container.dispatcher.dispatch()  # the client gets the code now
+                    else:
+                        container.reject.execute(user, disbursement_id, form.get("motivo", ""))
+                except DomainError as error:
+                    return Outcome("error", messages.describe(error), REQUESTS_PATH)
+                return Outcome("ok", f"Solicitud {past}.", REQUESTS_PATH)
+
+            return await run_once(container, request, f"{verb}:{disbursement_id}", decide)
+
+        return handler
+
+    router.post("/admin/solicitudes/{disbursement_id}/aprobar")(decision("aprobar", "aprobada"))
+    router.post("/admin/solicitudes/{disbursement_id}/rechazar")(decision("rechazar", "rechazada"))
+
+    @router.get("/admin/libro")
+    async def ledger_page(request: Request) -> Response:
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        entries = await run_in_threadpool(container.queries.ledger)
+        return _render(
+            container, "libro.html", entries=list(reversed(entries))[:LEDGER_LIMIT], limit=LEDGER_LIMIT
+        )
+
+    @router.get("/admin/clientes")
+    async def clients_page(request: Request) -> Response:
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        return _render(
+            container, "clientes.html", clients=await run_in_threadpool(container.client_queries.all)
+        )
+
+    @router.get("/admin/cajas")
+    async def closes_page(request: Request) -> Response:
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        closes = await run_in_threadpool(container.cash_close_queries.all)
+        rows = [
+            {
+                "collector_id": close.collector_id,
+                "day": close.day,
+                "summary": messages.close_summary(close, container.currency_symbol),
+            }
+            for close in reversed(closes)
+        ]
+        return _render(container, "cajas.html", rows=rows)
 
     @router.get("/resultado/{token}")
     async def result_page(token: str, request: Request) -> Response:

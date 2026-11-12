@@ -282,6 +282,11 @@ class SalesQueries:
                 disbursement, loan, uow.ledger.for_disbursement(disbursement_id)
             )
 
+    def awaiting_decision(self) -> list[Disbursement]:
+        """T8: what the administrator still has to approve or reject."""
+        with self._uow() as uow:
+            return uow.disbursements.awaiting_decision()
+
     def for_collector(self, collector_id: str) -> list[Disbursement]:
         """T7c: what the collector has in progress plus whatever was requested today."""
         today = self._calendar.day_of(self._clock.now())

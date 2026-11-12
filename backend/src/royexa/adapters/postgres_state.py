@@ -30,6 +30,7 @@ from royexa.loans.domain import (
 from royexa.sales.domain import (
     ConfirmationCode,
     Disbursement,
+    AWAITING_DECISION,
     IN_PROGRESS,
     DisbursementStatus,
     RefusedApprovalAttempt,
@@ -640,6 +641,16 @@ class PostgresDisbursementRepository:
             loan_id=row[20],
             refused_approval_attempts=attempts,
         )
+
+    def awaiting_decision(self) -> list[Disbursement]:
+        ids = [
+            row[0]
+            for row in self._connection.execute(
+                "SELECT id FROM disbursement WHERE status = ANY(%s) ORDER BY requested_at, id",
+                ([status.value for status in AWAITING_DECISION],),
+            )
+        ]
+        return [item for item in (self.get(i) for i in ids) if item is not None]
 
     def for_collector(self, collector_id: str, since: datetime) -> list[Disbursement]:
         ids = [

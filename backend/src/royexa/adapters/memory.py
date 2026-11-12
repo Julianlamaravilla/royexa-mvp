@@ -20,7 +20,7 @@ from royexa.web.forms import FormToken
 from royexa.ledger.domain import DuplicateLedgerEntry, LedgerEntry
 from royexa.ledger.ports import LedgerRepository
 from royexa.loans.domain import Loan, NonPayment, Payment, RenewalException
-from royexa.sales.domain import IN_PROGRESS, Disbursement
+from royexa.sales.domain import AWAITING_DECISION, IN_PROGRESS, Disbursement
 from royexa.shared.errors import StaleWrite
 from royexa.shared.outbox import NoticeStatus, OutboxMessage
 
@@ -117,6 +117,10 @@ class InMemoryDisbursementRepository:
 
     def save(self, disbursement: Disbursement) -> None:
         self._rows[disbursement.id] = disbursement
+
+    def awaiting_decision(self) -> list[Disbursement]:
+        waiting = [item for item in self._rows.values() if item.status in AWAITING_DECISION]
+        return sorted(waiting, key=lambda item: item.requested_at)
 
     def for_collector(self, collector_id: str, since: datetime) -> list[Disbursement]:
         mine = [
