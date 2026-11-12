@@ -52,6 +52,7 @@ ALL_MIGRATIONS = [
     "010_cash_close.sql",
     "011_adjustments.sql",
     "012_auth.sql",
+    "013_password_policy.sql",
 ]
 NOW = datetime(2026, 10, 30, 14, 0, tzinfo=UTC)
 RECEIPT = "COMPROBANTE_DESEMBOLSO"
@@ -207,8 +208,9 @@ def test_pr07_catalog_lists_no_other_grant_on_any_table():
         + [("non_payment", "royexa_app", p) for p in ("INSERT", "SELECT")]
         # T5b: a close is append-only (RN-02, RF-02).
         + [("cash_close", "royexa_app", p) for p in ("INSERT", "SELECT")]
-        # T6a: a credential is never changed or deleted here; a session is only revoked.
-        + [("credential", "royexa_app", p) for p in ("INSERT", "SELECT")]
+        # T6a, T6b: a credential is read, created and updated (a user changes their own
+        # password, and failed attempts are counted), never deleted; a session is only revoked.
+        + [("credential", "royexa_app", p) for p in ("INSERT", "SELECT", "UPDATE")]
         + [("session", "royexa_app", p) for p in ("INSERT", "SELECT", "UPDATE")]
     )
 

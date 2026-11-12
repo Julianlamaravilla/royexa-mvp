@@ -97,6 +97,7 @@ def test_t6a_seeding_again_keeps_the_credentials_it_already_had():
 
 
 def test_t6a_the_application_role_cannot_delete_sessions_or_credentials():
+    """Updating a credential is allowed since T6b (password change); deleting never is."""
     _login(_server(FakeClock()))
 
     with psycopg.connect(APP_URL) as app:
@@ -104,6 +105,3 @@ def test_t6a_the_application_role_cannot_delete_sessions_or_credentials():
             with pytest.raises(errors.InsufficientPrivilege):
                 app.execute(f"DELETE FROM {table}")
             app.rollback()
-        with pytest.raises(errors.InsufficientPrivilege):
-            app.execute("UPDATE credential SET password_hash = 'x'")
-        app.rollback()
