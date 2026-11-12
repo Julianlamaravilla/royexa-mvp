@@ -15,6 +15,7 @@ _TABLES = (
     "payment",
     "loan_installment",
     "loan",
+    "cash_close",
     "cash_box",
     "client",
 )

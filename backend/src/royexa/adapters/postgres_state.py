@@ -13,7 +13,7 @@ from psycopg import errors
 from psycopg.types.json import Jsonb
 
 from royexa.adapters.postgres_ledger import PostgresLedgerSession
-from royexa.cash_box.domain import CashBox
+from royexa.cash_box.domain import CashBox, CashClose
 from royexa.clients.domain import Client
 from royexa.identity_access.domain import Role
 from royexa.loans.domain import (
@@ -92,6 +92,49 @@ class PostgresCashRepository:
             except errors.UniqueViolation as error:
                 raise StaleWrite(f"cash_box/{box.collector_id}/{box.day}") from error
             self._versions[box.id] = 0
+
+
+class PostgresCashCloseRepository:
+    _COLUMNS = (
+        "id, cash_box_id, collector_id, day, expected_cents, delivered_cents, closed_by, "
+        "device_time, server_time"
+    )
+
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+
+    def add(self, close: CashClose) -> None:
+        try:
+            self._connection.execute(
+                f"INSERT INTO cash_close ({self._COLUMNS}) VALUES ({', '.join(['%s'] * 9)})",
+                (
+                    close.id,
+                    close.cash_box_id,
+                    close.collector_id,
+                    close.day,
+                    close.expected.cents,
+                    close.delivered.cents,
+                    close.closed_by,
+                    close.device_time,
+                    close.server_time,
+                ),
+            )
+        except errors.UniqueViolation as error:
+            raise StaleWrite(f"cash_close/{close.cash_box_id}") from error
+
+    def all(self, collector_id: str | None = None, day: date | None = None) -> list[CashClose]:
+        filters = {"collector_id": collector_id, "day": day}
+        chosen = {column: value for column, value in filters.items() if value is not None}
+        where = " AND ".join(f"{column} = %s" for column in chosen)
+        rows = self._connection.execute(
+            f"SELECT {self._COLUMNS} FROM cash_close {'WHERE ' + where if chosen else ''} "
+            "ORDER BY seq",
+            tuple(chosen.values()),
+        )
+        return [
+            CashClose(id, box, collector, d, Money(expected), Money(delivered), by, device, server)
+            for id, box, collector, d, expected, delivered, by, device, server in rows
+        ]
 
 
 class PostgresClientRepository:
@@ -496,6 +539,7 @@ class PostgresSession(PostgresLedgerSession):
     def __init__(self, url: str) -> None:
         super().__init__(url)
         self.clients = PostgresClientRepository(self._connection)
+        self.cash_closes = PostgresCashCloseRepository(self._connection)
         self.disbursements = PostgresDisbursementRepository(self._connection)
         self.cash = PostgresCashRepository(self._connection)
         self.loans = PostgresLoanRepository(self._connection)

@@ -8,6 +8,7 @@ from datetime import timedelta
 
 from royexa.adapters.memory import InMemoryStore, InMemoryUnitOfWork
 from royexa.adapters.simulated_notifier import SimulatedNotifier
+from royexa.closing.application import CashCloseQueries, CloseCashBox
 from royexa.clients.application import ClientQueries, RegisterClient
 from royexa.identity_access.domain import Directory
 from royexa.loans.application import (
@@ -64,6 +65,8 @@ class Container:
     payment_queries: PaymentQueries
     register_non_payment: RegisterNonPayment
     visit_queries: VisitQueries
+    close_cash_box: CloseCashBox
+    cash_close_queries: CashCloseQueries
     store: InMemoryStore
     notifier: Notifier
     request: RequestDisbursement
@@ -114,6 +117,8 @@ def build_container(
         payment_queries=PaymentQueries(unit_of_work),
         register_non_payment=RegisterNonPayment(unit_of_work, clock, directory, calendar),
         visit_queries=VisitQueries(unit_of_work, clock, directory, calendar),
+        close_cash_box=CloseCashBox(unit_of_work, clock, directory, calendar),
+        cash_close_queries=CashCloseQueries(unit_of_work),
         store=store,
         notifier=notifier,
         request=RequestDisbursement(context),

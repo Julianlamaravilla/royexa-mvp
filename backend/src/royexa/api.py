@@ -13,7 +13,14 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from royexa.bootstrap import Container
-from royexa.cash_box.domain import CashBox, CashBoxClosed, NoOpenCashBox
+from royexa.cash_box.domain import (
+    CashBox,
+    CashBoxClosed,
+    CashCloseNotAllowed,
+    CashClose,
+    NoOpenCashBox,
+    PendingVisitsRemain,
+)
 from royexa.clients.domain import (
     Client,
     ClientNotFound,
@@ -74,6 +81,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     ValidatorNotAllowed: (403, "validador-no-autorizado", "Solo el cobrador de la ruta valida"),
     ClientOutsideRoute: (403, "cliente-fuera-de-ruta", "El cliente no pertenece a la ruta"),
     ClientRegistrationNotAllowed: (403, "rol-administrador-requerido", "Solo un administrador da de alta clientes"),
+    CashCloseNotAllowed: (403, "cierre-no-permitido", "Solo el cobrador de la caja la cierra"),
     VisitNotAllowed: (403, "visita-no-permitida", "Solo el cobrador de la ruta registra la visita"),
     PaymentNotAllowed: (403, "pago-no-permitido", "Solo el cobrador de la ruta registra el pago"),
     ExceptionNotAllowed: (403, "excepcion-no-permitida", "Excepcion no permitida"),
@@ -82,6 +90,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     LoanNotFound: (404, "prestamo-no-encontrado", "Prestamo no encontrado"),
     RouteNotFound: (404, "ruta-no-encontrada", "Ruta no encontrada"),
     NoOpenCashBox: (409, "caja-no-disponible", "El cobrador no tiene caja abierta"),
+    PendingVisitsRemain: (409, "visitas-pendientes", "Existen visitas pendientes"),
     CashBoxClosed: (409, "caja-cerrada", "La caja esta cerrada"),
     LoanAlreadySettled: (409, "prestamo-liquidado", "El prestamo ya esta liquidado"),
     PriorLoanNotSettled: (409, "prestamo-anterior-sin-liquidar", "Prestamo anterior sin liquidar"),
@@ -174,6 +183,24 @@ class PendingVisitOut(BaseModel):
     loan_id: str
     outstanding_cents: int
     remaining_installments: str
+
+
+class CloseBody(BaseModel):
+    delivered_cents: int = Field(ge=0)
+    device_time: datetime
+
+
+class CashCloseOut(BaseModel):
+    id: str
+    cash_box_id: str
+    collector_id: str
+    day: date
+    expected_cents: int
+    delivered_cents: int
+    discrepancy_cents: int
+    closed_by: str
+    device_time: datetime
+    server_time: datetime
 
 
 class AllocationOut(BaseModel):
@@ -353,6 +380,21 @@ def _pending_out(item: PendingVisit) -> PendingVisitOut:
         loan_id=item.loan_id,
         outstanding_cents=item.outstanding.cents,
         remaining_installments=exact_decimal(item.remaining_installments),
+    )
+
+
+def _close_out(close: CashClose) -> CashCloseOut:
+    return CashCloseOut(
+        id=close.id,
+        cash_box_id=close.cash_box_id,
+        collector_id=close.collector_id,
+        day=close.day,
+        expected_cents=close.expected.cents,
+        delivered_cents=close.delivered.cents,
+        discrepancy_cents=close.discrepancy.cents,
+        closed_by=close.closed_by,
+        device_time=close.device_time,
+        server_time=close.server_time,
     )
 
 
@@ -557,6 +599,24 @@ def create_app(container: Container) -> FastAPI:
     @app.get("/v1/loans/{loan_id}", response_model=LoanOut)
     def read_loan(loan_id: str, _: Actor) -> LoanOut:
         return _loan_out(container.loan_queries.get(loan_id))
+
+    @app.post(
+        "/v1/cash-boxes/{collector_id}/close", status_code=201, response_model=CashCloseOut
+    )
+    def close_cash_box(collector_id: str, body: CloseBody, actor: Actor) -> CashCloseOut:
+        return _close_out(
+            container.close_cash_box.execute(
+                actor, collector_id, Money(body.delivered_cents), body.device_time
+            )
+        )
+
+    @app.get("/v1/cash-closes", response_model=list[CashCloseOut])
+    def read_cash_closes(
+        _: Admin,
+        collector_id: str | None = None,
+        day: Annotated[date | None, Query(alias="date")] = None,
+    ) -> list[CashCloseOut]:
+        return [_close_out(c) for c in container.cash_close_queries.all(collector_id, day)]
 
     @app.post(
         "/v1/clients/{client_id}/renewal-exceptions",
