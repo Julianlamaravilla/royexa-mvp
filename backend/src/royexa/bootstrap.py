@@ -10,7 +10,9 @@ from royexa.adapters.memory import InMemoryStore, InMemoryUnitOfWork
 from royexa.adapters.simulated_notifier import SimulatedNotifier
 from royexa.closing.application import CashCloseQueries, CloseCashBox, RegisterAdjustment
 from royexa.clients.application import ClientQueries, RegisterClient
+from royexa.identity_access.application import DEFAULT_SESSION_TTL, Authenticator
 from royexa.identity_access.domain import Directory
+from royexa.identity_access.passwords import PasswordHasher
 from royexa.loans.application import (
     LoanQueries,
     PaymentQueries,
@@ -29,7 +31,13 @@ from royexa.sales.application import (
     SalesContext,
     SalesQueries,
 )
-from royexa.seed import seed_clients, seed_directory, seed_loans, seed_store
+from royexa.seed import (
+    seed_clients,
+    seed_credentials,
+    seed_directory,
+    seed_loans,
+    seed_store,
+)
 from royexa.shared.calendar import BusinessCalendar
 from royexa.shared.clock import Clock, SystemClock
 
@@ -43,6 +51,7 @@ class Settings:
     notifier_failing: bool = False
     ledger_url: str | None = None
     timezone: str = DEFAULT_TIMEZONE
+    session_ttl: timedelta = DEFAULT_SESSION_TTL
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -52,6 +61,9 @@ class Settings:
             notifier_failing=os.environ.get("ROYEXA_NOTIFIER_FAILING") == "1",
             ledger_url=os.environ.get("ROYEXA_LEDGER_URL"),
             timezone=os.environ.get("ROYEXA_TIMEZONE", DEFAULT_TIMEZONE),
+            session_ttl=timedelta(
+                hours=float(os.environ.get("ROYEXA_SESSION_HOURS", DEFAULT_SESSION_TTL.total_seconds() / 3600))
+            ),
         )
 
 
@@ -67,6 +79,7 @@ class Container:
     visit_queries: VisitQueries
     close_cash_box: CloseCashBox
     cash_close_queries: CashCloseQueries
+    authenticator: Authenticator
     register_adjustment: RegisterAdjustment
     store: InMemoryStore
     notifier: Notifier
@@ -91,11 +104,12 @@ def build_container(
     notifier = notifier or SimulatedNotifier(
         sink=lambda line: print(line, flush=True), failing=settings.notifier_failing
     )
-    store = seed_store()
+    hasher = PasswordHasher()
+    store = seed_store(hasher)
     if settings.ledger_url:
         from royexa.adapters.postgres_state import seed_database
 
-        seed_database(settings.ledger_url, seed_loans(), seed_clients())
+        seed_database(settings.ledger_url, seed_loans(), seed_clients(), seed_credentials(hasher))
     directory = seed_directory()
     calendar = BusinessCalendar.in_zone(settings.timezone)
 
@@ -120,6 +134,7 @@ def build_container(
         visit_queries=VisitQueries(unit_of_work, clock, directory, calendar),
         close_cash_box=CloseCashBox(unit_of_work, clock, directory, calendar),
         cash_close_queries=CashCloseQueries(unit_of_work),
+        authenticator=Authenticator(unit_of_work, clock, directory, hasher, settings.session_ttl),
         register_adjustment=RegisterAdjustment(unit_of_work, clock, directory, calendar),
         store=store,
         notifier=notifier,

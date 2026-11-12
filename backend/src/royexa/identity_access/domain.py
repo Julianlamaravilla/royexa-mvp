@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 
-from royexa.shared.errors import NotFound
+from royexa.shared.errors import DomainError, NotFound
 from royexa.shared.money import Money
 
 
@@ -20,6 +21,39 @@ class UnknownActor(NotFound):
 
 class RouteNotFound(NotFound):
     pass
+
+
+class InvalidCredentials(DomainError):
+    """T6-P3: the same answer for an unknown user and for a wrong password."""
+
+
+class SessionRequired(DomainError):
+    """There is no valid session: absent, unknown, expired or revoked (T6-P1)."""
+
+
+@dataclass(frozen=True)
+class Credential:
+    """What proves a user is who they say: a salted hash, never the password (T6-P2)."""
+
+    user_id: str
+    password_hash: str
+    is_demo: bool = False
+    """True while it is still the documented demonstration password."""
+
+
+@dataclass(frozen=True)
+class Session:
+    """T6-P1: only a digest of the token is kept, so a copy of the database cannot be used
+    to act as anyone."""
+
+    token_hash: str
+    user_id: str
+    created_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None = None
+
+    def is_valid(self, now: datetime) -> bool:
+        return self.revoked_at is None and now < self.expires_at
 
 
 @dataclass(frozen=True)
@@ -54,6 +88,9 @@ class Directory:
             return self._users[user_id]
         except KeyError:
             raise UnknownActor(user_id) from None
+
+    def users(self) -> list[User]:
+        return list(self._users.values())
 
     def opening_cash(self, collector_id: str) -> Money | None:
         return self.user(collector_id).opening_cash

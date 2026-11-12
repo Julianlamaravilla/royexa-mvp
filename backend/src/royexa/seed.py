@@ -1,10 +1,12 @@
 """Seeded demo data. Users and catalogs are a declared limitation (ALT-06B, RES-02)."""
 
 from datetime import date
+from functools import lru_cache
 
 from royexa.adapters.memory import InMemoryStore, Tables
 from royexa.clients.domain import Client
-from royexa.identity_access.domain import Directory, Role, Route, User
+from royexa.identity_access.domain import Credential, Directory, Role, Route, User
+from royexa.identity_access.passwords import PasswordHasher
 from royexa.loans.domain import Installment, Loan
 from royexa.shared.money import Money
 
@@ -29,6 +31,25 @@ def seed_directory() -> Directory:
             Route("ruta-2", "cobrador-2", ROUTE_LIMIT, FIXED_INTEREST_BPS),
         ],
     )
+
+
+def demo_password(user_id: str) -> str:
+    """T6-P2: the documented demonstration password of a seeded user. Valid only for local
+    development and tests, like the other credentials of the demonstration; T6b lets a
+    server refuse to start while any user still has it."""
+    return f"demo-{user_id}-royexa"
+
+
+@lru_cache(maxsize=4)
+def _seed_credentials(hasher: PasswordHasher) -> tuple[Credential, ...]:
+    return tuple(
+        Credential(user.id, hasher.hash(demo_password(user.id)), is_demo=True)
+        for user in seed_directory().users()
+    )
+
+
+def seed_credentials(hasher: PasswordHasher) -> list[Credential]:
+    return list(_seed_credentials(hasher))
 
 
 def seed_clients() -> list[Client]:
@@ -58,9 +79,11 @@ def seed_loans() -> list[Loan]:
     ]
 
 
-def seed_store() -> InMemoryStore:
+def seed_store(hasher: PasswordHasher | None = None) -> InMemoryStore:
+    hasher = hasher or PasswordHasher()
     return InMemoryStore(
         Tables(
+            credentials={c.user_id: c for c in seed_credentials(hasher)},
             clients={client.id: client for client in seed_clients()},
             loans={loan.id: loan for loan in seed_loans()},
         )

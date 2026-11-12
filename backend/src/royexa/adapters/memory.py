@@ -15,6 +15,7 @@ from typing import Protocol, Self
 
 from royexa.cash_box.domain import CashBox, CashClose
 from royexa.clients.domain import Client
+from royexa.identity_access.domain import Credential, Session
 from royexa.ledger.domain import DuplicateLedgerEntry, LedgerEntry
 from royexa.ledger.ports import LedgerRepository
 from royexa.loans.domain import Loan, NonPayment, Payment, RenewalException
@@ -31,6 +32,8 @@ _KEYED_TABLES = (
     "renewal_exceptions",
     "cash_boxes",
     "cash_closes",
+    "credentials",
+    "sessions",
     "outbox",
 )
 
@@ -45,6 +48,8 @@ class Tables:
     renewal_exceptions: dict[str, RenewalException] = field(default_factory=dict)
     cash_boxes: dict[str, CashBox] = field(default_factory=dict)
     cash_closes: dict[str, CashClose] = field(default_factory=dict)
+    credentials: dict[str, Credential] = field(default_factory=dict)
+    sessions: dict[str, Session] = field(default_factory=dict)
     outbox: dict[str, OutboxMessage] = field(default_factory=dict)
     ledger: list[LedgerEntry] = field(default_factory=list)
 
@@ -207,6 +212,24 @@ class InMemoryCashCloseRepository:
         ]
 
 
+class InMemoryAuthRepository:
+    def __init__(self, tables: Tables) -> None:
+        self._credentials = tables.credentials
+        self._sessions = tables.sessions
+
+    def credential(self, user_id: str) -> Credential | None:
+        return self._credentials.get(user_id)
+
+    def add_session(self, session: Session) -> None:
+        self._sessions[session.token_hash] = session
+
+    def session(self, token_hash: str) -> Session | None:
+        return self._sessions.get(token_hash)
+
+    def save_session(self, session: Session) -> None:
+        self._sessions[session.token_hash] = session
+
+
 class InMemoryOutbox:
     def __init__(self, tables: Tables) -> None:
         self._messages = tables.outbox
@@ -263,6 +286,7 @@ class InMemoryUnitOfWork:
             self.payments = InMemoryPaymentRepository(self._work)
             self.non_payments = InMemoryNonPaymentRepository(self._work)
             self.cash_closes = InMemoryCashCloseRepository(self._work)
+            self.auth = InMemoryAuthRepository(self._work)
             self.cash = InMemoryCashRepository(self._work)
             self.outbox = InMemoryOutbox(self._work)
         else:
@@ -287,6 +311,7 @@ class InMemoryUnitOfWork:
             self.cash_closes = getattr(
                 self._session, "cash_closes", None
             ) or InMemoryCashCloseRepository(self._work)
+            self.auth = getattr(self._session, "auth", None) or InMemoryAuthRepository(self._work)
         return self
 
     def __exit__(self, *exc_info: object) -> None:

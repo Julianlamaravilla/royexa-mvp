@@ -16,6 +16,7 @@ from royexa.adapters.postgres_ledger import PostgresLedgerSession
 from royexa.cash_box.domain import CashBox, CashClose
 from royexa.clients.domain import Client
 from royexa.identity_access.domain import Role
+from royexa.identity_access.domain import Credential, Session
 from royexa.loans.domain import (
     Allocation,
     Installment,
@@ -144,6 +145,45 @@ class PostgresCashCloseRepository:
             CashClose(id, box, collector, d, Money(expected), Money(delivered), by, device, server)
             for id, box, collector, d, expected, delivered, by, device, server in rows
         ]
+
+
+class PostgresAuthRepository:
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+
+    def credential(self, user_id: str) -> Credential | None:
+        row = self._connection.execute(
+            "SELECT user_id, password_hash, is_demo FROM credential WHERE user_id = %s",
+            (user_id,),
+        ).fetchone()
+        return Credential(*row) if row else None
+
+    def add_session(self, session: Session) -> None:
+        self._connection.execute(
+            "INSERT INTO session (token_hash, user_id, created_at, expires_at, revoked_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            (
+                session.token_hash,
+                session.user_id,
+                session.created_at,
+                session.expires_at,
+                session.revoked_at,
+            ),
+        )
+
+    def session(self, token_hash: str) -> Session | None:
+        row = self._connection.execute(
+            "SELECT token_hash, user_id, created_at, expires_at, revoked_at FROM session "
+            "WHERE token_hash = %s",
+            (token_hash,),
+        ).fetchone()
+        return Session(*row) if row else None
+
+    def save_session(self, session: Session) -> None:
+        self._connection.execute(
+            "UPDATE session SET revoked_at = %s WHERE token_hash = %s",
+            (session.revoked_at, session.token_hash),
+        )
 
 
 class PostgresClientRepository:
@@ -549,6 +589,7 @@ class PostgresSession(PostgresLedgerSession):
         super().__init__(url)
         self.clients = PostgresClientRepository(self._connection)
         self.cash_closes = PostgresCashCloseRepository(self._connection)
+        self.auth = PostgresAuthRepository(self._connection)
         self.disbursements = PostgresDisbursementRepository(self._connection)
         self.cash = PostgresCashRepository(self._connection)
         self.loans = PostgresLoanRepository(self._connection)
@@ -557,9 +598,17 @@ class PostgresSession(PostgresLedgerSession):
         self.outbox = PostgresOutbox(self._connection)
 
 
-def seed_database(url: str, loans: list[Loan], clients: list[Client]) -> None:
+def seed_database(
+    url: str, loans: list[Loan], clients: list[Client], credentials: list[Credential]
+) -> None:
     """Demo data (RES-02). Rows that already exist are left as they are."""
     with psycopg.connect(url) as connection:
+        for credential in credentials:
+            connection.execute(
+                "INSERT INTO credential (user_id, password_hash, is_demo) VALUES (%s, %s, %s) "
+                "ON CONFLICT DO NOTHING",
+                (credential.user_id, credential.password_hash, credential.is_demo),
+            )
         for client in clients:
             connection.execute(
                 "INSERT INTO client (id, name, route_id) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
