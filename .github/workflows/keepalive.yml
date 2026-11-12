@@ -1,0 +1,23 @@
+# Keeps the free host awake and the free database active (T10b2): the health route answers
+# only if the service runs and its database responds. It does nothing until the repository
+# variable ROYEXA_HEALTH_URL (the full URL of /health) is set. Scheduled workflows stop after
+# 60 days without repository activity; run it again by hand if that happens.
+name: Keep alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    if: vars.ROYEXA_HEALTH_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ask /health
+        env:
+          HEALTH_URL: ${{ vars.ROYEXA_HEALTH_URL }}
+        run: curl --fail --silent --show-error --retry 4 --retry-delay 15 --max-time 90 "$HEALTH_URL"

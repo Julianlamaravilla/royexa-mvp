@@ -1,0 +1,31 @@
+# Render blueprint for the pilot (T10b2): one web service on the free plan; the database is
+# Supabase, outside Render. Secrets are never written here: `sync: false` leaves them to be
+# set by hand in the dashboard. A deploy is triggered by hand (autoDeploy: false).
+services:
+  - type: web
+    name: royexa
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: mvp
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: ROYEXA_SEED
+        value: pilot
+      - key: ROYEXA_REQUIRE_CHANGED_PASSWORDS
+        value: "1"
+      - key: ROYEXA_TIMEZONE
+        value: America/Bogota
+      - key: ROYEXA_CURRENCY_SYMBOL
+        value: "$"
+      - key: ROYEXA_DISPATCH_SECONDS
+        value: "30"
+      - key: ROYEXA_LEDGER_URL
+        sync: false
+      - key: ROYEXA_MIGRATOR_URL
+        sync: false
+      - key: ROYEXA_APP_PASSWORD
+        sync: false

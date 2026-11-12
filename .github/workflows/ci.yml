@@ -38,3 +38,18 @@ jobs:
       - run: uv run pytest -m ""
         env:
           ROYEXA_REQUIRE_E2E: "1"
+      - name: Build the production image and start it as production does (T10b2)
+        run: |
+          docker build -t royexa:ci .
+          docker run -d --name royexa --network host \
+            -e PORT=8001 -e ROYEXA_SEED=pilot -e ROYEXA_REQUIRE_CHANGED_PASSWORDS=1 \
+            -e ROYEXA_DISPATCH_SECONDS=0 -e ROYEXA_APP_PASSWORD=ci-only-password-0123456789 \
+            -e ROYEXA_MIGRATOR_URL=postgresql://royexa_migrator:royexa_migrator@127.0.0.1:55432/royexa \
+            -e ROYEXA_LEDGER_URL=postgresql://royexa_app:ci-only-password-0123456789@127.0.0.1:55432/royexa \
+            royexa:ci
+          for attempt in $(seq 1 40); do
+            curl --fail --silent http://127.0.0.1:8001/health && exit 0
+            sleep 2
+          done
+          docker logs royexa
+          exit 1
