@@ -7,6 +7,7 @@ it, so the composition root can import the web without a cycle."""
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import parse_qs
@@ -20,10 +21,12 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from royexa.cash_box.domain import NoOpenCashBox
 from royexa.identity_access.domain import InvalidCredentials, SessionRequired, User
 from royexa.loans.domain import exact_decimal
+from royexa.shared.money import Money
+from royexa.shared.payments import PaymentMethod
 from royexa.shared.errors import DomainError
 from royexa.web import messages
 from royexa.web.forms import ClaimState, Outcome
-from royexa.web.format import long_date, money, short_date
+from royexa.web.format import long_date, money, parse_amount, short_date
 from royexa.web.session import SESSION_COOKIE, clear_session_cookie, set_session_cookie
 
 HERE = Path(__file__).parent
@@ -42,6 +45,8 @@ class WebContainer(Protocol):
     form_tokens: object
     visit_queries: object
     queries: object
+    register_payment: object
+    register_non_payment: object
     currency_symbol: str
 
 
@@ -244,6 +249,89 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
             box=box,
             logout_token=logout_token,
         )
+
+    async def visit_form(request: Request, loan_id: str, template: str, purpose: str) -> Response:
+        """T7b: the form of a client who is still pending on today's route; anyone else gets
+        no form, so a closed visit cannot be registered twice from a stale link."""
+        token, user = await current(request)
+        if user.is_admin:
+            return _redirect(ADMIN_PATH)
+        panels = await run_in_threadpool(container.visit_queries.panels, user, user.id)
+        visit = next((item for item in panels.pending if item.loan_id == loan_id), None)
+        if visit is None:
+            return _message(
+                container, 404, "Sin visita pendiente",
+                "Este cliente ya no está pendiente de visita en tu ruta de hoy.",
+                ROUTE_PATH, "Volver a la ruta",
+            )
+        form_token = await run_in_threadpool(container.form_tokens.issue, token, purpose)
+        earliest = (panels.day + timedelta(days=1)).isoformat()
+        return _render(container, template, visit=visit, token=form_token, earliest=earliest)
+
+    def device_time(form: dict[str, str]) -> datetime:
+        """The device clock when it sent one, the server clock when it did not (no script)."""
+        now = container.authenticator.clock_now()
+        try:
+            claimed = datetime.fromisoformat(form.get("device_time", ""))
+        except ValueError:
+            return now
+        return claimed if claimed.tzinfo else claimed.replace(tzinfo=now.tzinfo)
+
+    @router.get("/pago/{loan_id}")
+    async def payment_page(loan_id: str, request: Request) -> Response:
+        return await visit_form(request, loan_id, "pago.html", f"pago:{loan_id}")
+
+    @router.post("/pago/{loan_id}")
+    async def payment(loan_id: str, request: Request) -> Response:
+        back = f"/web/pago/{loan_id}"
+
+        def register(user: User, form: dict[str, str]) -> Outcome:
+            cents = parse_amount(form.get("monto", ""))
+            if not cents:
+                return Outcome(
+                    "error", "El importe no es válido. Escríbelo como 1.234,56 y mayor que cero.", back
+                )
+            try:
+                method = PaymentMethod(form.get("medio", ""))
+            except ValueError:
+                return Outcome("error", "Elige el medio de pago: efectivo o transferencia.", back)
+            _, loan = container.register_payment.execute(
+                user, loan_id, Money(cents), method, device_time(form)
+            )
+            symbol = container.currency_symbol
+            text = (
+                f"Pago de {money(cents, symbol)} registrado. "
+                f"Saldo restante {money(loan.outstanding.cents, symbol)}."
+            )
+            if not loan.outstanding.cents:
+                text += " El préstamo quedó liquidado."
+            return Outcome("ok", text, ROUTE_PATH)
+
+        return await run_once(container, request, f"pago:{loan_id}", register)
+
+    @router.get("/no-pago/{loan_id}")
+    async def non_payment_page(loan_id: str, request: Request) -> Response:
+        return await visit_form(request, loan_id, "no_pago.html", f"no-pago:{loan_id}")
+
+    @router.post("/no-pago/{loan_id}")
+    async def non_payment(loan_id: str, request: Request) -> Response:
+        back = f"/web/no-pago/{loan_id}"
+
+        def register(user: User, form: dict[str, str]) -> Outcome:
+            try:
+                commitment = date.fromisoformat(form.get("compromiso", ""))
+            except ValueError:
+                return Outcome("error", "Elige la fecha de compromiso.", back)
+            container.register_non_payment.execute(
+                user, loan_id, form.get("motivo", ""), commitment, device_time(form)
+            )
+            return Outcome(
+                "ok",
+                f"No pago registrado. Compromiso para el {short_date(commitment)}.",
+                ROUTE_PATH,
+            )
+
+        return await run_once(container, request, f"no-pago:{loan_id}", register)
 
     @router.get("/admin")
     async def admin_page(request: Request) -> Response:

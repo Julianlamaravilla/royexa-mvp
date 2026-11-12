@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Registrar no pago · ROYEXA{% endblock %}
+{% block body %}
+<main class="narrow">
+  <h1>El cliente no pagó</h1>
+  <section class="card">
+    <strong>{{ visit.client_name }}</strong>
+    <span class="amount">Saldo {{ visit.outstanding.cents | money }}</span>
+  </section>
+  <form method="post" action="/web/no-pago/{{ visit.loan_id }}" class="stack">
+    <input type="hidden" name="ficha" value="{{ token }}">
+    <input type="hidden" name="device_time" value="">
+    <label>Motivo
+      <input type="text" name="motivo" autocomplete="off" required maxlength="300">
+    </label>
+    <label>Fecha de compromiso
+      <input type="date" name="compromiso" min="{{ earliest }}" required>
+    </label>
+    <button type="submit" class="primary">Registrar no pago</button>
+  </form>
+  <p><a href="/web/pago/{{ visit.loan_id }}">Mejor registrar un pago</a></p>
+  <p><a href="/web/ruta">Volver a la ruta</a></p>
+</main>
+{% endblock %}

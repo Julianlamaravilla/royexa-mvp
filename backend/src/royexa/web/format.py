@@ -1,5 +1,6 @@
 """How the pages write amounts and dates (T7-P1)."""
 
+import re
 from datetime import date
 
 MONTHS = (
@@ -23,3 +24,17 @@ def long_date(day: date) -> str:
 
 def short_date(day: date) -> str:
     return day.strftime("%d/%m/%Y")
+
+
+_AMOUNT = re.compile(r"(\d{1,3}(\.\d{3})+|\d+)(,\d{1,2})?")
+
+
+def parse_amount(text: str) -> int | None:
+    """What a person types in Spanish, 1.234,56 or 250,5 or 30, as cents; None when it is not
+    clear. A dot is only a thousands separator and a comma the decimal mark, so 250.50 and
+    1,234 are refused instead of read as another amount."""
+    text = text.strip()
+    if not _AMOUNT.fullmatch(text):
+        return None
+    whole, _, fraction = text.replace(".", "").partition(",")
+    return int(whole) * 100 + int(fraction.ljust(2, "0") or 0)

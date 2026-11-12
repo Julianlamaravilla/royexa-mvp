@@ -41,3 +41,5 @@ button.link { min-height: 44px; border: 0; background: none; color: #0b5cad; tex
 .notice.error { background: #fdecea; border-color: #e0a9a2; color: #7a1c14; }
 .notice.ok { background: #e8f5e9; border-color: #a5d2a8; color: #1b5e20; }
 a { color: #0b5cad; }
+.actions { display: flex; gap: 8px; margin-top: 8px; }
+.actions .button { flex: 1; }
