@@ -46,7 +46,7 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: cada panel tiene una prueba; la suma de los tres cubre a los clientes de la ruta con préstamo activo.
 - [x] **T5d Ajuste del administrador (CA-08, T5-P4).** El administrador registra un ajuste con importe con signo y motivo, como asiento `AJUSTE` nuevo en la caja abierta del día siguiente; el asiento original no se toca.
   - Acepta: un ajuste posterior al cierre exige un asiento nuevo; solo el administrador; el motivo es obligatorio.
-- [ ] **T6 Inicio de sesión.** Sustituir la cabecera `X-Actor-Id` por usuario y contraseña con sesión, conservando los roles de cobrador y administrador y la regla RN-06.
+- [ ] **T6 Inicio de sesión.** *Detenida: faltan las decisiones T6-P1 a T6-P3 de «Preguntas abiertas».* Sustituir la cabecera `X-Actor-Id` por usuario y contraseña con sesión, conservando los roles de cobrador y administrador y la regla RN-06.
   - Acepta: sin sesión válida la API responde 401; las pruebas existentes de RN-06 siguen pasando; contraseñas guardadas con hash.
 - [ ] **T7 Web del cobrador.** Páginas generadas en el servidor y usables en un celular: ruta del día, registrar pago o no pago, solicitar desembolso, validar el código del cliente y cerrar la caja.
   - Acepta: el flujo completo funciona en un ancho de 360 px; una prueba de extremo a extremo cubre pago y cierre.
@@ -58,7 +58,21 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
 
 ## Preguntas abiertas
 
-- Ninguna por ahora.
+Bloquean T6. Hoy el actor llega en la cabecera `X-Actor-Id` y se resuelve contra usuarios sembrados, sin autenticación: quien conozca un identificador actúa como ese usuario (limitación declarada en ALT-06B y en la sección 10 del diseño). Los documentos no definen sesiones, contraseñas ni política de acceso; T6 las introduce para todo el API y, después, para la web de T7 y T8.
+
+- **T6-P1. ¿Cómo viaja la sesión y cuánto dura?**
+  - Recomendada: al iniciar sesión se emite un token opaco aleatorio de 256 bits, guardado solo como huella en la base. El cliente lo envía en `Authorization: Bearer <token>`; para las páginas del servidor de T7 y T8 el mismo token viaja además en una cookie `HttpOnly` y `SameSite=Lax` (con `Secure` bajo HTTPS). Dura 12 horas desde el inicio de sesión, sin renovación, para cubrir una jornada de ruta con señal intermitente. Un usuario puede tener varias sesiones (teléfono y computador). `POST /v1/auth/logout` la revoca de inmediato. Sin sesión válida el API responde 401.
+  - Alternativa: vencimiento por inactividad de 30 minutos. Es más seguro, pero una ruta sin señal obligaría a iniciar sesión de nuevo con frecuencia.
+- **T6-P2. ¿De dónde salen las contraseñas y pueden cambiarse?** Los usuarios siguen sembrados, sin registro ni recuperación (ALT-06B).
+  - Recomendada: los cuatro usuarios sembrados traen contraseñas de demostración, documentadas en el README como las demás credenciales locales y válidas solo para desarrollo y pruebas. Se guardan con hash `scrypt` de la biblioteca estándar, con sal propia por usuario, sin dependencias nuevas. Cada usuario puede cambiar la suya con `POST /v1/auth/password` (contraseña actual y nueva de al menos 12 caracteres). Con `ROYEXA_REQUIRE_CHANGED_PASSWORDS=1` el servidor se niega a arrancar mientras algún usuario conserve la de demostración; el despliegue (T10) lo activará.
+  - Alternativa: sin cambio de contraseña en el MVP; las contraseñas solo se fijan por entorno al desplegar.
+- **T6-P3. ¿Qué pasa con los intentos fallidos?**
+  - Recomendada: tras 5 intentos fallidos seguidos de un usuario, su inicio de sesión se bloquea 15 minutos. La respuesta es la misma (401) para un usuario inexistente que para una contraseña errónea, para no revelar qué usuarios existen. Riesgo aceptado: un tercero puede bloquear temporalmente a un cobrador conociendo su usuario.
+  - Alternativa: sin bloqueo en el MVP, anotado como riesgo abierto.
+
+Resuelto sin pregunta: el hash se hace con `scrypt` de la biblioteca estándar; la cabecera `X-Actor-Id` desaparece por completo (T6 pide sustituirla); los roles de cobrador y administrador y la regla RN-06 siguen en el dominio, sin cambios; las pruebas existentes pasan a iniciar sesión mediante su ayudante, sin tocar sus aserciones.
+
+Con las respuestas recomendadas, T6 se divide en T6a (credenciales con hash, sesiones, inicio y cierre de sesión, cabecera retirada y 401) y T6b (cambio de contraseña, bloqueo por intentos fallidos y arranque exigente), por la regla 10.
 
 ## Decisiones resueltas
 
