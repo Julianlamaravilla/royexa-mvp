@@ -6,6 +6,7 @@ from royexa.migrate import MIGRATOR_URL, apply_migrations
 
 _TABLES = (
     "ledger_entry",
+    "form_token",
     "session",
     "credential",
     "refused_approval_attempt",
