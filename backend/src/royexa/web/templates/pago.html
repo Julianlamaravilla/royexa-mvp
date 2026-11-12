@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Registrar pago · ROYEXA{% endblock %}
+{% block body %}
+<main class="narrow">
+  <h1>Registrar pago</h1>
+  <section class="card">
+    <strong>{{ visit.client_name }}</strong>
+    <span class="amount">Saldo {{ visit.outstanding.cents | money }}</span>
+    <span class="muted">Cuotas restantes {{ visit.remaining_installments | exact }}</span>
+  </section>
+  <form method="post" action="/web/pago/{{ visit.loan_id }}" class="stack">
+    <input type="hidden" name="ficha" value="{{ token }}">
+    <input type="hidden" name="device_time" value="">
+    <label>Importe cobrado
+      <input type="text" name="monto" inputmode="decimal" autocomplete="off" required placeholder="0,00">
+    </label>
+    <label>Medio de pago
+      <select name="medio">
+        <option value="EFECTIVO">Efectivo</option>
+        <option value="TRANSFERENCIA">Transferencia</option>
+      </select>
+    </label>
+    <button type="submit" class="primary">Registrar pago</button>
+  </form>
+  <p><a href="/web/no-pago/{{ visit.loan_id }}">El cliente no pagó</a></p>
+  <p><a href="/web/ruta">Volver a la ruta</a></p>
+</main>
+{% endblock %}
