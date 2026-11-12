@@ -14,7 +14,7 @@ from royexa.shared.money import Money
 
 _COLUMNS = (
     "id, disbursement_id, entry_type, amount_cents, cash_box_id, "
-    "actor_id, device_time, server_time, reason, payment_id, payment_method"
+    "actor_id, device_time, server_time, reason, payment_id, payment_method, adjusts_entry_id"
 )
 
 
@@ -31,7 +31,7 @@ class PostgresLedgerRepository:
     def append(self, entry: LedgerEntry) -> None:
         try:
             self._connection.execute(
-                f"INSERT INTO ledger_entry ({_COLUMNS}) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                f"INSERT INTO ledger_entry ({_COLUMNS}) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     entry.id,
                     entry.disbursement_id,
@@ -44,6 +44,7 @@ class PostgresLedgerRepository:
                     entry.reason,
                     entry.payment_id,
                     entry.payment_method,
+                    entry.adjusts_entry_id,
                 ),
             )
         except errors.UniqueViolation as error:
@@ -56,6 +57,12 @@ class PostgresLedgerRepository:
             (disbursement_id,),
         )
         return [_entry(row) for row in rows]
+
+    def get(self, entry_id: str) -> LedgerEntry | None:
+        row = self._connection.execute(
+            f"SELECT {_COLUMNS} FROM ledger_entry WHERE id = %s", (entry_id,)
+        ).fetchone()
+        return _entry(row) if row else None
 
     def for_cash_box(self, cash_box_id: str) -> list[LedgerEntry]:
         rows = self._connection.execute(

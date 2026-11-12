@@ -57,6 +57,15 @@ class PostgresCashRepository:
         self._connection = connection
         self._versions: dict[str, int] = {}
 
+    def get(self, box_id: str) -> CashBox | None:
+        row = self._connection.execute(
+            f"SELECT {_BOX}, version FROM cash_box WHERE id = %s", (box_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        self._versions[row[0]] = row[6]
+        return CashBox(row[0], row[1], row[2], Money(row[3]), Money(row[4]), row[5])
+
     def box_of_day(self, collector_id: str, day: date) -> CashBox | None:
         row = self._connection.execute(
             f"SELECT {_BOX}, version FROM cash_box WHERE collector_id = %s AND day = %s",

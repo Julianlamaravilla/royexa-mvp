@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from royexa.bootstrap import Container
 from royexa.cash_box.domain import (
+    AdjustmentNotAllowed,
     CashBox,
     CashBoxClosed,
     CashCloseNotAllowed,
@@ -28,7 +29,7 @@ from royexa.clients.domain import (
     InvalidClient,
 )
 from royexa.identity_access.domain import RouteNotFound, UnknownActor, User
-from royexa.ledger.domain import LedgerEntry
+from royexa.ledger.domain import InvalidLedgerEntry, LedgerEntry, LedgerEntryNotFound
 from royexa.loans.application import DayPanels, PendingVisit
 from royexa.loans.domain import (
     ExceptionNotAllowed,
@@ -82,11 +83,13 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     ValidatorNotAllowed: (403, "validador-no-autorizado", "Solo el cobrador de la ruta valida"),
     ClientOutsideRoute: (403, "cliente-fuera-de-ruta", "El cliente no pertenece a la ruta"),
     ClientRegistrationNotAllowed: (403, "rol-administrador-requerido", "Solo un administrador da de alta clientes"),
+    AdjustmentNotAllowed: (403, "rol-administrador-requerido", "Solo un administrador registra un ajuste"),
     CashCloseNotAllowed: (403, "cierre-no-permitido", "Solo el cobrador de la caja la cierra"),
     VisitNotAllowed: (403, "visita-no-permitida", "Solo el cobrador de la ruta registra la visita"),
     PaymentNotAllowed: (403, "pago-no-permitido", "Solo el cobrador de la ruta registra el pago"),
     ExceptionNotAllowed: (403, "excepcion-no-permitida", "Excepcion no permitida"),
     DisbursementNotFound: (404, "desembolso-no-encontrado", "Desembolso no encontrado"),
+    LedgerEntryNotFound: (404, "asiento-no-encontrado", "Asiento no encontrado"),
     ClientNotFound: (404, "cliente-no-encontrado", "Cliente no encontrado"),
     LoanNotFound: (404, "prestamo-no-encontrado", "Prestamo no encontrado"),
     RouteNotFound: (404, "ruta-no-encontrada", "Ruta no encontrada"),
@@ -102,6 +105,7 @@ _PROBLEMS: dict[type[DomainError], tuple[int, str, str]] = {
     AmountExceedsRouteLimit: (422, "monto-sobre-limite-de-ruta", "Monto sobre el limite de ruta"),
     InvalidCommitmentDate: (422, "compromiso-invalido", "El compromiso debe ser posterior al dia del registro"),
     PaymentExceedsBalance: (422, "pago-excede-saldo", "El pago excede el saldo del prestamo"),
+    InvalidLedgerEntry: (422, "asiento-invalido", "Asiento invalido"),
     InvalidClient: (422, "cliente-invalido", "Cliente invalido"),
     InvalidLoanTerms: (422, "condiciones-invalidas", "Condiciones de prestamo invalidas"),
     InvalidAmount: (422, "monto-invalido", "Monto invalido"),
@@ -269,11 +273,18 @@ class PaymentResultOut(BaseModel):
     loan: LoanOut
 
 
+class AdjustmentBody(BaseModel):
+    amount_cents: int
+    reason: str
+    device_time: datetime
+
+
 class LedgerEntryOut(BaseModel):
     id: str
     disbursement_id: str | None
     payment_id: str | None
     payment_method: str | None
+    adjusts_entry_id: str | None
     entry_type: str
     amount_cents: int
     cash_effect_cents: int
@@ -468,6 +479,7 @@ def _entry_out(entry: LedgerEntry) -> LedgerEntryOut:
         disbursement_id=entry.disbursement_id,
         payment_id=entry.payment_id,
         payment_method=entry.payment_method,
+        adjusts_entry_id=entry.adjusts_entry_id,
         entry_type=entry.entry_type.value,
         amount_cents=entry.amount.cents,
         cash_effect_cents=entry.cash_effect.cents,
@@ -663,6 +675,16 @@ def create_app(container: Container) -> FastAPI:
     @app.get("/v1/loans/{loan_id}", response_model=LoanOut)
     def read_loan(loan_id: str, _: Actor) -> LoanOut:
         return _loan_out(container.loan_queries.get(loan_id))
+
+    @app.post(
+        "/v1/ledger/{entry_id}/adjustments", status_code=201, response_model=LedgerEntryOut
+    )
+    def register_adjustment(entry_id: str, body: AdjustmentBody, actor: Actor) -> LedgerEntryOut:
+        return _entry_out(
+            container.register_adjustment.execute(
+                actor, entry_id, Money(body.amount_cents), body.reason, body.device_time
+            )
+        )
 
     @app.get("/v1/cash-boxes/{collector_id}/panels", response_model=PanelsOut)
     def read_panels(collector_id: str, actor: Actor) -> PanelsOut:
