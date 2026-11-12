@@ -4,6 +4,7 @@ from royexa.cash_box.domain import (
     CashBoxClosed,
     CashClose,
     CashCloseNotAllowed,
+    InvalidPeriod,
     NoOpenCashBox,
     PendingVisitsRemain,
 )
@@ -55,6 +56,7 @@ _MESSAGES: dict[type[DomainError], str] = {
         "Quedan clientes pendientes de visita: registra su pago o su no pago antes de cerrar la caja."
     ),
     CashCloseNotAllowed: "Solo el cobrador de la caja la cierra.",
+    InvalidPeriod: "El período debe ir de una fecha a otra posterior y abarcar como máximo un año.",
     CashBoxClosed: "La caja del día ya está cerrada: no admite más movimientos.",
     NoOpenCashBox: "Hoy no hay caja disponible: no es día de cobranza.",
     WriteConflict: "Otra operación se cruzó con esta y no se guardó nada. Revisa la ruta e inténtalo de nuevo.",

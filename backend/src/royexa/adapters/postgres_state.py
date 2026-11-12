@@ -80,6 +80,14 @@ class PostgresCashRepository:
         self._versions[row[0]] = row[6]
         return CashBox(row[0], row[1], row[2], Money(row[3]), Money(row[4]), row[5])
 
+    def open_between(self, since: date, until: date) -> list[CashBox]:
+        rows = self._connection.execute(
+            f"SELECT {_BOX}, version FROM cash_box WHERE NOT closed AND day BETWEEN %s AND %s "
+            "ORDER BY day, collector_id",
+            (since, until),
+        ).fetchall()
+        return [CashBox(r[0], r[1], r[2], Money(r[3]), Money(r[4]), r[5]) for r in rows]
+
     def save(self, box: CashBox) -> None:
         """Optimistic: the write wins only if nobody changed the box since it was read. Two
         first movements of a day race for the same row; the second one loses."""

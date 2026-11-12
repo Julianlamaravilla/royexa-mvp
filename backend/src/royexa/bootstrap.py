@@ -8,7 +8,12 @@ from datetime import timedelta
 
 from royexa.adapters.memory import InMemoryStore, InMemoryUnitOfWork
 from royexa.adapters.simulated_notifier import SimulatedNotifier
-from royexa.closing.application import CashCloseQueries, CloseCashBox, RegisterAdjustment
+from royexa.closing.application import (
+    CashCloseQueries,
+    CloseCashBox,
+    DiscrepancyQueries,
+    RegisterAdjustment,
+)
 from royexa.clients.application import ClientQueries, RegisterClient
 from royexa.identity_access.application import DEFAULT_SESSION_TTL, Authenticator
 from royexa.identity_access.domain import DemoPasswordsInUse, Directory
@@ -84,6 +89,7 @@ class Container:
     visit_queries: VisitQueries
     close_cash_box: CloseCashBox
     cash_close_queries: CashCloseQueries
+    discrepancy_queries: DiscrepancyQueries
     authenticator: Authenticator
     form_tokens: FormTokens
     currency_symbol: str
@@ -156,6 +162,7 @@ def build_container(
         visit_queries=VisitQueries(unit_of_work, clock, directory, calendar),
         close_cash_box=CloseCashBox(unit_of_work, clock, directory, calendar),
         cash_close_queries=CashCloseQueries(unit_of_work),
+        discrepancy_queries=DiscrepancyQueries(unit_of_work, clock, calendar),
         authenticator=Authenticator(unit_of_work, clock, directory, hasher, settings.session_ttl),
         form_tokens=FormTokens(unit_of_work, clock),
         currency_symbol=settings.currency_symbol,

@@ -209,6 +209,10 @@ class InMemoryCashRepository:
     def save(self, box: CashBox) -> None:
         self._boxes[box.id] = box
 
+    def open_between(self, since: date, until: date) -> list[CashBox]:
+        found = [b for b in self._boxes.values() if not b.closed and since <= b.day <= until]
+        return sorted(found, key=lambda box: (box.day, box.collector_id))
+
 
 class InMemoryCashCloseRepository:
     def __init__(self, tables: Tables) -> None:
