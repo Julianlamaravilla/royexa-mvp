@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from fractions import Fraction
 
+from royexa.cash_box.desk import CashDesk
 from royexa.cash_box.ports import CashRepository
 from royexa.clients.domain import ClientNotFound
 from royexa.clients.ports import ClientRepository
@@ -23,6 +24,7 @@ from royexa.loans.domain import (
     VisitNotAllowed,
 )
 from royexa.loans.ports import LoanRepository, NonPaymentRepository, PaymentRepository
+from royexa.shared.calendar import BusinessCalendar
 from royexa.shared.clock import Clock
 from royexa.shared.money import Money
 from royexa.shared.outbox import Outbox, OutboxMessage
@@ -52,11 +54,16 @@ class RegisterPayment:
     """UC-05 (RF-01, RN-01): the collector of the route registers what a client paid."""
 
     def __init__(
-        self, uow: Callable[[], PaymentsUnitOfWork], clock: Clock, directory: Directory
+        self,
+        uow: Callable[[], PaymentsUnitOfWork],
+        clock: Clock,
+        directory: Directory,
+        calendar: BusinessCalendar,
     ) -> None:
         self._uow = uow
         self._clock = clock
         self._directory = directory
+        self._calendar = calendar
 
     def execute(
         self,
@@ -80,7 +87,9 @@ class RegisterPayment:
             )
             uow.loans.save(updated)
             uow.payments.add(payment)
-            LedgerPosting(uow.ledger, uow.cash).post_payment(
+            LedgerPosting(
+                uow.ledger, CashDesk(uow.cash, self._directory, self._calendar)
+            ).post_payment(
                 payment.id, actor.id, amount, method, actor.id, device_time, now
             )
             uow.outbox.add(
@@ -125,11 +134,16 @@ class RegisterNonPayment:
     """UC-06 (RF-01, CA-02, T3-P2): the collector records why a client did not pay."""
 
     def __init__(
-        self, uow: Callable[[], VisitsUnitOfWork], clock: Clock, directory: Directory
+        self,
+        uow: Callable[[], VisitsUnitOfWork],
+        clock: Clock,
+        directory: Directory,
+        calendar: BusinessCalendar,
     ) -> None:
         self._uow = uow
         self._clock = clock
         self._directory = directory
+        self._calendar = calendar
 
     def execute(
         self,
@@ -147,8 +161,16 @@ class RegisterNonPayment:
             if client is None:
                 raise ClientNotFound(loan.client_id)
             route = self._directory.route(client.route_id)
+            now = self._clock.now()
             non_payment = NonPayment.register(
-                actor, route, loan, reason, commitment_date, device_time, self._clock.now()
+                actor,
+                route,
+                loan,
+                reason,
+                commitment_date,
+                device_time,
+                now,
+                self._calendar.day_of(now),
             )
             uow.non_payments.add(non_payment)
             uow.commit()
@@ -168,14 +190,17 @@ class VisitQueries:
     """T3-P1: on a collection day, every client of the route with an active loan is pending
     until a payment or a non-payment is registered for that day."""
 
-    COLLECTION_DAYS = range(1, 7)  # Monday to Saturday
-
     def __init__(
-        self, uow: Callable[[], VisitsUnitOfWork], clock: Clock, directory: Directory
+        self,
+        uow: Callable[[], VisitsUnitOfWork],
+        clock: Clock,
+        directory: Directory,
+        calendar: BusinessCalendar,
     ) -> None:
         self._uow = uow
         self._clock = clock
         self._directory = directory
+        self._calendar = calendar
 
     def non_payments_of(self, loan_id: str) -> list[NonPayment]:
         with self._uow() as uow:
@@ -187,8 +212,8 @@ class VisitQueries:
         route = self._directory.route(route_id)
         if not actor.is_admin and actor.id != route.collector_id:
             raise VisitNotAllowed(actor.id)
-        day = day or self._clock.now().date()
-        if day.isoweekday() not in self.COLLECTION_DAYS:
+        day = day or self._calendar.day_of(self._clock.now())
+        if not self._calendar.is_collection_day(day):
             return []
         pending = []
         with self._uow() as uow:
@@ -210,10 +235,12 @@ class VisitQueries:
                 )
         return pending
 
-    @staticmethod
-    def _visited(uow: VisitsUnitOfWork, loan_id: str, day: date) -> bool:
-        return any(p.server_time.date() == day for p in uow.payments.for_loan(loan_id)) or any(
-            n.server_time.date() == day for n in uow.non_payments.for_loan(loan_id)
+    def _visited(self, uow: VisitsUnitOfWork, loan_id: str, day: date) -> bool:
+        return any(
+            self._calendar.day_of(p.server_time) == day for p in uow.payments.for_loan(loan_id)
+        ) or any(
+            self._calendar.day_of(n.server_time) == day
+            for n in uow.non_payments.for_loan(loan_id)
         )
 
 

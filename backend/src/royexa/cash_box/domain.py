@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 from royexa.shared.errors import DomainError, NotFound
 from royexa.shared.money import Money
@@ -20,9 +21,15 @@ class NoOpenCashBox(NotFound):
 class CashBox:
     id: str
     collector_id: str
+    day: date
     opening_balance: Money
     balance: Money
     closed: bool = False
+
+    @classmethod
+    def open(cls, collector_id: str, day: date, opening_balance: Money) -> CashBox:
+        """T5-P2: one box per collector and day."""
+        return cls(f"caja-{collector_id}-{day.isoformat()}", collector_id, day, opening_balance, opening_balance)
 
     def ensure_open(self) -> None:
         if self.closed:

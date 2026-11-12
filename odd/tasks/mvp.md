@@ -38,8 +38,14 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: CA-02 tiene prueba; las decisiones T3-P1 y T3-P2 están aplicadas tal como se resolvieron.
 - [x] **T4 Comprobante del pago (RF-06).** Cada pago emite un aviso con importe, saldo restante y próximo vencimiento, por el notificador simulado y con el mismo patrón de bandeja de salida del desembolso.
   - Acepta: los criterios de RF-06 tienen prueba; un fallo del notificador no pierde el aviso.
-- [ ] **T5 Cierre de caja (RF-02, RN-02).** *Detenida: faltan las decisiones T5-P1 a T5-P4 de «Preguntas abiertas».* Cierre diario en tres paneles (pendientes, pagaron, no pagaron) con diferencia entre lo registrado y lo entregado; solo sin pendientes e irreversible.
-  - Acepta: los criterios de RF-02 tienen prueba; un ajuste posterior al cierre exige un asiento nuevo.
+- [x] **T5a Caja diaria y zona horaria (RN-02, T5-P2, T5-P3).** Una caja por cobrador y día, que se abre sola con el primer movimiento de cada día de cobranza (lunes a sábado) y con el fondo del cobrador como saldo inicial; el día lo fija `ROYEXA_TIMEZONE` (por defecto `UTC`) y lo usan también los pendientes de visita. Migración `009`.
+  - Acepta: el primer movimiento del día abre la caja con el fondo; al día siguiente se abre otra sin cerrar la anterior; el domingo no hay caja y los movimientos se rechazan; con otra zona horaria el día cambia en su medianoche; dos primeros movimientos simultáneos no duplican la caja; las pruebas existentes siguen en verde.
+- [ ] **T5b Cierre y descuadre (RF-02, CA-03, CA-04, RN-02, T5-P1).** El cobrador cierra su caja indicando el efectivo entregado; solo sin pendientes de visita; irreversible; el descuadre (`entregado − esperado`, con `esperado = cobros en efectivo − desembolsos confirmados del día`) queda asentado y lo consulta el administrador.
+  - Acepta: CA-03 y CA-04 tienen una prueba cada uno; una caja cerrada rechaza pagos y desembolsos; un descuadre de cero no se asienta.
+- [ ] **T5c Paneles del día (RF-02).** Consulta de los tres paneles de la caja: pendientes, pagaron (con algún pago ese día) y no pagaron (con no pago y sin pago ese día), con la distinción entre efectivo y transferencia.
+  - Acepta: cada panel tiene una prueba; la suma de los tres cubre a los clientes de la ruta con préstamo activo.
+- [ ] **T5d Ajuste del administrador (CA-08, T5-P4).** El administrador registra un ajuste con importe con signo y motivo, como asiento `AJUSTE` nuevo en la caja abierta del día siguiente; el asiento original no se toca.
+  - Acepta: un ajuste posterior al cierre exige un asiento nuevo; solo el administrador; el motivo es obligatorio.
 - [ ] **T6 Inicio de sesión.** Sustituir la cabecera `X-Actor-Id` por usuario y contraseña con sesión, conservando los roles de cobrador y administrador y la regla RN-06.
   - Acepta: sin sesión válida la API responde 401; las pruebas existentes de RN-06 siguen pasando; contraseñas guardadas con hash.
 - [ ] **T7 Web del cobrador.** Páginas generadas en el servidor y usables en un celular: ruta del día, registrar pago o no pago, solicitar desembolso, validar el código del cliente y cerrar la caja.
@@ -52,31 +58,19 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
 
 ## Preguntas abiertas
 
-Bloquean T5. Hoy la caja (`CashBox`) es una por cobrador con un saldo inicial sembrado de 1.000.000,00 y un indicador `closed` sin camino de reapertura: tras un cierre, T3a (pagos) y los desembolsos fallarían para siempre con «sin caja abierta». La arquitectura pide «una caja por ruta y día», y los documentos no dicen cómo nace la del día siguiente ni qué se espera al cierre.
-
-- **T5-P1. ¿Qué efectivo se espera al cierre?** CA-03 dice «lo registrado en pagos en efectivo del día» (750 → entrega 725 → descuadre de 25), pero la arquitectura («Caja») dice «cobros en efectivo menos desembolsos confirmados; las transferencias no entran».
-  - Recomendada: la fórmula de la arquitectura, `esperado = cobros en efectivo del día − desembolsos confirmados del día`, y `descuadre = entregado − esperado` con signo (CA-03: −25). Las transferencias no entran.
-  - Alternativa: solo los cobros en efectivo del día, como el texto literal de CA-03; los desembolsos salen del fondo del cobrador y no se descuentan al cierre.
-  - Caso límite a decidir: con la fórmula recomendada, un día con más desembolsos que cobros da un esperado negativo. Propuesta: el entregado nunca es negativo y la diferencia se asienta igual.
-- **T5-P2. ¿Cómo se abre la caja del día siguiente y con qué saldo?**
-  - Recomendada: se abre sola, al primer movimiento de cada día de cobranza (lunes a sábado), una caja nueva del cobrador con el mismo saldo inicial que la anterior (el fondo fijo del cobrador, 1.000.000,00 en la demostración). El descuadre se asienta, no corrige el fondo.
-  - Alternativa: la abre el administrador cada día, indicando el saldo inicial.
-- **T5-P3. ¿Qué día y qué zona horaria?** Los pendientes de visita y la caja necesitan una frontera de día, y hoy se cuenta en UTC (ver evidencia de T3b). En UTC, una caja cerrada a las 20:00 en Bogotá o en Ciudad de México ya cuenta como del día siguiente.
-  - Recomendada: una zona horaria configurable del piloto, `ROYEXA_TIMEZONE`, por defecto `UTC`, que usan los pendientes y la caja. Necesito que me digas la zona del piloto para fijarla.
-  - Alternativa: dejarlo en UTC durante el MVP y anotarlo como limitación.
-- **T5-P4. ¿Qué incluye «un ajuste posterior al cierre exige un asiento nuevo»?** Con la caja cerrada, los pagos y desembolsos ya se rechazan (RN-02).
-  - Recomendada: solo el administrador registra un ajuste (`POST /v1/cash-boxes/{id}/adjustments`) con importe con signo y motivo obligatorio; queda como asiento `AJUSTE` nuevo en la caja abierta del día siguiente (contra-asiento) y el asiento original no se toca.
-  - Alternativa: en T5 solo se garantiza que la caja cerrada rechaza movimientos, y el ajuste queda para una tarea posterior (CA-08).
-
-Resuelto con los documentos, sin pregunta: solo el cobrador de la ruta cierra su caja; el cierre se rechaza con pendientes de visita según T3-P1 (CA-04) y la caja queda abierta; el cierre es irreversible; un descuadre de cero no cuenta como descuadre; el descuadre queda asentado y lo consulta el administrador (CA-03); los tres paneles son pendientes, pagaron (con algún pago ese día) y no pagaron (con no pago y sin pago ese día).
-
-Si las respuestas son las recomendadas, T5 se divide en T5a (apertura diaria, cierre y descuadre), T5b (los tres paneles) y T5c (ajuste del administrador), por la regla 10.
+- Ninguna por ahora.
 
 ## Decisiones resueltas
 
 - **T3-P1. Pendiente de visita** (decidido por el usuario, opción recomendada): cada día de cobranza (lunes a sábado), todo cliente de la ruta con un préstamo `ACTIVO` es pendiente hasta que el cobrador registra un pago o un no pago ese día. Un cliente sin préstamo activo nunca es pendiente. Afecta a T3b, T5 y T7.
 - **T3-P2. Fecha de compromiso** (decidido por el usuario, opción recomendada): obligatoria y posterior al día del registro; solo se guarda y se consulta, no vuelve pendiente a nadie ni cambia el saldo.
 - Resuelto con los documentos, sin pregunta: el medio de pago es efectivo o transferencia y solo el efectivo suma a la caja (arquitectura, «Caja»); el pago se imputa a las cuotas más antiguas primero y nunca excede el saldo (RN-01, «Pago»); cada pago genera su asiento en el libro.
+
+- **T5-P1 a T5-P4** (decididas por el usuario, opciones recomendadas):
+  - T5-P1: `esperado = cobros en efectivo del día − desembolsos confirmados del día`; `descuadre = entregado − esperado` con signo; las transferencias no entran; el entregado nunca es negativo.
+  - T5-P2: la caja del día se abre sola, al primer movimiento de cada día de cobranza (lunes a sábado), con el mismo saldo inicial que la anterior (el fondo fijo del cobrador).
+  - T5-P3: zona horaria configurable `ROYEXA_TIMEZONE`, por defecto `UTC` (el usuario no indicó otra).
+  - T5-P4: el administrador registra el ajuste como asiento nuevo en la caja abierta del día siguiente.
 
 ## Evidencia
 
@@ -102,3 +96,9 @@ Si las respuestas son las recomendadas, T5 se divide en T5a (apertura diaria, ci
   - «Próximo vencimiento» se interpreta como la fecha de la cuota pendiente más antigua; puede estar vencida si el cliente va atrasado.
   - El comprobante no incluye el contador de cuotas restantes: RF-06 pide importe, saldo y próximo vencimiento. Se añade al contenido si el piloto lo pide.
   - Pendiente: nada de T4. Siguiente: T5.
+- T5a: `BusinessCalendar` (zona horaria y días de cobranza), `CashDesk` (abre la caja del día con el primer movimiento, con el fondo del cobrador como saldo inicial) y `CashBox.day`; `GET /v1/cash-boxes/{cobrador}?date=` (hoy muestra la apertura aunque no haya movimientos); migración `009_daily_box.sql` (una caja por cobrador y día; ya no hace falta cerrar la anterior). `ROYEXA_TIMEZONE` (por defecto `UTC`) rige la caja y los pendientes de visita de T3b, y un nombre desconocido impide arrancar. Los cobradores sembrados traen su fondo (`User.opening_cash`) y ya no se siembran cajas. 255 pruebas en verde con `uv run pytest -m ""` (118 sin PostgreSQL, 137 con PostgreSQL), tres corridas sin intermitencias. PostgreSQL 16 en la máquina de la sesión; la CI usa 17. Rama `tasks/t5a-daily-box`.
+  - Hallazgo: el ejecutor de migraciones reaplica todos los archivos en cada arranque, así que `002` volvía a crear el índice «una caja abierta por cobrador» después de que `009` lo quitara. Se eliminó de `002` (comentado); las bases ya existentes lo pierden con `009`.
+  - Dos primeros movimientos simultáneos del día abren una sola caja: el perdedor recibe 409 para reintentar (la apertura es una escritura del mismo movimiento).
+  - Límite conocido: el domingo no hay caja, así que ni siquiera un código caducado deja asiento ese día (CA-06 necesita una caja); el movimiento se rechaza con 409 `caja-no-disponible`.
+  - Cambio visible en el API: `GET /v1/cash-boxes/{cobrador}` devuelve `day` y el identificador de la caja incluye el día (`caja-cobrador-1-2026-10-30`).
+  - Pendiente: T5b (cierre y descuadre), T5c (paneles) y T5d (ajuste).

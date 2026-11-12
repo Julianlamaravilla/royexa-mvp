@@ -259,6 +259,7 @@ class DisbursementOut(BaseModel):
 class CashBoxOut(BaseModel):
     id: str
     collector_id: str
+    day: date
     opening_balance_cents: int
     balance_cents: int
     closed: bool
@@ -426,6 +427,7 @@ def _box_out(box: CashBox) -> CashBoxOut:
     return CashBoxOut(
         id=box.id,
         collector_id=box.collector_id,
+        day=box.day,
         opening_balance_cents=box.opening_balance.cents,
         balance_cents=box.balance.cents,
         closed=box.closed,
@@ -502,8 +504,10 @@ def create_app(container: Container) -> FastAPI:
         return [_entry_out(entry) for entry in container.queries.ledger(disbursement_id)]
 
     @app.get("/v1/cash-boxes/{collector_id}", response_model=CashBoxOut)
-    def read_cash_box(collector_id: str, _: Actor) -> CashBoxOut:
-        return _box_out(container.queries.cash_box(collector_id))
+    def read_cash_box(
+        collector_id: str, _: Actor, day: Annotated[date | None, Query(alias="date")] = None
+    ) -> CashBoxOut:
+        return _box_out(container.queries.cash_box(collector_id, day))
 
     @app.post("/v1/clients", status_code=201, response_model=ClientOut)
     def register_client(body: ClientBody, actor: Actor) -> ClientOut:
