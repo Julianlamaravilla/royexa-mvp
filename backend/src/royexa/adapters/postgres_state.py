@@ -17,6 +17,7 @@ from royexa.cash_box.domain import CashBox, CashClose
 from royexa.clients.domain import Client
 from royexa.identity_access.domain import Role
 from royexa.identity_access.domain import Credential, Session
+from royexa.web.forms import FormToken, Outcome
 from royexa.loans.domain import (
     Allocation,
     Installment,
@@ -217,6 +218,62 @@ class PostgresAuthRepository:
         self._connection.execute(
             "UPDATE session SET revoked_at = %s WHERE token_hash = %s",
             (session.revoked_at, session.token_hash),
+        )
+
+
+class PostgresFormTokenRepository:
+    _COLUMNS = (
+        "token_hash, session_hash, purpose, created_at, used_at, outcome_kind, outcome_text, "
+        "outcome_next"
+    )
+
+    def __init__(self, connection: psycopg.Connection) -> None:
+        self._connection = connection
+
+    def add(self, token: FormToken) -> None:
+        self._connection.execute(
+            f"INSERT INTO form_token ({self._COLUMNS}) VALUES ({', '.join(['%s'] * 8)})",
+            self._values(token),
+        )
+
+    def get(self, token_hash: str) -> FormToken | None:
+        row = self._connection.execute(
+            f"SELECT {self._COLUMNS} FROM form_token WHERE token_hash = %s", (token_hash,)
+        ).fetchone()
+        if row is None:
+            return None
+        outcome = Outcome(row[5], row[6], row[7]) if row[5] else None
+        return FormToken(row[0], row[1], row[2], row[3], row[4], outcome)
+
+    def save(self, token: FormToken) -> None:
+        """Two claims that race lose with a serialization failure: only one is fresh."""
+        outcome = token.outcome
+        _update(
+            self._connection,
+            "UPDATE form_token SET used_at = %s, outcome_kind = %s, outcome_text = %s, "
+            "outcome_next = %s WHERE token_hash = %s",
+            (
+                token.used_at,
+                outcome.kind if outcome else None,
+                outcome.text if outcome else None,
+                outcome.next_path if outcome else None,
+                token.token_hash,
+            ),
+            f"form_token/{token.token_hash}",
+        )
+
+    @staticmethod
+    def _values(token: FormToken) -> tuple:
+        outcome = token.outcome
+        return (
+            token.token_hash,
+            token.session_hash,
+            token.purpose,
+            token.created_at,
+            token.used_at,
+            outcome.kind if outcome else None,
+            outcome.text if outcome else None,
+            outcome.next_path if outcome else None,
         )
 
 
@@ -624,6 +681,7 @@ class PostgresSession(PostgresLedgerSession):
         self.clients = PostgresClientRepository(self._connection)
         self.cash_closes = PostgresCashCloseRepository(self._connection)
         self.auth = PostgresAuthRepository(self._connection)
+        self.form_tokens = PostgresFormTokenRepository(self._connection)
         self.disbursements = PostgresDisbursementRepository(self._connection)
         self.cash = PostgresCashRepository(self._connection)
         self.loans = PostgresLoanRepository(self._connection)

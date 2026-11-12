@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Administrador · ROYEXA{% endblock %}
+{% block body %}
+<header class="bar">
+  <div><strong>{{ user.name }}</strong></div>
+  <form method="post" action="/web/logout">
+    <input type="hidden" name="ficha" value="{{ logout_token }}">
+    <button type="submit" class="link">Salir</button>
+  </form>
+</header>
+<main>
+  <h1>Administrador</h1>
+  <p class="muted">Las páginas del administrador llegan en una tarea posterior.</p>
+</main>
+{% endblock %}

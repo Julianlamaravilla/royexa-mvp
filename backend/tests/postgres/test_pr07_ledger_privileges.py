@@ -53,6 +53,7 @@ ALL_MIGRATIONS = [
     "011_adjustments.sql",
     "012_auth.sql",
     "013_password_policy.sql",
+    "014_form_token.sql",
 ]
 NOW = datetime(2026, 10, 30, 14, 0, tzinfo=UTC)
 RECEIPT = "COMPROBANTE_DESEMBOLSO"
@@ -212,6 +213,8 @@ def test_pr07_catalog_lists_no_other_grant_on_any_table():
         # password, and failed attempts are counted), never deleted; a session is only revoked.
         + [("credential", "royexa_app", p) for p in ("INSERT", "SELECT", "UPDATE")]
         + [("session", "royexa_app", p) for p in ("INSERT", "SELECT", "UPDATE")]
+        # T7a: a form token is issued, claimed and given its result, never deleted.
+        + [("form_token", "royexa_app", p) for p in ("INSERT", "SELECT", "UPDATE")]
     )
 
 

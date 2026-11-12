@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }} · ROYEXA{% endblock %}
+{% block body %}
+<main class="narrow">
+  <h1>{{ heading }}</h1>
+  <p class="notice {{ kind }}" role="{{ 'alert' if kind == 'error' else 'status' }}">{{ text }}</p>
+  <p><a class="button" href="{{ next_path }}">{{ link_text }}</a></p>
+</main>
+{% endblock %}

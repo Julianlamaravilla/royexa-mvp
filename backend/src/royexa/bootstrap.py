@@ -39,6 +39,7 @@ from royexa.seed import (
     seed_store,
 )
 from royexa.shared.calendar import BusinessCalendar
+from royexa.web.forms import FormTokens
 from royexa.shared.clock import Clock, SystemClock
 
 DEFAULT_CODE_TTL_MINUTES = 60
@@ -52,6 +53,7 @@ class Settings:
     ledger_url: str | None = None
     timezone: str = DEFAULT_TIMEZONE
     session_ttl: timedelta = DEFAULT_SESSION_TTL
+    currency_symbol: str = ""
     require_changed_passwords: bool = False
 
     @classmethod
@@ -63,6 +65,7 @@ class Settings:
             ledger_url=os.environ.get("ROYEXA_LEDGER_URL"),
             timezone=os.environ.get("ROYEXA_TIMEZONE", DEFAULT_TIMEZONE),
             require_changed_passwords=os.environ.get("ROYEXA_REQUIRE_CHANGED_PASSWORDS") == "1",
+            currency_symbol=os.environ.get("ROYEXA_CURRENCY_SYMBOL", ""),
             session_ttl=timedelta(
                 hours=float(os.environ.get("ROYEXA_SESSION_HOURS", DEFAULT_SESSION_TTL.total_seconds() / 3600))
             ),
@@ -82,6 +85,8 @@ class Container:
     close_cash_box: CloseCashBox
     cash_close_queries: CashCloseQueries
     authenticator: Authenticator
+    form_tokens: FormTokens
+    currency_symbol: str
     register_adjustment: RegisterAdjustment
     store: InMemoryStore
     notifier: Notifier
@@ -152,6 +157,8 @@ def build_container(
         close_cash_box=CloseCashBox(unit_of_work, clock, directory, calendar),
         cash_close_queries=CashCloseQueries(unit_of_work),
         authenticator=Authenticator(unit_of_work, clock, directory, hasher, settings.session_ttl),
+        form_tokens=FormTokens(unit_of_work, clock),
+        currency_symbol=settings.currency_symbol,
         register_adjustment=RegisterAdjustment(unit_of_work, clock, directory, calendar),
         store=store,
         notifier=notifier,
