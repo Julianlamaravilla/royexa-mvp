@@ -36,6 +36,10 @@
         <strong>{{ item.client_name }}</strong>
         <span>Saldo {{ item.outstanding.cents | money }}</span>
         <span class="muted">Cuotas restantes {{ item.remaining_installments | exact }}</span>
+        <span class="actions">
+          <a class="button" href="/web/pago/{{ item.loan_id }}">Registrar pago</a>
+          <a class="button" href="/web/no-pago/{{ item.loan_id }}">No pagó</a>
+        </span>
       </li>
       {% else %}
       <li class="muted">No quedan clientes por visitar.</li>
