@@ -28,6 +28,8 @@ class User:
     name: str
     role: Role
     disbursement_limit: Money | None = None
+    opening_cash: Money | None = None
+    """The collector's fixed float: the opening balance of each day's cash box (T5-P2)."""
 
     @property
     def is_admin(self) -> bool:
@@ -52,6 +54,9 @@ class Directory:
             return self._users[user_id]
         except KeyError:
             raise UnknownActor(user_id) from None
+
+    def opening_cash(self, collector_id: str) -> Money | None:
+        return self.user(collector_id).opening_cash
 
     def route(self, route_id: str) -> Route:
         try:

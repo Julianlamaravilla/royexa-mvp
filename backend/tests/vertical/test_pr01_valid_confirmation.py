@@ -37,7 +37,7 @@ def test_pr01_valid_code_records_entry_schedule_and_cash_deduction(flow, clock):
     assert entry["actor_id"] == COLLECTOR
     assert entry["device_time"] == DEVICE_TIME.replace("+00:00", "Z")
     assert entry["server_time"] == clock.now().isoformat().replace("+00:00", "Z")
-    assert entry["cash_box_id"] == "caja-cobrador-1"
+    assert entry["cash_box_id"] == "caja-cobrador-1-2026-10-30"
 
 
 def test_pr01_result_is_queryable_with_who_requested_and_who_approved(flow):

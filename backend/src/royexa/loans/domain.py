@@ -257,6 +257,7 @@ class NonPayment:
         commitment_date: date,
         device_time: datetime,
         now: datetime,
+        today: date,
     ) -> NonPayment:
         if actor.id != route.collector_id:
             raise VisitNotAllowed(actor.id)
@@ -264,7 +265,7 @@ class NonPayment:
             raise LoanAlreadySettled(loan.id)
         if not reason.strip():
             raise ReasonRequired("a non-payment needs a reason")
-        if commitment_date <= now.date():
+        if commitment_date <= today:
             raise InvalidCommitmentDate(commitment_date.isoformat())
         return cls(
             new_id(),

@@ -6,6 +6,8 @@ loan and notice commit together or not at all.
 
 from __future__ import annotations
 
+from datetime import date
+
 import psycopg
 from psycopg import errors
 from psycopg.types.json import Jsonb
@@ -34,7 +36,7 @@ from royexa.shared.money import Money
 from royexa.shared.payments import PaymentMethod
 from royexa.shared.outbox import NoticeKind, NoticeStatus, OutboxMessage
 
-_BOX = "id, collector_id, opening_balance_cents, balance_cents, closed"
+_BOX = "id, collector_id, day, opening_balance_cents, balance_cents, closed"
 _EXCEPTION = "id, client_id, prior_loan_id, granted_by, reason, granted_at, consumed_by"
 _NOTICE = (
     "id, kind, client_id, disbursement_id, created_at, payload, status, attempts, "
@@ -55,18 +57,19 @@ class PostgresCashRepository:
         self._connection = connection
         self._versions: dict[str, int] = {}
 
-    def open_box_of(self, collector_id: str) -> CashBox | None:
+    def box_of_day(self, collector_id: str, day: date) -> CashBox | None:
         row = self._connection.execute(
-            f"SELECT {_BOX}, version FROM cash_box WHERE collector_id = %s AND NOT closed",
-            (collector_id,),
+            f"SELECT {_BOX}, version FROM cash_box WHERE collector_id = %s AND day = %s",
+            (collector_id, day),
         ).fetchone()
         if row is None:
             return None
-        self._versions[row[0]] = row[5]
-        return CashBox(row[0], row[1], Money(row[2]), Money(row[3]), row[4])
+        self._versions[row[0]] = row[6]
+        return CashBox(row[0], row[1], row[2], Money(row[3]), Money(row[4]), row[5])
 
     def save(self, box: CashBox) -> None:
-        """Optimistic: the write wins only if nobody changed the box since it was read."""
+        """Optimistic: the write wins only if nobody changed the box since it was read. Two
+        first movements of a day race for the same row; the second one loses."""
         values = (box.opening_balance.cents, box.balance.cents, box.closed, box.id)
         if box.id in self._versions:
             written = _update(
@@ -80,11 +83,14 @@ class PostgresCashRepository:
                 raise StaleWrite(f"cash_box/{box.id}")
             self._versions[box.id] += 1
         else:
-            self._connection.execute(
-                "INSERT INTO cash_box (opening_balance_cents, balance_cents, closed, id, "
-                "collector_id) VALUES (%s, %s, %s, %s, %s)",
-                (*values, box.collector_id),
-            )
+            try:
+                self._connection.execute(
+                    "INSERT INTO cash_box (opening_balance_cents, balance_cents, closed, id, "
+                    "collector_id, day) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (*values, box.collector_id, box.day),
+                )
+            except errors.UniqueViolation as error:
+                raise StaleWrite(f"cash_box/{box.collector_id}/{box.day}") from error
             self._versions[box.id] = 0
 
 
@@ -498,21 +504,13 @@ class PostgresSession(PostgresLedgerSession):
         self.outbox = PostgresOutbox(self._connection)
 
 
-def seed_database(
-    url: str, boxes: list[CashBox], loans: list[Loan], clients: list[Client]
-) -> None:
+def seed_database(url: str, loans: list[Loan], clients: list[Client]) -> None:
     """Demo data (RES-02). Rows that already exist are left as they are."""
     with psycopg.connect(url) as connection:
         for client in clients:
             connection.execute(
                 "INSERT INTO client (id, name, route_id) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
                 (client.id, client.name, client.route_id),
-            )
-        for box in boxes:
-            connection.execute(
-                "INSERT INTO cash_box (id, collector_id, opening_balance_cents, balance_cents, "
-                "closed) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
-                (box.id, box.collector_id, box.opening_balance.cents, box.balance.cents, box.closed),
             )
         for loan in loans:
             if connection.execute("SELECT 1 FROM loan WHERE id = %s", (loan.id,)).fetchone():
