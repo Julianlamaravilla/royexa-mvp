@@ -329,3 +329,17 @@ def test_t7a_a_configured_currency_symbol_shows_on_every_amount():
     html = browser.get("/web/ruta").text
 
     assert "$ 1.000.000,00" in html and "$ 700,00" in html
+
+
+def test_t7a_on_sunday_the_route_page_says_there_is_no_collection(container, clock):
+    browser = _browser(container)
+    clock.advance(timedelta(days=2))  # Sunday 1 November
+    _login(browser)
+
+    response = browser.get("/web/ruta")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "domingo 1 de noviembre de 2026" in response.text
+    assert "no es día de cobranza" in response.text
+    assert "Caja abierta" not in response.text

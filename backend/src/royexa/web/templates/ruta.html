@@ -14,12 +14,19 @@
 <main>
   <h1>Ruta del día</h1>
 
+  {% if box %}
   <section class="card">
     <h2>{{ "Caja cerrada" if box.closed else "Caja abierta" }}</h2>
     <p class="amount">Saldo {{ box.balance.cents | money }}</p>
     <p class="muted">Cobrado en efectivo hoy {{ panels.cash_total.cents | money }}
       · por transferencia {{ panels.transfer_total.cents | money }}</p>
   </section>
+  {% else %}
+  <section class="card">
+    <h2>Sin caja hoy</h2>
+    <p class="muted">Hoy no es día de cobranza: no hay caja ni visitas.</p>
+  </section>
+  {% endif %}
 
   <section>
     <h2>Pendientes ({{ panels.pending | length }})</h2>

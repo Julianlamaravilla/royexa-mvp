@@ -22,7 +22,7 @@ uv sync
 Desde `backend/`. El comando por defecto no necesita Docker:
 
 ```bash
-uv run pytest                # 210 pruebas, sin PostgreSQL
+uv run pytest                # 262 pruebas, sin PostgreSQL
 ```
 
 Las pruebas de privilegios del libro necesitan PostgreSQL. Levántelo desde la raíz del repositorio:
@@ -34,8 +34,8 @@ docker compose up -d --wait postgres
 Después, desde `backend/`:
 
 ```bash
-uv run pytest -m postgres    # las 238 pruebas con PostgreSQL (1 se omite a propósito)
-uv run pytest -m ""          # las 448 pruebas
+uv run pytest -m postgres    # las 279 pruebas con PostgreSQL (2 se omiten a propósito)
+uv run pytest -m ""          # las 541 pruebas
 ```
 
 Las pruebas aplican la migración por sí mismas.
@@ -64,6 +64,7 @@ La documentación OpenAPI queda en <http://localhost:8000/docs>. El recorrido co
 | `ROYEXA_CODE_TTL_MINUTES` | `60` | Vigencia del código de confirmación |
 | `ROYEXA_NOTIFIER_FAILING` | Sin definir | Con `1`, el notificador simulado falla |
 | `ROYEXA_TIMEZONE` | `UTC` | Zona horaria del piloto (por ejemplo `America/Bogota`): fija el día de la caja y de los pendientes de visita. Un nombre desconocido impide arrancar |
+| `ROYEXA_CURRENCY_SYMBOL` | Vacío | Símbolo que antecede a los importes de las páginas (`$ 1.234,56`). Los documentos no nombran la moneda, así que por defecto no hay símbolo |
 | `ROYEXA_REQUIRE_CHANGED_PASSWORDS` | Sin definir | Con `1`, no se siembra ninguna contraseña de demostración y el servidor se niega a arrancar si queda alguna, o si no hay base de datos. Se aprovisionan con `python -m royexa.set_password` |
 | `ROYEXA_SESSION_HOURS` | `12` | Duración de una sesión desde el inicio de sesión, sin renovación |
 | `ROYEXA_SCRYPT_N` | `16384` | Coste del hash de contraseñas. Solo las pruebas lo bajan; el hash guarda su coste, así que cambiarlo no invalida los existentes |
@@ -93,6 +94,16 @@ curl -X POST localhost:8000/v1/auth/logout -H "Authorization: Bearer $TOKEN"
 ```bash
 ROYEXA_LEDGER_URL=postgresql://royexa_app:...@host/royexa python -m royexa.set_password admin-1
 ```
+
+## Páginas web
+
+Páginas en español generadas en el servidor, pensadas para un celular de 360 px. Con el servidor en marcha, abre <http://localhost:8000/web/> e ingresa con un usuario sembrado (`cobrador-1` y `demo-cobrador-1-royexa`, por ejemplo).
+
+- `/web/login`, `/web/ruta` (la ruta del día del cobrador: caja, pendientes, pagaron y no pagaron), `/web/admin` (de momento solo la entrada del administrador) y `/web/resultado/<ficha>`.
+- Usan la cookie `royexa_session` de la sesión (HttpOnly, SameSite=Lax). Sin sesión, redirigen al inicio de sesión.
+- **Fichas de un solo uso:** cada formulario lleva una ficha ligada a la sesión que lo pidió. El servidor la acepta una vez; repetirla (doble toque, reenvío del navegador) muestra el resultado ya registrado y no repite el efecto. Una ficha ausente, desconocida o de otra sesión no hace nada, y eso sirve también contra CSRF.
+- **Política de contenido estricta:** CSS y JavaScript se sirven desde `/web/static/` del mismo origen; las páginas no llevan scripts ni estilos en línea. Respuestas con `Cache-Control: no-store`, `X-Content-Type-Options` y `Referrer-Policy`.
+- Todo texto que viene de la base se escapa. Importes con dos decimales y miles en el estilo español (`1.234,56`).
 
 ## Limitaciones
 

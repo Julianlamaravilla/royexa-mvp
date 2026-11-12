@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from royexa.cash_box.domain import NoOpenCashBox
 from royexa.identity_access.domain import InvalidCredentials, SessionRequired, User
 from royexa.loans.domain import exact_decimal
 from royexa.shared.errors import DomainError
@@ -229,7 +230,10 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         if user.is_admin:
             return _redirect(ADMIN_PATH)
         panels = await run_in_threadpool(container.visit_queries.panels, user, user.id)
-        box = await run_in_threadpool(container.queries.cash_box, user.id)
+        try:
+            box = await run_in_threadpool(container.queries.cash_box, user.id)
+        except NoOpenCashBox:
+            box = None  # a day without collection has no box (T5a)
         logout_token = await run_in_threadpool(container.form_tokens.issue, token, "salir")
         return _render(
             container,
