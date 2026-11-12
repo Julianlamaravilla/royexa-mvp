@@ -1,6 +1,10 @@
 import os
 
-import pytest
+# A cheap scrypt cost keeps the logins of hundreds of tests fast; the hash records its cost,
+# and a test checks that a clean environment keeps the strong default. Set before royexa loads.
+os.environ.setdefault("ROYEXA_SCRYPT_N", "16")
+
+import pytest  # noqa: E402
 from database import reset_database
 from fastapi.testclient import TestClient
 from support import FakeClock, Flow

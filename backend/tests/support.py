@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 from httpx import Response
 
+from royexa.seed import demo_password
+
 COLLECTOR = "cobrador-1"
 ADMIN = "admin-1"
 OTHER_ADMIN = "admin-2"
@@ -30,12 +32,41 @@ class Flow:
     def __init__(self, api, notifier) -> None:
         self.api = api
         self.notifier = notifier
+        self._tokens: dict[str, str] = {}
+
+    def _token(self, actor: str) -> str:
+        """One session per user, opened on first use with the documented demo password. A
+        user that cannot log in gets a token that is refused, so a test still sees the 401."""
+        if actor not in self._tokens:
+            response = self.api.post(
+                "/v1/auth/login", json={"user_id": actor, "password": demo_password(actor)}
+            )
+            self._tokens[actor] = (
+                response.json()["token"] if response.status_code == 200 else "sin-sesion"
+            )
+        return self._tokens[actor]
+
+    def _send(self, method: str, path: str, actor: str, body: dict | None = None) -> Response:
+        """Tests move the FakeClock by days; a session that lapsed meanwhile is renewed once.
+        A 401 means the request was refused before it ran, so repeating it is safe."""
+        for attempt in (1, 2):
+            token = self._token(actor)
+            options: dict = {"headers": {"Authorization": f"Bearer {token}"}}
+            if method == "POST":
+                options["json"] = body or {}
+            response = self.api.request(method, path, **options)
+            if response.status_code != 401 or token == "sin-sesion" or attempt == 2:
+                return response
+            if not response.json().get("type", "").endswith("/sesion-requerida"):
+                return response
+            self._tokens.pop(actor, None)
+        return response
 
     def _post(self, path: str, actor: str, body: dict | None = None) -> Response:
-        return self.api.post(path, headers={"X-Actor-Id": actor}, json=body or {})
+        return self._send("POST", path, actor, body)
 
     def _get(self, path: str, actor: str = ADMIN) -> Response:
-        return self.api.get(path, headers={"X-Actor-Id": actor})
+        return self._send("GET", path, actor)
 
     def request(
         self,
