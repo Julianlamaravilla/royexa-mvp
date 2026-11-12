@@ -11,10 +11,18 @@ from datetime import date, datetime
 from typing import Protocol
 
 from royexa.cash_box.desk import CashDesk
-from royexa.cash_box.domain import CashClose, CashCloseNotAllowed, PendingVisitsRemain
+from royexa.cash_box.domain import (
+    AdjustmentNotAllowed,
+    CashClose,
+    CashCloseNotAllowed,
+    NoOpenCashBox,
+    PendingVisitsRemain,
+)
 from royexa.cash_box.ports import CashCloseRepository, CashRepository
 from royexa.identity_access.domain import Directory, User
+from royexa.ledger.domain import LedgerEntry, LedgerEntryNotFound
 from royexa.ledger.ports import LedgerRepository
+from royexa.ledger.posting import LedgerPosting
 from royexa.loans.application import VisitsUnitOfWork, pending_visits
 from royexa.shared.calendar import BusinessCalendar
 from royexa.shared.clock import Clock
@@ -65,6 +73,44 @@ class CloseCashBox:
             uow.cash_closes.add(close)
             uow.commit()
         return close
+
+
+class RegisterAdjustment:
+    """UC-08 (CA-08, T5-P4): the administrator corrects an entry with a new one. It lands in
+    the box of the original's collector for the current day, so a closed day is corrected
+    on the next one and the closed box and its close are left alone."""
+
+    def __init__(
+        self,
+        uow: Callable[[], ClosingUnitOfWork],
+        clock: Clock,
+        directory: Directory,
+        calendar: BusinessCalendar,
+    ) -> None:
+        self._uow = uow
+        self._clock = clock
+        self._directory = directory
+        self._calendar = calendar
+
+    def execute(
+        self, actor: User, entry_id: str, amount: Money, reason: str, device_time: datetime
+    ) -> LedgerEntry:
+        if not actor.is_admin:
+            raise AdjustmentNotAllowed(actor.id)
+        now = self._clock.now()
+        with self._uow() as uow:
+            original = uow.ledger.get(entry_id)
+            if original is None:
+                raise LedgerEntryNotFound(entry_id)
+            box = uow.cash.get(original.cash_box_id)
+            if box is None:
+                raise NoOpenCashBox(original.cash_box_id)
+            desk = CashDesk(uow.cash, self._directory, self._calendar)
+            entry = LedgerPosting(uow.ledger, desk).post_adjustment(
+                original.id, box.collector_id, amount, reason, actor.id, device_time, now
+            )
+            uow.commit()
+        return entry
 
 
 class ClosesUnitOfWork(Protocol):
