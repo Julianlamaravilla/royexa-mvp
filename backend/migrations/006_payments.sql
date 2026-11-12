@@ -6,18 +6,27 @@ ALTER TABLE ledger_entry ALTER COLUMN disbursement_id DROP NOT NULL;
 ALTER TABLE ledger_entry ADD COLUMN IF NOT EXISTS payment_id text;
 ALTER TABLE ledger_entry ADD COLUMN IF NOT EXISTS payment_method text;
 
+-- The ledger checks below are created only when absent: every migration is reapplied on
+-- each start, and later ones (011) widen them, so recreating them here would fail as soon
+-- as a row of a newer type exists.
 ALTER TABLE ledger_entry DROP CONSTRAINT IF EXISTS ledger_entry_entry_type_check;
-ALTER TABLE ledger_entry DROP CONSTRAINT IF EXISTS ledger_entry_type_known;
-ALTER TABLE ledger_entry ADD CONSTRAINT ledger_entry_type_known
-    CHECK (entry_type IN ('DESEMBOLSO', 'DESEMBOLSO_CADUCADO', 'PAGO'));
 
-ALTER TABLE ledger_entry DROP CONSTRAINT IF EXISTS ledger_entry_names_its_operation;
-ALTER TABLE ledger_entry ADD CONSTRAINT ledger_entry_names_its_operation CHECK (
-    (entry_type = 'PAGO' AND payment_id IS NOT NULL AND payment_method IS NOT NULL
-        AND disbursement_id IS NULL)
-    OR (entry_type <> 'PAGO' AND disbursement_id IS NOT NULL AND payment_id IS NULL
-        AND payment_method IS NULL)
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_constraint WHERE conname = 'ledger_entry_type_known') THEN
+        ALTER TABLE ledger_entry ADD CONSTRAINT ledger_entry_type_known
+            CHECK (entry_type IN ('DESEMBOLSO', 'DESEMBOLSO_CADUCADO', 'PAGO'));
+    END IF;
+    IF NOT EXISTS (SELECT FROM pg_constraint WHERE conname = 'ledger_entry_names_its_operation') THEN
+        ALTER TABLE ledger_entry ADD CONSTRAINT ledger_entry_names_its_operation CHECK (
+            (entry_type = 'PAGO' AND payment_id IS NOT NULL AND payment_method IS NOT NULL
+                AND disbursement_id IS NULL)
+            OR (entry_type <> 'PAGO' AND disbursement_id IS NOT NULL AND payment_id IS NULL
+                AND payment_method IS NULL)
+        );
+    END IF;
+END
+$$;
 
 -- INV-02: one entry per payment.
 CREATE UNIQUE INDEX IF NOT EXISTS ledger_entry_one_per_payment

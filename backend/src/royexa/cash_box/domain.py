@@ -23,6 +23,10 @@ class CashCloseNotAllowed(DomainError):
     """RF-02: the collector of the box closes it; nobody else."""
 
 
+class AdjustmentNotAllowed(DomainError):
+    """CA-08: only an administrator corrects an entry."""
+
+
 class PendingVisitsRemain(DomainError):
     """CA-04, RN-02: a box with clients still pending a visit does not close."""
 
@@ -54,6 +58,11 @@ class CashBox:
         """RF-01: cash received on a payment. Transfers never reach this point (RES-01)."""
         self.ensure_open()
         self.balance = self.balance + amount
+
+    def adjust(self, signed: Money) -> None:
+        """CA-08: a compensating entry moves the box by its signed amount."""
+        self.ensure_open()
+        self.balance = self.balance + signed
 
     def close(self) -> None:
         """RN-02: irreversible. A closed box is never reopened or edited."""

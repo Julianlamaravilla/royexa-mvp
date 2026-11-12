@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from royexa.shared.errors import DomainError, WriteConflict
+from royexa.shared.errors import DomainError, NotFound, WriteConflict
 from royexa.shared.money import Money
 from royexa.shared.payments import PaymentMethod
 
@@ -14,6 +14,10 @@ CODE_EXPIRED_REASON = "codigo_caducado"
 
 
 class InvalidLedgerEntry(DomainError):
+    pass
+
+
+class LedgerEntryNotFound(NotFound):
     pass
 
 
@@ -25,6 +29,7 @@ class LedgerEntryType(StrEnum):
     DISBURSEMENT = "DESEMBOLSO"
     EXPIRED_ATTEMPT = "DESEMBOLSO_CADUCADO"
     PAYMENT = "PAGO"
+    ADJUSTMENT = "AJUSTE"
 
 
 @dataclass(frozen=True)
@@ -40,8 +45,14 @@ class LedgerEntry:
     reason: str | None = None
     payment_id: str | None = None
     payment_method: str | None = None
+    adjusts_entry_id: str | None = None
 
     def __post_init__(self) -> None:
+        if self.entry_type is LedgerEntryType.ADJUSTMENT:
+            self._check_adjustment()
+            return
+        if self.adjusts_entry_id:
+            raise InvalidLedgerEntry("only an adjustment names an entry it corrects")
         if not self.amount.is_positive:
             raise InvalidLedgerEntry("the amount must be positive")
         if self.entry_type is LedgerEntryType.PAYMENT:
@@ -52,12 +63,25 @@ class LedgerEntry:
         if self.entry_type is LedgerEntryType.EXPIRED_ATTEMPT and not self.reason:
             raise InvalidLedgerEntry("an expired attempt must state its reason (CA-06)")
 
+    def _check_adjustment(self) -> None:
+        """CA-08, T5-P4: signed, never zero; it names the entry it corrects and why."""
+        if self.amount.cents == 0:
+            raise InvalidLedgerEntry("an adjustment is never zero")
+        if not self.adjusts_entry_id:
+            raise InvalidLedgerEntry("an adjustment names the entry it corrects")
+        if not (self.reason or "").strip():
+            raise InvalidLedgerEntry("an adjustment states its motive")
+        if self.disbursement_id or self.payment_id or self.payment_method:
+            raise InvalidLedgerEntry("an adjustment belongs to no disbursement or payment")
+
     @property
     def cash_effect(self) -> Money:
         """RN-03: an expired attempt records the amount but releases nothing. A payment
         adds cash only when it was received in cash (RES-01)."""
         if self.entry_type is LedgerEntryType.DISBURSEMENT:
             return -self.amount
+        if self.entry_type is LedgerEntryType.ADJUSTMENT:
+            return self.amount
         if self.entry_type is LedgerEntryType.PAYMENT and self.payment_method == PaymentMethod.CASH:
             return self.amount
         return Money(0)
@@ -66,4 +90,4 @@ class LedgerEntry:
     def operation_id(self) -> str:
         """INV-02: the disbursement or the payment this entry settles; one entry of each
         type per operation."""
-        return self.disbursement_id or self.payment_id or ""
+        return self.disbursement_id or self.payment_id or self.id
