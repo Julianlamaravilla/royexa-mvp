@@ -10,8 +10,11 @@
       <span class="amount">{{ row.terms.principal.cents | money }}</span>
       <span class="muted">{{ row.terms.installment_count }} cuotas en {{ row.terms.term_days }} días · {{ row.collector_id }}</span>
       <span>{{ row.waiting_text }}</span>
-      <form method="post" action="/web/admin/solicitudes/{{ row.id }}/aprobar">
+      <form method="post" action="/web/admin/solicitudes/{{ row.id }}/aprobar" class="stack">
         <input type="hidden" name="ficha" value="{{ row.approve_token }}">
+        <label>Motivo de la autorización{{ " (obligatorio: supera el límite del cobrador)" if row.over_limit else " (opcional)" }}
+          <input type="text" name="motivo" autocomplete="off" maxlength="300"{{ " required" if row.over_limit else "" }}>
+        </label>
         <button type="submit" class="primary">Aprobar</button>
       </form>
       <form method="post" action="/web/admin/solicitudes/{{ row.id }}/rechazar" class="stack">
