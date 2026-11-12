@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
+from urllib.parse import urlparse
 
-from royexa.adapters.memory import InMemoryStore, InMemoryUnitOfWork
+from royexa.adapters.memory import InMemoryStore, InMemoryUnitOfWork, Tables
 from royexa.adapters.simulated_notifier import SimulatedNotifier
 from royexa.closing.application import (
     CashCloseQueries,
@@ -39,7 +42,7 @@ from royexa.sales.application import (
 from royexa.seed import (
     seed_clients,
     seed_credentials,
-    seed_directory,
+    directory_for,
     seed_loans,
     seed_store,
 )
@@ -61,9 +64,15 @@ class Settings:
     currency_symbol: str = ""
     require_changed_passwords: bool = False
     dispatch_seconds: float = 30.0
+    seed: str = "demo"
+    directory_file: Path | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
+        seed = os.environ.get("ROYEXA_SEED", "demo")
+        if seed not in ("demo", "pilot"):
+            raise ValueError(f"ROYEXA_SEED must be 'demo' or 'pilot', not {seed!r}")
+        directory_file = os.environ.get("ROYEXA_DIRECTORY_FILE")
         minutes = int(os.environ.get("ROYEXA_CODE_TTL_MINUTES", DEFAULT_CODE_TTL_MINUTES))
         return cls(
             code_ttl=timedelta(minutes=minutes),
@@ -73,6 +82,8 @@ class Settings:
             require_changed_passwords=os.environ.get("ROYEXA_REQUIRE_CHANGED_PASSWORDS") == "1",
             currency_symbol=os.environ.get("ROYEXA_CURRENCY_SYMBOL", ""),
             dispatch_seconds=float(os.environ.get("ROYEXA_DISPATCH_SECONDS", "30")),
+            seed=seed,
+            directory_file=Path(directory_file) if directory_file else None,
             session_ttl=timedelta(
                 hours=float(os.environ.get("ROYEXA_SESSION_HOURS", DEFAULT_SESSION_TTL.total_seconds() / 3600))
             ),
@@ -107,6 +118,33 @@ class Container:
     dispatcher: NotificationDispatcher
     notices: NoticeQueries
     context: SalesContext
+    ping: Callable[[], None]
+
+
+def ensure_production_ready(settings: Settings) -> None:
+    """Checked by the production entry point (royexa.main), not by every container the tests
+    build: the strict mode also refuses the known password of the application role."""
+    if (
+        settings.require_changed_passwords
+        and settings.ledger_url
+        and urlparse(settings.ledger_url).password == "royexa_app"
+    ):
+        raise DemoPasswordsInUse(
+            "the strict mode refuses the known password of the royexa_app role: set ROYEXA_APP_PASSWORD"
+        )
+
+
+def database_ping(url: str | None) -> Callable[[], None]:
+    """What /health asks of the database: a query that answers, within five seconds."""
+
+    def ping() -> None:
+        if url:
+            import psycopg
+
+            with psycopg.connect(url, connect_timeout=5) as connection:
+                connection.execute("SELECT 1")
+
+    return ping
 
 
 def build_container(
@@ -124,14 +162,16 @@ def build_container(
             "the strict mode keeps passwords in the database: set ROYEXA_LEDGER_URL"
         )
     hasher = PasswordHasher()
-    store = seed_store(hasher)
-    if settings.ledger_url:
+    pilot = settings.seed == "pilot"
+    # T10-P5: a pilot start keeps no demonstration client, loan or password.
+    store = InMemoryStore(Tables()) if pilot else seed_store(hasher)
+    if settings.ledger_url and not pilot:
         from royexa.adapters.postgres_state import seed_database
 
         # T6-P2: the strict mode seeds no demonstration password at all.
         demo = [] if settings.require_changed_passwords else seed_credentials(hasher)
         seed_database(settings.ledger_url, seed_loans(), seed_clients(), demo)
-    directory = seed_directory()
+    directory = directory_for(settings.seed, settings.directory_file)
     calendar = BusinessCalendar.in_zone(settings.timezone)
 
     def ledger_session():
@@ -180,4 +220,5 @@ def build_container(
         dispatcher=NotificationDispatcher(unit_of_work, notifier, clock),
         notices=NoticeQueries(unit_of_work),
         context=context,
+        ping=database_ping(settings.ledger_url),
     )
