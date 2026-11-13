@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from royexa.bootstrap import Container
@@ -675,6 +675,11 @@ def create_app(container: Container, dispatch_every: float = 0.0) -> FastAPI:
 
     Actor = Annotated[User, Depends(current_actor)]
     Admin = Annotated[User, Depends(current_admin)]
+
+    @app.get("/", include_in_schema=False)
+    def front_door() -> RedirectResponse:
+        """Whoever opens the bare address lands on the web, not on a JSON "Not Found"."""
+        return RedirectResponse("/web/", status_code=303)
 
     @app.get("/health")
     def health() -> JSONResponse:
