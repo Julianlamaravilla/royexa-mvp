@@ -106,3 +106,14 @@ def test_t11a_initials_use_up_to_two_words():
     assert routes.initials("María Fernanda Ruiz") == "MF"
     assert routes.initials("cobrador") == "C"
     assert routes.initials("  ") == "?"
+
+
+def test_t11_the_bare_address_leads_to_the_web_instead_of_a_not_found(container):
+    browser = TestClient(create_app(container), follow_redirects=False)
+
+    for path in ("/", "/web"):
+        response = browser.get(path)
+        assert response.status_code in (303, 307), path
+        assert response.headers["location"].endswith("/web/"), path
+    assert browser.get("/web/").headers["location"] == "/web/login"
+    assert "/" not in {route for route in create_app(container).openapi()["paths"] if route == "/"}, "not in the API docs"
