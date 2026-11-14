@@ -19,7 +19,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from royexa.cash_box.domain import NoOpenCashBox
+from royexa.cash_box.domain import CashBoxClosed, NoOpenCashBox
 from royexa.identity_access.domain import InvalidCredentials, SessionRequired, User
 from royexa.clients.domain import ClientNotFound
 from royexa.loans.domain import LoanNotFound, LoanTerms, exact_decimal
@@ -32,7 +32,8 @@ from royexa.web import messages
 from royexa.web.charts import discrepancy_chart, progress_bar
 from royexa.web.forms import ClaimState, Outcome
 from royexa.web.format import (
-    installments_text, long_date, money, parse_amount, short_date, weekday_name,
+    installments_text, long_date, money, parse_amount, parse_signed_amount, short_date,
+    weekday_name,
 )
 from royexa.web.session import SESSION_COOKIE, clear_session_cookie, set_session_cookie
 
@@ -48,6 +49,7 @@ ADMIN_PATH = "/web/admin"
 CLOSE_PATH = "/web/cierre"
 REQUESTS_PATH = "/web/admin/solicitudes"
 NOTICES_PATH = "/web/admin/avisos"
+LEDGER_PATH = "/web/admin/libro"
 LEDGER_LIMIT = 200
 NEW_DISBURSEMENT_PATH = "/web/desembolso/nuevo"
 
@@ -72,6 +74,8 @@ class WebContainer(Protocol):
     discrepancy_queries: object
     register_payment: object
     register_non_payment: object
+    register_adjustment: object
+    grant_exception: object
     currency_symbol: str
 
 
@@ -160,6 +164,23 @@ async def run_once(
             outcome = Outcome("error", messages.describe(error), ROUTE_PATH)
         await run_in_threadpool(container.form_tokens.finish, token, outcome)
     return _redirect(f"/web/resultado/{token}")
+
+
+def ledger_nodes(entries: list) -> list[dict]:
+    """T14a (CA-08): each original entry with the adjustments that correct it, recursively, the
+    group with the latest activity first. An adjustment is never shown apart from its original."""
+    children: dict[str, list] = {}
+    for entry in entries:
+        if entry.adjusts_entry_id:
+            children.setdefault(entry.adjusts_entry_id, []).append(entry)
+
+    def build(entry) -> dict:
+        nested = [build(child) for child in children.get(entry.id, [])]
+        last = max([entry.server_time, *(node["last"] for node in nested)])
+        return {"entry": entry, "adjustments": nested, "last": last}
+
+    nodes = [build(entry) for entry in entries if not entry.adjusts_entry_id]
+    return sorted(nodes, key=lambda node: node["last"], reverse=True)
 
 
 def _render(container: WebContainer, name: str, status: int = 200, **context) -> HTMLResponse:
@@ -612,8 +633,77 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
             return guard
         entries = await run_in_threadpool(container.queries.ledger)
         return await render_admin(
-            "libro.html", entries=list(reversed(entries))[:LEDGER_LIMIT], limit=LEDGER_LIMIT
+            "libro.html", nodes=ledger_nodes(entries)[:LEDGER_LIMIT], limit=LEDGER_LIMIT
         )
+
+    async def ledger_entry(entry_id: str):
+        entries = await run_in_threadpool(container.queries.ledger)
+        return next((entry for entry in entries if entry.id == entry_id), None)
+
+    @router.get("/admin/libro/{entry_id}/ajuste")
+    async def adjustment_page(entry_id: str, request: Request) -> Response:
+        """T14a (RF-04, CA-08): the form to correct an entry with a new signed one."""
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        token, _ = guard
+        entry = await ledger_entry(entry_id)
+        if entry is None:
+            return _message(
+                container, 404, "Sin asiento", "No se encontró ese asiento del libro.",
+                LEDGER_PATH, "Volver al libro",
+            )
+        form_token = await run_in_threadpool(container.form_tokens.issue, token, f"ajuste:{entry_id}")
+        return await render_admin("ajuste.html", entry=entry, token=form_token)
+
+    @router.post("/admin/libro/{entry_id}/ajuste")
+    async def adjustment(entry_id: str, request: Request) -> Response:
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        back = f"/web/admin/libro/{entry_id}/ajuste"
+
+        def register(user: User, form: dict[str, str]) -> Outcome:
+            cents = parse_signed_amount(form.get("importe", ""))
+            if not cents:
+                return Outcome("error", messages.ADJUSTMENT_AMOUNT, back)
+            if not form.get("motivo", "").strip():
+                return Outcome("error", messages.ADJUSTMENT_MOTIVE, back)
+            try:
+                container.register_adjustment.execute(
+                    user, entry_id, Money(cents), form["motivo"], device_time(form)
+                )
+            except CashBoxClosed:
+                return Outcome("error", messages.ADJUSTMENT_AFTER_CLOSE, LEDGER_PATH)
+            except DomainError as error:
+                return Outcome("error", messages.describe(error), LEDGER_PATH)
+            return Outcome(
+                "ok", "Ajuste registrado. El asiento original no se tocó.", LEDGER_PATH
+            )
+
+        return await run_once(container, request, f"ajuste:{entry_id}", register)
+
+    @router.post("/admin/clientes/{client_id}/excepcion")
+    async def renewal_exception(client_id: str, request: Request) -> Response:
+        """T14a (RN-05, CA-10): the administrator authorizes one renewal with a balance."""
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        back = f"/web/clientes/{client_id}"
+
+        def grant(user: User, form: dict[str, str]) -> Outcome:
+            try:
+                container.grant_exception.execute(user, client_id, form.get("motivo", ""))
+            except DomainError as error:
+                return Outcome("error", messages.describe(error), back)
+            return Outcome(
+                "ok",
+                "Excepción registrada: el cobrador puede solicitar un préstamo nuevo para este "
+                "cliente, una sola vez.",
+                back,
+            )
+
+        return await run_once(container, request, f"excepcion:{client_id}", grant)
 
     @router.get("/admin/clientes")
     async def clients_page(request: Request) -> Response:
@@ -640,7 +730,7 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
     async def file_page(request: Request, name: str, load: Callable, **extra) -> Response:
         """The page of a client or a loan: `load` raises when it does not exist and returns
         the client and the context of the page."""
-        _, user = await current(request)
+        session_token, user = await current(request)
         try:
             client, context = await run_in_threadpool(load)
         except (ClientNotFound, LoanNotFound):
@@ -648,6 +738,10 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         if not await file_access(user, client):
             return file_missing(user, "esa ficha")
         context.update(client=client, **extra)
+        if user.is_admin and any(not item["loan"].is_settled for item in context.get("loans", [])):
+            context["exception_token"] = await run_in_threadpool(
+                container.form_tokens.issue, session_token, f"excepcion:{client.id}"
+            )
         if user.is_admin:
             return await render_admin(name, admin=True, **context)
         return _render(container, name, admin=False, **context)
