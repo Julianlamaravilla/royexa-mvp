@@ -10,7 +10,7 @@
     <li class="card">
       <div class="row">
         <span class="avatar" aria-hidden="true">{{ client.name | initials }}</span>
-        <span class="grow"><strong>{{ client.name }}</strong>{{ ui.badge("info", client.route_id) }}</span>
+        <span class="grow"><strong><a class="plain" href="/web/clientes/{{ client.id }}">{{ client.name }}</a></strong>{{ ui.badge("info", client.route_id) }}</span>
       </div>
       <span class="muted">{{ client.id }}</span>
     </li>

@@ -229,3 +229,18 @@ form.stack + .card, form.stack + .notice, form.stack + section { margin-top: 16p
 .tabs a .count { position: absolute; top: 0; right: 2px; min-width: 18px; height: 18px; font-size: 0.68rem; }
 .notices h2 { margin: 18px 0 8px; font-size: 1.05rem; }
 .reason { color: var(--bad); font-weight: 600; overflow-wrap: anywhere; }
+
+/* Client and loan pages (T13) */
+a.plain { color: inherit; text-decoration: none; }
+.progress { margin: 10px 0 2px; height: 14px; border-radius: 999px; overflow: hidden; background: var(--brand-soft); border: 1px solid var(--line); }
+.progress svg { display: block; width: 100%; height: 100%; }
+.progress .track { fill: var(--brand-soft); }
+.progress .fill { fill: var(--ok); }
+.progress .ticks { stroke: var(--card); stroke-width: 0.35; fill: none; }
+.schedule { counter-reset: none; }
+.inst { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; padding: 10px 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); border-left-width: 5px; }
+.inst .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.inst-n { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-weight: 700; font-size: 0.85rem; }
+.inst-paid { border-left-color: var(--ok); }
+.inst-part { border-left-color: var(--accent); }
+.inst-open { border-left-color: var(--line); }
