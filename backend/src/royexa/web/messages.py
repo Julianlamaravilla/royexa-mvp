@@ -143,6 +143,31 @@ def close_badge(close: CashClose, symbol: str = "") -> str:
     return f"{'Sobran' if gap > 0 else 'Faltan'} {money(abs(gap), symbol)}"
 
 
+NOTICE_KINDS = {
+    "CODIGO_CONFIRMACION": "Código de confirmación",
+    "COMPROBANTE_DESEMBOLSO": "Comprobante de desembolso",
+    "COMPROBANTE_PAGO": "Comprobante de pago",
+}
+NOTICE_STATES = {
+    "ENVIADO": ("ok", "Enviado"),
+    "PENDIENTE": ("wait", "Pendiente"),
+    "FALLIDO": ("bad", "Fallido"),
+}
+
+
+def dispatch_text(attempted: int, sent: int) -> str:
+    """T12: what the administrator reads after asking to retry the pending notices."""
+    if not attempted:
+        return "No había avisos pendientes."
+    if sent == attempted:
+        return "Se envió 1 aviso." if sent == 1 else f"Se enviaron los {sent} avisos."
+    left = attempted - sent
+    return (
+        f"Se intentaron {attempted} avisos: {sent} enviados y {left} siguen sin confirmar. "
+        "Se reintentarán en el próximo despacho."
+    )
+
+
 def describe(error: DomainError) -> str:
     for kind in type(error).__mro__:
         if kind in _MESSAGES:

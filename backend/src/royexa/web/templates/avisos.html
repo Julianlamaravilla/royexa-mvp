@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Avisos · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
+{% macro notice_list(id, title, items) %}
+<section class="notices" id="{{ id }}">
+  <h2>{{ title }}</h2>
+  <ul class="list">
+    {% for item in items %}
+    <li class="card">
+      <div class="row">
+        <span class="avatar" aria-hidden="true">{{ item.client_name | initials }}</span>
+        <span class="grow"><strong>{{ item.client_name }}</strong>{{ ui.badge(item.state_kind, item.state_text) }}</span>
+      </div>
+      <span>{{ item.kind_text }}</span>
+      <span class="muted">{{ item.created_at.strftime("%d/%m/%Y %H:%M") }}{% if item.sent_at %} · enviado {{ item.sent_at.strftime("%d/%m/%Y %H:%M") }}{% endif %}</span>
+      {% if item.attempts and not item.sent_at %}<span class="muted">{{ item.attempts }} de {{ max_attempts }} intentos</span>{% endif %}
+      {% if item.reason and not item.sent_at %}<span class="reason">Motivo: {{ item.reason }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endmacro %}
+{% block body %}
+<main>
+  {{ ui.head("/web/admin", "Inicio", "Avisos a clientes") }}
+  <div class="tiles">
+    <div class="tile t-bad"><strong>{{ groups["FALLIDO"] | length }}</strong><span>fallidos</span></div>
+    <div class="tile t-wait"><strong>{{ groups["PENDIENTE"] | length }}</strong><span>pendientes</span></div>
+    <div class="tile t-ok"><strong>{{ groups["ENVIADO"] | length }}</strong><span>enviados</span></div>
+  </div>
+  {% if retry_token %}
+  <form method="post" action="/web/admin/avisos/reintentar" class="stack">
+    <input type="hidden" name="ficha" value="{{ retry_token }}">
+    <button type="submit" class="primary">{{ ui.icon("send") }} Reintentar envío</button>
+  </form>
+  {% endif %}
+  {% if not total %}
+  {{ ui.empty("bell", "No hay avisos todavía.") }}
+  {% else %}
+  {% if groups["FALLIDO"] %}{{ notice_list("fallidos", "Fallidos: el cliente no recibió el aviso", groups["FALLIDO"]) }}{% endif %}
+  {% if groups["PENDIENTE"] %}{{ notice_list("pendientes", "Pendientes de envío", groups["PENDIENTE"]) }}{% endif %}
+  {% if groups["ENVIADO"] %}{{ notice_list("enviados", "Enviados", groups["ENVIADO"]) }}{% endif %}
+  {% endif %}
+</main>
+{{ ui.admin_nav("avisos", failed_notices) }}
+{% endblock %}
