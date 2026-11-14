@@ -1,18 +1,23 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Cajas cerradas · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
 {% block body %}
 <main>
-  <h1>Cajas cerradas</h1>
+  {{ ui.head("/web/admin", "Inicio", "Cajas cerradas") }}
   <ul class="list">
     {% for row in rows %}
     <li class="card">
-      <strong>{{ row.collector_id }} · {{ row.day | short_date }}</strong>
-      <span>{{ row.summary }}</span>
+      <div class="row">
+        <span class="avatar" aria-hidden="true">{{ row.collector_id | initials }}</span>
+        <span class="grow"><strong>{{ row.collector_id }} · {{ row.day | short_date }}</strong>{{ ui.badge(row.kind, row.badge) }}</span>
+      </div>
+      <span class="muted">{{ row.summary }}</span>
     </li>
     {% else %}
-    <li class="muted">Todavía no hay cajas cerradas.</li>
+    <li>{{ ui.empty("box", "Todavía no hay cajas cerradas.") }}</li>
     {% endfor %}
   </ul>
-  <p><a href="/web/admin">Volver</a></p>
 </main>
+{{ ui.admin_nav("cajas") }}
 {% endblock %}

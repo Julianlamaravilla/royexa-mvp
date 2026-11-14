@@ -1,10 +1,15 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Registrar no pago · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
 {% block body %}
 <main class="narrow">
-  <h1>El cliente no pagó</h1>
+  {{ ui.head("/web/ruta", "Ruta", "El cliente no pagó") }}
   <section class="card">
-    <strong>{{ visit.client_name }}</strong>
+    <div class="row">
+      <span class="avatar" aria-hidden="true">{{ visit.client_name | initials }}</span>
+      <div class="grow"><strong>{{ visit.client_name }}</strong></div>
+    </div>
     <span class="amount">Saldo {{ visit.outstanding.cents | money }}</span>
   </section>
   <form method="post" action="/web/no-pago/{{ visit.loan_id }}" class="stack">
@@ -12,13 +17,15 @@
     <input type="hidden" name="device_time" value="">
     <label>Motivo
       <input type="text" name="motivo" autocomplete="off" required maxlength="300">
+      <span class="hint">Por qué no pagó hoy.</span>
     </label>
     <label>Fecha de compromiso
       <input type="date" name="compromiso" min="{{ earliest }}" required>
+      <span class="hint">El día en que prometió pagar; debe ser posterior a hoy.</span>
     </label>
-    <button type="submit" class="primary">Registrar no pago</button>
+    <button type="submit" class="primary">{{ ui.icon("clock") }} Registrar no pago</button>
   </form>
   <p><a href="/web/pago/{{ visit.loan_id }}">Mejor registrar un pago</a></p>
-  <p><a href="/web/ruta">Volver a la ruta</a></p>
 </main>
+{{ ui.nav("ruta") }}
 {% endblock %}

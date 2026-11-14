@@ -1,29 +1,39 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Cerrar caja · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
 {% block body %}
 <main class="narrow">
-  <h1>Cerrar caja</h1>
+  {{ ui.head("/web/ruta", "Ruta", "Cerrar caja") }}
   {% if box is none %}
-  <p class="notice error">Hoy no es día de cobranza: no hay caja que cerrar.</p>
+  <p class="notice error">{{ ui.icon("alert") }}<span>Hoy no es día de cobranza: no hay caja que cerrar.</span></p>
   {% elif box.closed %}
-  <p class="notice ok">La caja de hoy ya está cerrada.</p>
-  {% if close_text %}<p>{{ close_text }}</p>{% endif %}
+  <p class="notice ok">{{ ui.icon("check") }}<span>La caja de hoy ya está cerrada.</span></p>
+  {% if close_text %}<section class="card"><p>{{ close_text }}</p></section>{% endif %}
   {% elif pending %}
-  <p class="notice error">Aún hay clientes pendientes de visita. Registra su pago o su no pago antes de cerrar:</p>
+  <p class="notice error">{{ ui.icon("alert") }}<span>Aún hay clientes pendientes de visita. Registra su pago o su no pago antes de cerrar:</span></p>
   <ul class="list">
-    {% for item in pending %}<li class="card"><strong>{{ item.client_name }}</strong></li>{% endfor %}
+    {% for item in pending %}
+    <li class="card">
+      <div class="row">
+        <span class="avatar" aria-hidden="true">{{ item.client_name | initials }}</span>
+        <div class="grow"><strong>{{ item.client_name }}</strong></div>
+      </div>
+    </li>
+    {% endfor %}
   </ul>
   {% else %}
-  <p class="notice">El cierre es irreversible. Cuenta el efectivo que entregas y escríbelo: el sistema calcula el descuadre.</p>
+  <p class="notice">{{ ui.icon("lock") }}<span>El cierre es irreversible. Cuenta el efectivo que entregas y escríbelo: el sistema calcula el descuadre.</span></p>
   <form method="post" action="/web/cierre" class="stack">
     <input type="hidden" name="ficha" value="{{ token }}">
     <input type="hidden" name="device_time" value="">
     <label>Efectivo entregado
       <input type="text" name="entregado" inputmode="decimal" autocomplete="off" required placeholder="0,00">
+      <span class="hint">Escríbelo como 1.234,56</span>
     </label>
-    <button type="submit" class="primary">Cerrar caja</button>
+    <button type="submit" class="primary">{{ ui.icon("box") }} Cerrar caja</button>
   </form>
   {% endif %}
-  <p><a href="/web/ruta">Volver a la ruta</a></p>
 </main>
+{{ ui.nav("cierre", "closed" if box and box.closed else "open") }}
 {% endblock %}
