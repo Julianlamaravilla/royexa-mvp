@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Solicitar desembolso · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
 {% block body %}
 <main class="narrow">
-  <h1>Solicitar desembolso</h1>
+  {{ ui.head("/web/ruta", "Ruta", "Solicitar desembolso") }}
   <form method="post" action="/web/desembolso/nuevo" class="stack">
     <input type="hidden" name="ficha" value="{{ token }}">
     <label>Cliente
@@ -11,18 +13,21 @@
         <option value="{{ client.id }}">{{ client.name }}</option>
         {% endfor %}
       </select>
+      <span class="hint">Solo los clientes de tu ruta.</span>
     </label>
     <label>Monto
       <input type="text" name="monto" inputmode="decimal" autocomplete="off" required placeholder="0,00">
+      <span class="hint">Escríbelo como 1.234,56</span>
     </label>
     <label>Plazo en días
       <input type="text" name="plazo" inputmode="numeric" autocomplete="off" required value="20">
     </label>
     <label>Número de cuotas
       <input type="text" name="cuotas" inputmode="numeric" autocomplete="off" required value="20">
+      <span class="hint">Se cobra de lunes a sábado.</span>
     </label>
-    <button type="submit" class="primary">Solicitar</button>
+    <button type="submit" class="primary">{{ ui.icon("send") }} Solicitar</button>
   </form>
-  <p><a href="/web/ruta">Volver a la ruta</a></p>
 </main>
+{{ ui.nav("pedir") }}
 {% endblock %}

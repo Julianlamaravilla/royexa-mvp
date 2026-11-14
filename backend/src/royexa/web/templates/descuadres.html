@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Descuadres · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
 {% block body %}
 <main>
-  <h1>Descuadres del periodo</h1>
+  {{ ui.head("/web/admin", "Inicio", "Descuadres del periodo") }}
   <form method="get" action="/web/admin/descuadres" class="stack">
     <label>Desde
       <input type="date" name="desde" value="{{ report.since.isoformat() if report else since }}">
@@ -10,10 +12,10 @@
     <label>Hasta
       <input type="date" name="hasta" value="{{ report.until.isoformat() if report else until }}">
     </label>
-    <button type="submit" class="primary">Consultar</button>
+    <button type="submit" class="primary">{{ ui.icon("chart") }} Consultar</button>
   </form>
   {% if error %}
-  <p class="notice error" role="alert">{{ error }}</p>
+  <p class="notice error" role="alert">{{ ui.icon("alert") }}<span>{{ error }}</span></p>
   {% elif report %}
   <section class="card">
     {% if report.count %}
@@ -24,23 +26,41 @@
     {% endif %}
   </section>
 
-  <section>
-    <h2>Detalle</h2>
-    <ul class="list">
-      {% for item in report.items %}
-      <li class="card">
-        <strong>{{ item.day | short_date }} · {{ item.collector_id }}</strong>
-        <span class="amount">{{ item.discrepancy.cents | money }}</span>
-        <span class="muted">Esperado {{ item.expected.cents | money }} · Entregado {{ item.delivered.cents | money }}</span>
-      </li>
-      {% else %}
-      <li class="muted">Ninguno.</li>
-      {% endfor %}
-    </ul>
-  </section>
+  <div class="tiles">
+    <div class="tile t-bad"><strong>{{ report.items | selectattr("discrepancy.cents", "lt", 0) | list | length }}</strong><span>Faltantes</span></div>
+    <div class="tile t-ok"><strong>{{ report.items | selectattr("discrepancy.cents", "gt", 0) | list | length }}</strong><span>Sobrantes</span></div>
+    <div class="tile t-wait"><strong>{{ report.unclosed | length }}</strong><span>Sin cerrar</span></div>
+  </div>
 
   <section>
-    <h2>Evolución</h2>
+    <h2>{{ ui.icon("chart") }}Evolución</h2>
+    {% if chart %}
+    <div class="card">
+      <svg class="chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-labelledby="chart-title chart-desc" focusable="false">
+        <title id="chart-title">Descuadres por día de cobranza</title>
+        <desc id="chart-desc">Del {{ report.since | short_date }} al {{ report.until | short_date }}: {{ report.count }} descuadre{{ "" if report.count == 1 else "s" }}. Faltantes {{ report.shortage.cents | money }}, sobrantes {{ report.surplus.cents | money }}. Las barras hacia abajo son faltantes y las barras hacia arriba son sobrantes.</desc>
+        <defs>
+          <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect class="hatch-bg" width="6" height="6"/>
+            <line class="hatch-line" x1="0" y1="0" x2="0" y2="6"/>
+          </pattern>
+        </defs>
+        <line class="axis" x1="{{ chart.left }}" y1="{{ chart.axis_y }}" x2="{{ chart.right }}" y2="{{ chart.axis_y }}"/>
+        {% for bar in chart.bars %}
+        <rect class="bar bar-{{ bar.kind }}" x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.width }}" height="{{ bar.height }}"><title>{{ bar.label }}</title></rect>
+        {% endfor %}
+        {% for label in chart.labels %}
+        <text class="tick" x="{{ label.x }}" y="{{ chart.height - 4 }}">{{ label.text }}</text>
+        {% endfor %}
+      </svg>
+      <ul class="key">
+        <li class="key-short">Faltante: la barra cuelga hacia abajo.</li>
+        <li class="key-surplus">Sobrante: la barra sube hacia arriba.</li>
+      </ul>
+    </div>
+    {% else %}
+    {{ ui.empty("check", "Sin descuadres en el periodo: no hay barras que mostrar.") }}
+    {% endif %}
     <ul class="list">
       {% for day in report.days %}
       <li class="card">
@@ -52,7 +72,24 @@
   </section>
 
   <section>
-    <h2>Cajas sin cerrar</h2>
+    <h2>{{ ui.icon("alert") }}Detalle</h2>
+    <ul class="list">
+      {% for item in report.items %}
+      <li class="card">
+        <div class="row">
+          <span class="grow"><strong>{{ item.day | short_date }} · {{ item.collector_id }}</strong>{{ ui.badge("bad" if item.discrepancy.cents < 0 else "ok", "Faltante" if item.discrepancy.cents < 0 else "Sobrante") }}</span>
+          <span class="amount {{ 'amount-out' if item.discrepancy.cents < 0 else 'amount-in' }}">{{ item.discrepancy.cents | money }}</span>
+        </div>
+        <span class="muted">Esperado {{ item.expected.cents | money }} · Entregado {{ item.delivered.cents | money }}</span>
+      </li>
+      {% else %}
+      <li>{{ ui.empty("check", "Ninguno.") }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section>
+    <h2>{{ ui.icon("lock") }}Cajas sin cerrar</h2>
     <ul class="list">
       {% for box in report.unclosed %}
       <li class="card"><strong>{{ box.day | short_date }} · {{ box.collector_id }}</strong></li>
@@ -62,6 +99,6 @@
     </ul>
   </section>
   {% endif %}
-  <p><a href="/web/admin">Volver</a></p>
 </main>
+{{ ui.admin_nav("descuadres") }}
 {% endblock %}
