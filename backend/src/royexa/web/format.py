@@ -2,6 +2,9 @@
 
 import re
 from datetime import date
+from fractions import Fraction
+
+from royexa.loans.domain import exact_decimal
 
 MONTHS = (
     "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre"
@@ -16,6 +19,10 @@ def money(cents: int, symbol: str = "") -> str:
     number = f"{whole:,}".replace(",", ".") + f",{fraction:02d}"
     sign = "-" if cents < 0 else ""
     return f"{sign}{symbol} {number}" if symbol else f"{sign}{number}"
+
+
+def weekday_name(day: date) -> str:
+    return WEEKDAYS[day.weekday()][:3]
 
 
 def long_date(day: date) -> str:
@@ -38,3 +45,14 @@ def parse_amount(text: str) -> int | None:
         return None
     whole, _, fraction = text.replace(".", "").partition(",")
     return int(whole) * 100 + int(fraction.ljust(2, "0") or 0)
+
+
+def installments_text(value: Fraction) -> str:
+    """The fractional counter in Spanish and never rounded (RN-01, T13): a finite decimal with
+    a comma (19,5); when there is none, the whole part and the exact fraction (18 y 5/6)."""
+    text = exact_decimal(value)
+    if "/" not in text:
+        return text.replace(".", ",")
+    whole, rest = divmod(value.numerator, value.denominator)
+    fraction = f"{rest}/{value.denominator}"
+    return f"{whole} y {fraction}" if whole else fraction

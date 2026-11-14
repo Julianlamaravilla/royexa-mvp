@@ -111,3 +111,45 @@ def test_t12_the_notices_page_and_the_six_tabs_fit_a_phone(server, phone):
     phone.goto(f"{server.url}/web/admin/avisos")
     assert phone.locator("section#enviados").count() == 1
     _fits(phone)
+
+
+def test_t13_the_client_and_loan_pages_fit_a_phone(server, phone):
+    """T13: the schedule of 20 installments is a stack of cards, the progress bar is drawn and
+    nothing scrolls sideways at 360 px, for the administrator and for the collector."""
+    collector = _api(server, "cobrador-1")
+    admin = _api(server, "admin-1")
+    asked = collector.post(
+        "/v1/disbursements",
+        json={"client_id": "cliente-1", "amount_cents": 100_000, "term_days": 20, "installment_count": 20},
+    ).json()
+    admin.post(f"/v1/disbursements/{asked['id']}/approve", json={})
+    server.notifier.failing = False
+    admin.post("/v1/notifications/dispatch")
+    code = next(s.payload["code"] for s in server.notifier.delivered if "code" in s.payload)
+    done = collector.post(
+        f"/v1/disbursements/{asked['id']}/confirm",
+        json={"code": code, "device_time": "2026-10-30T13:59:00+00:00"},
+    )
+    assert done.status_code == 200, done.text
+    loan = done.json()["loan"]["id"]
+    collector.post(
+        f"/v1/loans/{loan}/payments",
+        json={"amount_cents": 3_000, "method": "EFECTIVO", "device_time": "2026-10-30T14:00:00+00:00"},
+    )
+
+    for user, landing in (("admin-1", "/web/admin"), ("cobrador-1", "/web/ruta")):
+        phone.context.clear_cookies()
+        _login(phone, server, user, landing)
+        phone.goto(f"{server.url}/web/clientes/cliente-1")
+        assert phone.locator(f"a[href='/web/prestamos/{loan}']").count() == 1
+        _fits(phone)
+        phone.goto(f"{server.url}/web/prestamos/{loan}")
+        _fits(phone)
+        assert phone.locator("li.inst").count() == 20
+        bar = phone.locator("[role=progressbar]").bounding_box()
+        assert 0 <= bar["x"] and bar["x"] + bar["width"] <= PHONE["width"] and bar["height"] >= 8
+        rows = phone.locator("li.inst").evaluate_all(
+            "items => items.map(i => { const b = i.getBoundingClientRect(); return [b.left, b.right]; })"
+        )
+        assert all(left >= 0 and right <= PHONE["width"] for left, right in rows), rows
+        assert "19,5 de 20" in phone.inner_text("body")
