@@ -77,3 +77,7 @@ class NoticeQueries:
     ) -> list[OutboxMessage]:
         with self._uow() as uow:
             return uow.outbox.all(disbursement_id, payment_id)
+
+    def failed_count(self) -> int:
+        """The number the administrator's menu shows (T12)."""
+        return sum(1 for message in self.list() if message.status is NoticeStatus.FAILED)

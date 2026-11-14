@@ -18,6 +18,7 @@
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></symbol>
   <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 13.5 6.5 6h11L20 13.5V18a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13.5h4.5a3.5 3.5 0 0 0 7 0H20"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M20 4 4 11l6 2.5L12.5 20 20 4zM10 13.5 20 4"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></symbol>
 </svg>
 {% endmacro %}
 
@@ -55,12 +56,13 @@
 {% endmacro %}
 
 {# The administrator's bottom tabs; `active` is the page being shown. #}
-{% macro admin_nav(active) %}
+{% macro admin_nav(active, failed=0) %}
 <nav class="tabs" aria-label="Administración">
   <a href="/web/admin/solicitudes"{% if active == "solicitudes" %} aria-current="page"{% endif %}>{{ icon("inbox") }}<span>Solicitudes</span></a>
   <a href="/web/admin/libro"{% if active == "libro" %} aria-current="page"{% endif %}>{{ icon("book") }}<span>Libro</span></a>
   <a href="/web/admin/clientes"{% if active == "clientes" %} aria-current="page"{% endif %}>{{ icon("users") }}<span>Clientes</span></a>
   <a href="/web/admin/cajas"{% if active == "cajas" %} aria-current="page"{% endif %}>{{ icon("box") }}<span>Cajas</span></a>
   <a href="/web/admin/descuadres"{% if active == "descuadres" %} aria-current="page"{% endif %}>{{ icon("chart") }}<span>Descuadres</span></a>
+  <a href="/web/admin/avisos"{% if active == "avisos" %} aria-current="page"{% endif %}>{{ icon("bell") }}<span>Avisos</span>{% if failed %}<span class="count">{{ failed }}</span>{% endif %}</a>
 </nav>
 {% endmacro %}
