@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Préstamo de {{ client.name }} · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
+{% block body %}
+<main>
+  {{ ui.head("/web/clientes/" ~ client.id, client.name, "Préstamo") }}
+  <section class="card">
+    <div class="row">
+      <span class="grow">
+        <strong>Faltan {{ loan.remaining_installments | counter }} de {{ bar.max }} cuotas</strong>
+        <span class="muted">Capital {{ loan.principal.cents | money }} · Interés {{ loan.interest.cents | money }}</span>
+      </span>
+      {% if loan.is_settled %}{{ ui.badge("ok", "Liquidado") }}{% else %}{{ ui.badge("wait", "Activo") }}{% endif %}
+    </div>
+    <div class="progress" role="progressbar" aria-label="Avance del préstamo" aria-valuemin="0" aria-valuemax="{{ bar.max }}" aria-valuenow="{{ bar.now }}" aria-valuetext="{{ bar.text }}">
+      <svg viewBox="0 0 {{ bar.track }} 8" preserveAspectRatio="none" focusable="false" aria-hidden="true">
+        <rect class="track" x="0" y="0" width="{{ bar.track }}" height="8"/>
+        <rect class="fill" x="0" y="0" width="{{ bar.width }}" height="8"/>
+        {% if bar.ticks %}<path class="ticks" d="{{ bar.ticks }}"/>{% endif %}
+      </svg>
+    </div>
+    <p class="amount">Saldo {{ loan.outstanding.cents | money }}</p>
+  </section>
+
+  <section id="calendario">
+    <h2>{{ ui.icon("clock") }}Calendario de cuotas ({{ bar.max }})</h2>
+    <ol class="list schedule">
+      {% for item in loan.installments %}
+      <li class="inst {{ 'inst-paid' if not item.pending.cents else ('inst-part' if item.paid.cents else 'inst-open') }}">
+        <span class="inst-n">{{ item.sequence }}</span>
+        <span class="grow"><time datetime="{{ item.due_date.isoformat() }}">{{ item.due_date | weekday }} {{ item.due_date | short_date }}</time>
+          {% if item.paid.cents and item.pending.cents %}<span class="muted">Pagado {{ item.paid.cents | money }} · falta {{ item.pending.cents | money }}</span>{% endif %}</span>
+        <span class="right">{{ item.amount.cents | money }}</span>
+        {% if not item.pending.cents %}{{ ui.badge("ok", "Pagada") }}{% elif item.paid.cents %}{{ ui.badge("wait", "Parcial") }}{% else %}{{ ui.badge("info", "Pendiente") }}{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section id="pagos">
+    <h2>{{ ui.icon("check") }}Pagos ({{ payments | length }})</h2>
+    <ul class="list">
+      {% for payment, day in payments %}
+      <li class="card">
+        <div class="row">
+          <span class="grow"><strong>{{ payment.amount.cents | money }}</strong><span class="muted">{{ day | short_date }}</span></span>
+          {{ ui.badge("ok" if payment.method.value == "EFECTIVO" else "info", "Efectivo" if payment.method.value == "EFECTIVO" else "Transferencia") }}
+        </div>
+      </li>
+      {% else %}
+      <li class="muted">Todavía no hay pagos.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section id="no-pagos">
+    <h2>{{ ui.icon("x") }}No pagos ({{ refusals | length }})</h2>
+    <ul class="list">
+      {% for refusal, day in refusals %}
+      <li class="card">
+        <strong>{{ refusal.reason }}</strong>
+        <span class="muted">Visita del {{ day | short_date }} · compromiso {{ refusal.commitment_date | short_date }}</span>
+      </li>
+      {% else %}
+      <li class="muted">Todavía no hay no pagos.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</main>
+{% if admin %}{{ ui.admin_nav("clientes", failed_notices) }}{% else %}{{ ui.nav("ruta") }}{% endif %}
+{% endblock %}
