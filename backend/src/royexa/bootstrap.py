@@ -14,6 +14,7 @@ from royexa.adapters.simulated_notifier import SimulatedNotifier
 from royexa.closing.application import (
     CashCloseQueries,
     CloseCashBox,
+    CashFlowQueries,
     DiscrepancyQueries,
     RegisterAdjustment,
 )
@@ -103,6 +104,7 @@ class Container:
     close_cash_box: CloseCashBox
     cash_close_queries: CashCloseQueries
     discrepancy_queries: DiscrepancyQueries
+    cash_flow_queries: CashFlowQueries
     authenticator: Authenticator
     form_tokens: FormTokens
     currency_symbol: str
@@ -206,6 +208,7 @@ def build_container(
         close_cash_box=CloseCashBox(unit_of_work, clock, directory, calendar),
         cash_close_queries=CashCloseQueries(unit_of_work),
         discrepancy_queries=DiscrepancyQueries(unit_of_work, clock, calendar),
+        cash_flow_queries=CashFlowQueries(unit_of_work, clock, calendar),
         authenticator=Authenticator(unit_of_work, clock, directory, hasher, settings.session_ttl),
         form_tokens=FormTokens(unit_of_work, clock),
         currency_symbol=settings.currency_symbol,

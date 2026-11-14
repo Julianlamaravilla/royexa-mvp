@@ -47,6 +47,15 @@ def parse_amount(text: str) -> int | None:
     return int(whole) * 100 + int(fraction.ljust(2, "0") or 0)
 
 
+def parse_signed_amount(text: str) -> int | None:
+    """T14a: an amount with its sign, -25,00 or +10 or 1.000, as signed cents; None when it is
+    not clear. No sign means positive. The caller refuses zero."""
+    text = text.strip()
+    sign = -1 if text.startswith("-") else 1
+    cents = parse_amount(text[1:] if text[:1] in "+-" and text else text)
+    return None if cents is None else sign * cents
+
+
 def installments_text(value: Fraction) -> str:
     """The fractional counter in Spanish and never rounded (RN-01, T13): a finite decimal with
     a comma (19,5); when there is none, the whole part and the exact fraction (18 y 5/6)."""

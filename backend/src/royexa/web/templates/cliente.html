@@ -32,6 +32,20 @@
       {% endfor %}
     </ul>
   </section>
+  {% if exception_token %}
+  <section class="card" id="excepcion">
+    <h2>{{ ui.icon("lock") }}Autorizar renovación</h2>
+    <p class="muted">El cliente tiene un préstamo sin liquidar. Con esta excepción el cobrador podrá solicitarle uno nuevo, una sola vez.</p>
+    <form method="post" action="/web/admin/clientes/{{ client.id }}/excepcion" class="stack">
+      <input type="hidden" name="ficha" value="{{ exception_token }}">
+      <label>Motivo
+        <input type="text" name="motivo" autocomplete="off" required maxlength="300">
+        <span class="hint">Por qué se autoriza la renovación.</span>
+      </label>
+      <button type="submit" class="primary">{{ ui.icon("check") }} Autorizar renovación</button>
+    </form>
+  </section>
+  {% endif %}
 </main>
 {% if admin %}{{ ui.admin_nav("clientes", failed_notices) }}{% else %}{{ ui.nav("ruta") }}{% endif %}
 {% endblock %}
