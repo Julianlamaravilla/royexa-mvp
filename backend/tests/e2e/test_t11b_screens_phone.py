@@ -67,3 +67,47 @@ def test_t11b_the_admin_pages_and_the_chart_fit_a_phone(server, phone):
         "rects => rects.map(r => { const b = r.getBoundingClientRect(); return [b.width, b.height]; })"
     )
     assert all(width > 2 and height > 0 for width, height in sizes), sizes
+
+
+def test_t12_the_notices_page_and_the_six_tabs_fit_a_phone(server, phone):
+    """T12: a failed notice with its reason, a pending one and the failed counter on the tab
+    bar, none of it scrolling sideways at 360 px; the retry button works from the phone."""
+    collector = _api(server, "cobrador-1")
+    admin = _api(server, "admin-1")
+    server.notifier.failing = True
+    asked = collector.post(
+        "/v1/disbursements",
+        json={"client_id": "cliente-1", "amount_cents": 100_000, "term_days": 20, "installment_count": 20},
+    ).json()
+    assert admin.post(f"/v1/disbursements/{asked['id']}/approve", json={}).status_code == 200
+    for _ in range(5):
+        admin.post("/v1/notifications/dispatch")
+
+    _login(phone, server, "admin-1", "/web/admin")
+    _fits(phone)
+    assert phone.locator("nav.tabs .count").inner_text() == "1"
+    phone.goto(f"{server.url}/web/admin/avisos")
+    _fits(phone)
+    assert phone.locator("section#fallidos .reason").count() == 1
+    assert phone.locator("nav.tabs a[aria-current=page]").count() == 1
+    tabs = phone.locator("nav.tabs").bounding_box()
+    assert tabs["x"] >= 0 and tabs["x"] + tabs["width"] <= PHONE["width"]
+    boxes = phone.locator("nav.tabs a").evaluate_all(
+        "links => links.map(a => { const b = a.getBoundingClientRect(); return [b.left, b.right]; })"
+    )
+    assert all(left >= 0 and right <= PHONE["width"] for left, right in boxes), boxes
+
+    server.notifier.failing = False
+    other = collector.post(
+        "/v1/disbursements",
+        json={"client_id": "cliente-3", "amount_cents": 50_000, "term_days": 20, "installment_count": 20},
+    ).json()
+    admin.post(f"/v1/disbursements/{other['id']}/approve", json={})
+    phone.goto(f"{server.url}/web/admin/avisos")
+    phone.click("button:has-text('Reintentar envío')")
+    phone.wait_for_url("**/web/resultado/**")
+    assert "Se envió 1 aviso" in phone.inner_text("body")
+    _fits(phone)
+    phone.goto(f"{server.url}/web/admin/avisos")
+    assert phone.locator("section#enviados").count() == 1
+    _fits(phone)

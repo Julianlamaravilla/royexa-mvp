@@ -24,6 +24,7 @@ from royexa.identity_access.domain import InvalidCredentials, SessionRequired, U
 from royexa.loans.domain import LoanTerms, exact_decimal
 from royexa.sales.domain import DisbursementNotFound, DisbursementStatus
 from royexa.shared.money import Money
+from royexa.shared.outbox import MAX_DELIVERY_ATTEMPTS
 from royexa.shared.payments import PaymentMethod
 from royexa.shared.errors import DomainError
 from royexa.web import messages
@@ -43,6 +44,7 @@ ROUTE_PATH = "/web/ruta"
 ADMIN_PATH = "/web/admin"
 CLOSE_PATH = "/web/cierre"
 REQUESTS_PATH = "/web/admin/solicitudes"
+NOTICES_PATH = "/web/admin/avisos"
 LEDGER_LIMIT = 200
 NEW_DISBURSEMENT_PATH = "/web/desembolso/nuevo"
 
@@ -58,6 +60,7 @@ class WebContainer(Protocol):
     approve: object
     reject: object
     dispatcher: object
+    notices: object
     close_cash_box: object
     cash_close_queries: object
     discrepancy_queries: object
@@ -524,6 +527,11 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         token, user = await current(request)
         return (token, user) if user.is_admin else _redirect(ROUTE_PATH)
 
+    async def render_admin(name: str, **context) -> Response:
+        """An administrator page: the menu carries the count of failed notices (T12)."""
+        failed = await run_in_threadpool(container.notices.failed_count)
+        return _render(container, name, failed_notices=failed, **context)
+
     @router.get("/admin")
     async def admin_page(request: Request) -> Response:
         guard = await admin_only(request)
@@ -532,8 +540,8 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         token, user = guard
         logout_token = await run_in_threadpool(container.form_tokens.issue, token, "salir")
         waiting = await run_in_threadpool(container.queries.awaiting_decision)
-        return _render(
-            container, "admin.html", user=user, logout_token=logout_token, waiting=len(waiting)
+        return await render_admin(
+            "admin.html", user=user, logout_token=logout_token, waiting=len(waiting)
         )
 
     @router.get("/admin/solicitudes")
@@ -561,7 +569,7 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
                     "reject_token": reject,
                 }
             )
-        return _render(container, "solicitudes.html", rows=rows)
+        return await render_admin("solicitudes.html", rows=rows)
 
     def decision(verb: str, past: str) -> Callable:
         async def handler(disbursement_id: str, request: Request) -> Response:
@@ -595,8 +603,8 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         if isinstance(guard, Response):
             return guard
         entries = await run_in_threadpool(container.queries.ledger)
-        return _render(
-            container, "libro.html", entries=list(reversed(entries))[:LEDGER_LIMIT], limit=LEDGER_LIMIT
+        return await render_admin(
+            "libro.html", entries=list(reversed(entries))[:LEDGER_LIMIT], limit=LEDGER_LIMIT
         )
 
     @router.get("/admin/clientes")
@@ -604,8 +612,8 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         guard = await admin_only(request)
         if isinstance(guard, Response):
             return guard
-        return _render(
-            container, "clientes.html", clients=await run_in_threadpool(container.client_queries.all)
+        return await render_admin(
+            "clientes.html", clients=await run_in_threadpool(container.client_queries.all)
         )
 
     @router.get("/admin/descuadres")
@@ -630,8 +638,8 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         if report is not None and report.count:
             symbol = container.currency_symbol
             chart = discrepancy_chart(report.days, lambda cents: money(cents, symbol))
-        return _render(
-            container, "descuadres.html", report=report, error=error, chart=chart,
+        return await render_admin(
+            "descuadres.html", report=report, error=error, chart=chart,
             since=asked.get("desde", ""), until=asked.get("hasta", ""),
         )
 
@@ -651,7 +659,54 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
             }
             for close in reversed(closes)
         ]
-        return _render(container, "cajas.html", rows=rows)
+        return await render_admin("cajas.html", rows=rows)
+
+    @router.get("/admin/avisos")
+    async def notices_page(request: Request) -> Response:
+        """T12 (RF-06, CA-12, EC-04): the same query as GET /v1/notifications, by state."""
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+        token, _ = guard
+        names = await client_names()
+        found = await run_in_threadpool(container.notices.list)
+        groups: dict[str, list[dict]] = {"FALLIDO": [], "PENDIENTE": [], "ENVIADO": []}
+        for message in sorted(found, key=lambda item: item.created_at, reverse=True):
+            kind, label = messages.NOTICE_STATES[message.status.value]
+            groups[message.status.value].append(
+                {
+                    "client_name": names.get(message.client_id, message.client_id),
+                    "kind_text": messages.NOTICE_KINDS[message.kind.value],
+                    "state_kind": kind,
+                    "state_text": label,
+                    "attempts": message.attempts,
+                    "reason": message.last_error,
+                    "created_at": message.created_at,
+                    "sent_at": message.sent_at,
+                }
+            )
+        retry_token = None
+        if groups["PENDIENTE"]:
+            retry_token = await run_in_threadpool(container.form_tokens.issue, token, "avisos")
+        return await render_admin(
+            "avisos.html",
+            groups=groups,
+            retry_token=retry_token,
+            max_attempts=MAX_DELIVERY_ATTEMPTS,
+            total=len(found),
+        )
+
+    @router.post("/admin/avisos/reintentar")
+    async def retry_notices(request: Request) -> Response:
+        guard = await admin_only(request)
+        if isinstance(guard, Response):
+            return guard
+
+        def retry(user: User, form: dict[str, str]) -> Outcome:
+            report = container.dispatcher.dispatch()
+            return Outcome("ok", messages.dispatch_text(report.attempted, report.sent), NOTICES_PATH)
+
+        return await run_once(container, request, "avisos", retry)
 
     @router.get("/resultado/{token}")
     async def result_page(token: str, request: Request) -> Response:

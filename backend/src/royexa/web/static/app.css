@@ -218,3 +218,14 @@ a.card.menu::after { content: "\203A"; color: var(--brand); font-weight: 700; fo
 .key-surplus::before { background: var(--ok); }
 
 form.stack + .card, form.stack + .notice, form.stack + section { margin-top: 16px; }
+
+/* Notices page and the failed counter (T12) */
+.tabs a { position: relative; }
+.tabs[aria-label="Administración"] a { flex: 1 1 auto; padding: 6px 3px; }
+.count {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px;
+  padding: 0 6px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 0.74rem; font-weight: 700;
+}
+.tabs a .count { position: absolute; top: 0; right: 2px; min-width: 18px; height: 18px; font-size: 0.68rem; }
+.notices h2 { margin: 18px 0 8px; font-size: 1.05rem; }
+.reason { color: var(--bad); font-weight: 600; overflow-wrap: anywhere; }
