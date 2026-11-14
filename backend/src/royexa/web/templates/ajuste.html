@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Ajustar asiento · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
+{% block body %}
+<main class="narrow">
+  {{ ui.head("/web/admin/libro", "Libro", "Ajustar un asiento") }}
+  <section class="card">
+    <div class="row">
+      <span class="grow"><strong>{{ ui.badge("info", entry.entry_type.value) }}</strong></span>
+      <span class="amount">{{ entry.amount.cents | money }}</span>
+    </div>
+    <span class="muted">{{ entry.cash_box_id }} · {{ entry.actor_id }} · {{ entry.server_time.strftime("%d/%m/%Y %H:%M") }}</span>
+    {% if entry.reason %}<span>{{ entry.reason }}</span>{% endif %}
+  </section>
+  <p class="notice info">{{ ui.icon("lock") }}<span>El asiento original no se modifica: el ajuste es un asiento nuevo, en la caja de hoy del cobrador.</span></p>
+  <form method="post" action="/web/admin/libro/{{ entry.id }}/ajuste" class="stack">
+    <input type="hidden" name="ficha" value="{{ token }}">
+    <input type="hidden" name="device_time" value="">
+    <label>Importe con signo
+      <input type="text" name="importe" inputmode="text" autocomplete="off" required placeholder="-25,00">
+      <span class="hint">Con menos (-) resta del efectivo y con más (+) suma. No puede ser cero.</span>
+    </label>
+    <label>Motivo
+      <input type="text" name="motivo" autocomplete="off" required maxlength="300">
+      <span class="hint">Por qué se corrige este asiento.</span>
+    </label>
+    <button type="submit" class="primary">{{ ui.icon("check") }} Registrar ajuste</button>
+  </form>
+</main>
+{{ ui.admin_nav("libro", failed_notices) }}
+{% endblock %}

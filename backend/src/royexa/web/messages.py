@@ -1,6 +1,7 @@
 """What the pages say when the domain refuses something. T7d closes the list."""
 
 from royexa.cash_box.domain import (
+    AdjustmentNotAllowed,
     CashBoxClosed,
     CashClose,
     CashCloseNotAllowed,
@@ -11,6 +12,7 @@ from royexa.cash_box.domain import (
 from royexa.clients.domain import ClientNotFound
 from royexa.loans.domain import (
     InvalidCommitmentDate,
+    ExceptionNotAllowed,
     InvalidLoanTerms,
     LoanAlreadySettled,
     LoanNotFound,
@@ -36,6 +38,7 @@ from royexa.sales.domain import (
     RequesterNotAllowed,
     ValidatorNotAllowed,
 )
+from royexa.ledger.domain import InvalidLedgerEntry
 from royexa.web.format import money
 from royexa.shared.errors import DomainError, NotFound, WriteConflict
 from royexa.shared.money import InvalidAmount
@@ -78,7 +81,23 @@ _MESSAGES: dict[type[DomainError], str] = {
     InvalidTransition: "La solicitud no está en un estado que permita esta operación.",
     DisbursementNotFound: "No se encontró la solicitud.",
     NotFound: "No se encontró lo que se pedía.",
+    AdjustmentNotAllowed: "Solo un administrador registra un ajuste.",
+    InvalidLedgerEntry: "El ajuste no es válido: el importe no puede ser cero y el motivo es obligatorio.",
+    ExceptionNotAllowed: (
+        "No se puede autorizar la excepción: solo un administrador la da y el cliente debe "
+        "tener un préstamo sin liquidar."
+    ),
 }
+
+ADJUSTMENT_AMOUNT = (
+    "Escribe el importe del ajuste con su signo, por ejemplo -25,00 o +10,00. "
+    "No puede ser cero."
+)
+ADJUSTMENT_MOTIVE = "Escribe el motivo del ajuste."
+ADJUSTMENT_AFTER_CLOSE = (
+    "La caja del cobrador ya está cerrada hoy. Registra el ajuste mañana: caerá en la caja "
+    "nueva y el cierre no cambia."
+)
 
 
 _STATUS = {

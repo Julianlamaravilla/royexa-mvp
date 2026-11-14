@@ -1,0 +1,47 @@
+{# The two server-drawn charts of the discrepancies page and of the administrator's panel (T11b, T14b). #}
+{% macro discrepancies(chart, report) %}
+<div class="card">
+  <svg class="chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-labelledby="chart-title chart-desc" focusable="false">
+    <title id="chart-title">Descuadres por día de cobranza</title>
+    <desc id="chart-desc">Del {{ report.since | short_date }} al {{ report.until | short_date }}: {{ report.count }} descuadre{{ "" if report.count == 1 else "s" }}. Faltantes {{ report.shortage.cents | money }}, sobrantes {{ report.surplus.cents | money }}. Las barras hacia abajo son faltantes y las barras hacia arriba son sobrantes.</desc>
+    <defs>
+      <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect class="hatch-bg" width="6" height="6"/>
+        <line class="hatch-line" x1="0" y1="0" x2="0" y2="6"/>
+      </pattern>
+    </defs>
+    <line class="axis" x1="{{ chart.left }}" y1="{{ chart.axis_y }}" x2="{{ chart.right }}" y2="{{ chart.axis_y }}"/>
+    {% for bar in chart.bars %}
+    <rect class="bar bar-{{ bar.kind }}" x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.width }}" height="{{ bar.height }}"><title>{{ bar.label }}</title></rect>
+    {% endfor %}
+    {% for label in chart.labels %}
+    <text class="tick" x="{{ label.x }}" y="{{ chart.height - 4 }}">{{ label.text }}</text>
+    {% endfor %}
+  </svg>
+  <ul class="key">
+    <li class="key-short">Faltante: la barra cuelga hacia abajo.</li>
+    <li class="key-surplus">Sobrante: la barra sube hacia arriba.</li>
+  </ul>
+</div>
+{% endmacro %}
+
+{% macro flow(chart, report) %}
+<div class="card">
+  <svg class="chart chart-flow" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-labelledby="flow-title flow-desc" focusable="false">
+    <title id="flow-title">Cobrado y desembolsado por día de cobranza</title>
+    <desc id="flow-desc">Del {{ report.since | short_date }} al {{ report.until | short_date }}: Cobrado {{ report.collected.cents | money }} y Desembolsado {{ report.disbursed.cents | money }}. Cada día tiene dos barras: la maciza es lo cobrado y la de contorno es lo desembolsado.</desc>
+    <text class="side" x="{{ chart.left }}" y="10">Máximo {{ chart.scale }}</text>
+    <line class="axis" x1="{{ chart.left }}" y1="{{ chart.axis_y }}" x2="{{ chart.right }}" y2="{{ chart.axis_y }}"/>
+    {% for bar in chart.bars %}
+    <rect class="bar bar-{{ bar.kind }}" x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.width }}" height="{{ bar.height }}"><title>{{ bar.label }}</title></rect>
+    {% endfor %}
+    {% for label in chart.labels %}
+    <text class="tick" x="{{ label.x }}" y="{{ chart.height - 4 }}">{{ label.text }}</text>
+    {% endfor %}
+  </svg>
+  <ul class="key">
+    <li class="key-collected">Cobrado {{ report.collected.cents | money }}: barra maciza.</li>
+    <li class="key-disbursed">Desembolsado {{ report.disbursed.cents | money }}: barra de contorno.</li>
+  </ul>
+</div>
+{% endmacro %}

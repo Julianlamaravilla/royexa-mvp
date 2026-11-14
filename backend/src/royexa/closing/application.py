@@ -23,7 +23,7 @@ from royexa.cash_box.domain import (
 )
 from royexa.cash_box.ports import CashCloseRepository, CashRepository
 from royexa.identity_access.domain import Directory, User
-from royexa.ledger.domain import LedgerEntry, LedgerEntryNotFound
+from royexa.ledger.domain import LedgerEntry, LedgerEntryNotFound, LedgerEntryType
 from royexa.ledger.ports import LedgerRepository
 from royexa.ledger.posting import LedgerPosting
 from royexa.loans.application import VisitsUnitOfWork, pending_visits
@@ -160,6 +160,18 @@ class DiscrepancyReport:
         return len(self.items)
 
 
+def resolve_period(today: date, since: date | None, until: date | None) -> tuple[date, date]:
+    """T9-P1: the month up to today when no dates are given; an inverted or over-long period
+    is refused."""
+    since = since or today.replace(day=1)
+    until = until or today
+    if since > until:
+        raise InvalidPeriod("the period starts after it ends")
+    if (until - since).days >= MAX_PERIOD_DAYS:
+        raise InvalidPeriod(f"the period spans more than {MAX_PERIOD_DAYS} days")
+    return since, until
+
+
 class DiscrepancyQueries:
     """UC-09 (RF-07, CA-13, T9-P1 to T9-P3): the closes of a period with a difference, their
     evolution by collection day, and the boxes of past days that were never closed."""
@@ -173,12 +185,7 @@ class DiscrepancyQueries:
 
     def report(self, since: date | None = None, until: date | None = None) -> DiscrepancyReport:
         today = self._calendar.day_of(self._clock.now())
-        since = since or today.replace(day=1)
-        until = until or today
-        if since > until:
-            raise InvalidPeriod("the period starts after it ends")
-        if (until - since).days >= MAX_PERIOD_DAYS:
-            raise InvalidPeriod(f"the period spans more than {MAX_PERIOD_DAYS} days")
+        since, until = resolve_period(today, since, until)
         with self._uow() as uow:
             closes = [c for c in uow.cash_closes.all() if since <= c.day <= until]
             # Today's box is still being worked; only past days can have been left open.
@@ -202,4 +209,59 @@ class DiscrepancyQueries:
             Money(sum(gap for gap in gaps if gap > 0)),
             days,
             unclosed,
+        )
+
+
+@dataclass(frozen=True)
+class DayFlow:
+    day: date
+    collected: Money
+    disbursed: Money
+
+
+@dataclass(frozen=True)
+class FlowReport:
+    since: date
+    until: date
+    days: list[DayFlow]
+    collected: Money
+    disbursed: Money
+
+
+class CashFlowQueries:
+    """T14b: per collection day, what was collected (every payment, cash or transfer) against
+    what was disbursed (confirmed disbursements). Adjustments and expired attempts move no
+    money of either kind, so they are left out. The period is the one of the discrepancies."""
+
+    def __init__(
+        self, uow: Callable[[], ClosingUnitOfWork], clock: Clock, calendar: BusinessCalendar
+    ) -> None:
+        self._uow = uow
+        self._clock = clock
+        self._calendar = calendar
+
+    def report(self, since: date | None = None, until: date | None = None) -> FlowReport:
+        today = self._calendar.day_of(self._clock.now())
+        since, until = resolve_period(today, since, until)
+        collected: dict[date, int] = {}
+        disbursed: dict[date, int] = {}
+        with self._uow() as uow:
+            entries = uow.ledger.all()
+        for entry in entries:
+            day = self._calendar.day_of(entry.server_time)
+            if entry.entry_type is LedgerEntryType.PAYMENT:
+                collected[day] = collected.get(day, 0) + entry.amount.cents
+            elif entry.entry_type is LedgerEntryType.DISBURSEMENT:
+                disbursed[day] = disbursed.get(day, 0) + entry.amount.cents
+        days = [
+            DayFlow(day, Money(collected.get(day, 0)), Money(disbursed.get(day, 0)))
+            for day in (since + timedelta(days=n) for n in range((until - since).days + 1))
+            if self._calendar.is_collection_day(day)
+        ]
+        return FlowReport(
+            since,
+            until,
+            days,
+            Money(sum(d.collected.cents for d in days)),
+            Money(sum(d.disbursed.cents for d in days)),
         )
