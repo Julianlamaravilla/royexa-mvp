@@ -27,6 +27,7 @@ from royexa.shared.money import Money
 from royexa.shared.payments import PaymentMethod
 from royexa.shared.errors import DomainError
 from royexa.web import messages
+from royexa.web.charts import discrepancy_chart
 from royexa.web.forms import ClaimState, Outcome
 from royexa.web.format import long_date, money, parse_amount, short_date
 from royexa.web.session import SESSION_COOKIE, clear_session_cookie, set_session_cookie
@@ -454,6 +455,8 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
             item=item,
             client_name=names.get(item.client_id, item.client_id),
             status_text=messages.status_text(item),
+            status_kind=messages.status_kind(item),
+            status_short=messages.status_short(item),
             token=form_token,
         )
 
@@ -623,8 +626,12 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
             error = "Escribe las fechas del período completas (año, mes y día)."
         except DomainError as problem:
             error = messages.describe(problem)
+        chart = None
+        if report is not None and report.count:
+            symbol = container.currency_symbol
+            chart = discrepancy_chart(report.days, lambda cents: money(cents, symbol))
         return _render(
-            container, "descuadres.html", report=report, error=error,
+            container, "descuadres.html", report=report, error=error, chart=chart,
             since=asked.get("desde", ""), until=asked.get("hasta", ""),
         )
 
@@ -639,6 +646,8 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
                 "collector_id": close.collector_id,
                 "day": close.day,
                 "summary": messages.close_summary(close, container.currency_symbol),
+                "kind": "bad" if close.discrepancy.cents < 0 else "ok",
+                "badge": messages.close_badge(close, container.currency_symbol),
             }
             for close in reversed(closes)
         ]

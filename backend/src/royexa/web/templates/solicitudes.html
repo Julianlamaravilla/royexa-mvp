@@ -1,12 +1,17 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Solicitudes · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
 {% block body %}
 <main>
-  <h1>Solicitudes en espera</h1>
+  {{ ui.head("/web/admin", "Inicio", "Solicitudes en espera") }}
   <ul class="list">
     {% for row in rows %}
     <li class="card">
-      <strong>{{ row.client_name }}</strong>
+      <div class="row">
+        <span class="avatar" aria-hidden="true">{{ row.client_name | initials }}</span>
+        <span class="grow"><strong>{{ row.client_name }}</strong>{{ ui.badge("bad" if row.over_limit else "wait", "Por autorizar" if row.over_limit else "En espera") }}</span>
+      </div>
       <span class="amount">{{ row.terms.principal.cents | money }}</span>
       <span class="muted">{{ row.terms.installment_count }} cuotas en {{ row.terms.term_days }} días · {{ row.collector_id }}</span>
       <span>{{ row.waiting_text }}</span>
@@ -26,9 +31,9 @@
       </form>
     </li>
     {% else %}
-    <li class="muted">No hay solicitudes en espera.</li>
+    <li>{{ ui.empty("inbox", "No hay solicitudes en espera.") }}</li>
     {% endfor %}
   </ul>
-  <p><a href="/web/admin">Volver</a></p>
 </main>
+{{ ui.admin_nav("solicitudes") }}
 {% endblock %}

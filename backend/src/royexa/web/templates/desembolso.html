@@ -1,10 +1,18 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Desembolso · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
 {% block body %}
 <main class="narrow">
-  <h1>Desembolso</h1>
+  {{ ui.head("/web/ruta", "Ruta", "Desembolso") }}
   <section class="card">
-    <strong>{{ client_name }}</strong>
+    <div class="row">
+      <span class="avatar" aria-hidden="true">{{ client_name | initials }}</span>
+      <div class="grow">
+        <strong>{{ client_name }}</strong>
+        {{ ui.badge(status_kind, status_short) }}
+      </div>
+    </div>
     <span class="amount">{{ item.terms.principal.cents | money }}</span>
     <span class="muted">{{ item.terms.installment_count }} cuotas en {{ item.terms.term_days }} días</span>
     <span>{{ status_text }}</span>
@@ -16,10 +24,11 @@
     <input type="hidden" name="device_time" value="">
     <label>Código que dicta el cliente
       <input type="text" name="codigo" autocomplete="off" autocapitalize="characters" required>
+      <span class="hint">Se acepta en mayúsculas o minúsculas.</span>
     </label>
-    <button type="submit" class="primary">Validar y entregar</button>
+    <button type="submit" class="primary">{{ ui.icon("lock") }} Validar y entregar</button>
   </form>
   {% endif %}
-  <p><a href="/web/ruta">Volver a la ruta</a></p>
 </main>
+{{ ui.nav("ruta") }}
 {% endblock %}
