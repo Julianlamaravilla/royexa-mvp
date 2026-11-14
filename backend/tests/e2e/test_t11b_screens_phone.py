@@ -153,3 +153,47 @@ def test_t13_the_client_and_loan_pages_fit_a_phone(server, phone):
         )
         assert all(left >= 0 and right <= PHONE["width"] for left, right in rows), rows
         assert "19,5 de 20" in phone.inner_text("body")
+
+
+def test_t14a_the_adjustment_and_the_exception_work_from_a_phone(server, phone):
+    """T14a (CA-08, CA-10): the administrator adjusts a payment and authorizes a renewal by
+    tapping, and the ledger shows the original with its adjustment inside 360 px."""
+    collector = _api(server, "cobrador-1")
+    paid = collector.post(
+        "/v1/loans/prestamo-impago/payments",
+        json={"amount_cents": 3_000, "method": "EFECTIVO", "device_time": "2026-10-30T14:00:00+00:00"},
+    )
+    assert paid.status_code == 201, paid.text
+
+    _login(phone, server, "admin-1", "/web/admin")
+    phone.goto(f"{server.url}/web/admin/libro")
+    _fits(phone)
+    phone.click("a:has-text('Ajustar')")
+    _fits(phone)
+    phone.fill("input[name=importe]", "-5,00")
+    phone.fill("input[name=motivo]", "se cobró de menos")
+    phone.click("button:has-text('Registrar ajuste')")
+    phone.wait_for_url("**/web/resultado/**")
+    assert "Ajuste registrado" in phone.inner_text("body")
+    _fits(phone)
+    phone.goto(f"{server.url}/web/admin/libro")
+    _fits(phone)
+    group = phone.locator("li.card", has=phone.locator("ul.adjustments"))
+    assert group.count() == 1
+    assert "se cobró de menos" in group.inner_text() and "-5,00" in group.inner_text()
+    box = group.bounding_box()
+    assert 0 <= box["x"] and box["x"] + box["width"] <= PHONE["width"]
+
+    phone.goto(f"{server.url}/web/clientes/cliente-2")
+    _fits(phone)
+    phone.fill("input[name=motivo]", "cliente recurrente")
+    phone.click("button:has-text('Autorizar renovación')")
+    phone.wait_for_url("**/web/resultado/**")
+    assert "Excepción registrada" in phone.inner_text("body")
+    _fits(phone)
+
+    asked = collector.post(
+        "/v1/disbursements",
+        json={"client_id": "cliente-2", "amount_cents": 100_000, "term_days": 20, "installment_count": 20},
+    )
+    assert asked.status_code == 201, "CA-10: with the exception the renewal is allowed"
