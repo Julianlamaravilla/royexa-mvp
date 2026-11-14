@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui %}
+{% import "_charts.html" as drawings %}
 {% block title %}Administrador · ROYEXA{% endblock %}
 {% block bodyclass %}has-tabs{% endblock %}
 {% block header %}
@@ -20,6 +21,32 @@
 {% block body %}
 <main>
   <h1>Administrador</h1>
+  <div class="tiles">
+    <a class="tile {{ 't-bad' if report.count else 't-ok' }}" href="/web/admin/descuadres"><strong>{{ report.count }}</strong><span>Descuadres del mes</span></a>
+    <a class="tile {{ 't-wait' if report.unclosed else 't-ok' }}" href="/web/admin/descuadres"><strong>{{ report.unclosed | length }}</strong><span>Cajas sin cerrar</span></a>
+    <a class="tile {{ 't-bad' if failed_notices else 't-ok' }}" href="/web/admin/avisos"><strong>{{ failed_notices }}</strong><span>Avisos fallidos</span></a>
+  </div>
+
+  <section>
+    <h2>{{ ui.icon("wallet") }}Cobrado y desembolsado</h2>
+    {% if flow_chart %}
+    {{ drawings.flow(flow_chart, flow) }}
+    {% else %}
+    {{ ui.empty("wallet", "Todavía no hay cobros ni desembolsos este mes.") }}
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>{{ ui.icon("chart") }}Descuadres del mes</h2>
+    {% if discrepancy_chart %}
+    <p>Faltantes {{ report.shortage.cents | money }} · Sobrantes {{ report.surplus.cents | money }}</p>
+    {{ drawings.discrepancies(discrepancy_chart, report) }}
+    {% else %}
+    {{ ui.empty("check", "Sin descuadres este mes.") }}
+    {% endif %}
+  </section>
+
+  <h2>{{ ui.icon("inbox") }}Páginas</h2>
   <ul class="list">
     <li><a class="card menu" href="/web/admin/solicitudes">{{ ui.icon("inbox") }}<span class="grow">Solicitudes en espera ({{ waiting }})</span></a></li>
     <li><a class="card menu" href="/web/admin/libro">{{ ui.icon("book") }}<span class="grow">Libro</span></a></li>

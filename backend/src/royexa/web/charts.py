@@ -8,7 +8,7 @@ from datetime import date
 from fractions import Fraction
 from math import ceil
 
-from royexa.closing.application import DayEvolution
+from royexa.closing.application import DayEvolution, DayFlow
 from royexa.web.format import installments_text, short_date
 
 WIDTH = 360
@@ -93,6 +93,72 @@ def discrepancy_chart(days: list[DayEvolution], fmt: Callable[[int], str]) -> Ch
         right=WIDTH - MARGIN,
         bars=bars,
         labels=labels,
+    )
+
+
+PLOT = 110.0  # height of the drawing area of the flow chart
+FLOW_TOP = 16.0  # room above it for the scale note
+MAX_FLOW_BAR = 14.0
+PAIR_GAP = 1.0
+
+
+@dataclass(frozen=True)
+class FlowBar:
+    day: int  # index of the day it belongs to
+    x: float
+    y: float
+    width: float
+    height: float
+    kind: str  # collected or disbursed
+    label: str
+
+
+@dataclass(frozen=True)
+class FlowChart:
+    width: int
+    height: int
+    axis_y: float
+    left: float
+    right: float
+    bars: list[FlowBar]
+    labels: list[Label]
+    scale: str
+
+
+def flow_chart(days: list[DayFlow], fmt: Callable[[int], str]) -> FlowChart | None:
+    """T14b: two bars per collection day, collected and disbursed, on one scale and standing on
+    one axis; None when no money moved in the period. A day without money draws nothing."""
+    largest = max((max(d.collected.cents, d.disbursed.cents) for d in days), default=0)
+    if largest <= 0:
+        return None
+    axis_y = FLOW_TOP + PLOT
+    slot = (WIDTH - 2 * MARGIN) / len(days)
+    width = round(min(slot * 0.4, MAX_FLOW_BAR), 1)
+    bars, labels = [], []
+    step = max(1, ceil(len(days) / MAX_LABELS))
+    for index, day in enumerate(days):
+        left = MARGIN + slot * index + (slot - 2 * width - PAIR_GAP) / 2
+        for offset, kind, cents, word in (
+            (0.0, "collected", day.collected.cents, "cobrado"),
+            (width + PAIR_GAP, "disbursed", day.disbursed.cents, "desembolsado"),
+        ):
+            if cents > 0:
+                height = round(max(cents / largest * PLOT, MIN_BAR), 1)
+                label = f"{short_date(day.day)}: {word} {fmt(cents)}"
+                bars.append(
+                    FlowBar(index, round(left + offset, 1), round(axis_y - height, 1), width, height, kind, label)
+                )
+        if index % step == 0:
+            labels.append(Label(round(left + width + PAIR_GAP / 2, 1), day.day.strftime("%d/%m")))
+    return FlowChart(
+        width=WIDTH,
+        height=round(axis_y + LABEL_GAP + 6),
+        axis_y=axis_y,
+        left=MARGIN,
+        right=WIDTH - MARGIN,
+        bars=bars,
+        labels=labels,
+        scale=fmt(largest),
     )
 
 

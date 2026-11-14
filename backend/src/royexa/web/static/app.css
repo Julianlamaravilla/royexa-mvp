@@ -253,3 +253,10 @@ a.plain { color: inherit; text-decoration: none; }
 .adjustment { display: flex; flex-direction: column; gap: 4px; }
 .adjustment > a { font-size: 0.9rem; color: var(--muted); text-decoration: none; }
 .adjustment > a::after { content: " \203A"; color: var(--brand); font-weight: 700; }
+
+/* Collected against disbursed on the administrator's panel (T14b) */
+a.tile { text-decoration: none; color: inherit; text-align: center; }
+.chart .bar-collected { fill: var(--ok); }
+.chart .bar-disbursed { fill: var(--wait-bg); stroke: var(--wait); stroke-width: 1.4; }
+.key-collected::before { background: var(--ok); }
+.key-disbursed::before { background: var(--wait-bg); border: 1.5px solid var(--wait); }

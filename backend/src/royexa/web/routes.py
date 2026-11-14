@@ -29,7 +29,7 @@ from royexa.shared.outbox import MAX_DELIVERY_ATTEMPTS
 from royexa.shared.payments import PaymentMethod
 from royexa.shared.errors import DomainError
 from royexa.web import messages
-from royexa.web.charts import discrepancy_chart, progress_bar
+from royexa.web.charts import discrepancy_chart, flow_chart, progress_bar
 from royexa.web.forms import ClaimState, Outcome
 from royexa.web.format import (
     installments_text, long_date, money, parse_amount, parse_signed_amount, short_date,
@@ -72,6 +72,7 @@ class WebContainer(Protocol):
     close_cash_box: object
     cash_close_queries: object
     discrepancy_queries: object
+    cash_flow_queries: object
     register_payment: object
     register_non_payment: object
     register_adjustment: object
@@ -569,8 +570,22 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         token, user = guard
         logout_token = await run_in_threadpool(container.form_tokens.issue, token, "salir")
         waiting = await run_in_threadpool(container.queries.awaiting_decision)
+        report = await run_in_threadpool(container.discrepancy_queries.report)
+        flow = await run_in_threadpool(container.cash_flow_queries.report)
+        symbol = container.currency_symbol
+
+        def fmt(cents: int) -> str:
+            return money(cents, symbol)
+
         return await render_admin(
-            "admin.html", user=user, logout_token=logout_token, waiting=len(waiting)
+            "admin.html",
+            user=user,
+            logout_token=logout_token,
+            waiting=len(waiting),
+            report=report,
+            flow=flow,
+            flow_chart=flow_chart(flow.days, fmt),
+            discrepancy_chart=discrepancy_chart(report.days, fmt) if report.count else None,
         )
 
     @router.get("/admin/solicitudes")
