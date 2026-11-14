@@ -25,8 +25,9 @@
     <li><a class="card menu" href="/web/admin/libro">{{ ui.icon("book") }}<span class="grow">Libro</span></a></li>
     <li><a class="card menu" href="/web/admin/clientes">{{ ui.icon("users") }}<span class="grow">Clientes</span></a></li>
     <li><a class="card menu" href="/web/admin/descuadres">{{ ui.icon("chart") }}<span class="grow">Descuadres del periodo</span></a></li>
+    <li><a class="card menu" href="/web/admin/avisos">{{ ui.icon("bell") }}<span class="grow">Avisos a clientes</span>{% if failed_notices %}<span class="count">{{ failed_notices }}</span>{% endif %}</a></li>
     <li><a class="card menu" href="/web/admin/cajas">{{ ui.icon("box") }}<span class="grow">Cajas cerradas</span></a></li>
   </ul>
 </main>
-{{ ui.admin_nav("") }}
+{{ ui.admin_nav("", failed_notices) }}
 {% endblock %}
