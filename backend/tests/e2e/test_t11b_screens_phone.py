@@ -197,3 +197,65 @@ def test_t14a_the_adjustment_and_the_exception_work_from_a_phone(server, phone):
         json={"client_id": "cliente-2", "amount_cents": 100_000, "term_days": 20, "installment_count": 20},
     )
     assert asked.status_code == 201, "CA-10: with the exception the renewal is allowed"
+
+
+def test_t14b_the_admin_panel_and_its_two_charts_fit_a_phone(server, phone):
+    """T14b: the cards and both server-drawn charts (collected against disbursed, and the
+    discrepancies) stay inside 360 px, with their bars drawn and nothing cut off."""
+    collector = _api(server, "cobrador-1")
+    admin = _api(server, "admin-1")
+    asked = collector.post(
+        "/v1/disbursements",
+        json={"client_id": "cliente-1", "amount_cents": 100_000, "term_days": 20, "installment_count": 20},
+    ).json()
+    admin.post(f"/v1/disbursements/{asked['id']}/approve", json={})
+    server.notifier.failing = False
+    admin.post("/v1/notifications/dispatch")
+    code = next(s.payload["code"] for s in server.notifier.delivered if "code" in s.payload)
+    collector.post(
+        f"/v1/disbursements/{asked['id']}/confirm",
+        json={"code": code, "device_time": "2026-10-30T13:59:00+00:00"},
+    )
+    for amount, method in ((60_000, "EFECTIVO"), (10_000, "TRANSFERENCIA")):
+        paid = collector.post(
+            "/v1/loans/prestamo-impago/payments",
+            json={"amount_cents": amount, "method": method, "device_time": "2026-10-30T14:00:00+00:00"},
+        )
+        assert paid.status_code == 201, paid.text
+    for row in collector.get("/v1/routes/ruta-1/pending-visits").json():
+        collector.post(
+            f"/v1/loans/{row['loan_id']}/non-payments",
+            json={"reason": "no estaba", "commitment_date": "2026-11-30", "device_time": "2026-10-30T14:10:00+00:00"},
+        )
+    closed = collector.post(
+        "/v1/cash-boxes/cobrador-1/close",
+        json={"delivered_cents": 55_050, "device_time": "2026-10-30T14:30:00+00:00"},
+    )
+    assert closed.status_code == 201, closed.text
+
+    _login(phone, server, "admin-1", "/web/admin")
+    _fits(phone)
+    tiles = phone.locator("a.tile")
+    assert tiles.count() == 3
+    spans = tiles.evaluate_all(
+        "items => items.map(i => { const b = i.getBoundingClientRect(); return [b.left, b.right]; })"
+    )
+    assert all(left >= 0 and right <= PHONE["width"] for left, right in spans), spans
+
+    charts = phone.locator("svg.chart")
+    assert charts.count() == 2
+    for index in range(2):
+        box = charts.nth(index).bounding_box()
+        assert 0 <= box["x"] and box["x"] + box["width"] <= PHONE["width"], box
+        assert box["height"] > 80, "tall enough to read the bars"
+    bars = phone.locator("svg.chart-flow rect.bar").evaluate_all(
+        "rects => rects.map(r => { const b = r.getBoundingClientRect(); return [b.left, b.right, b.width, b.height]; })"
+    )
+    assert len(bars) >= 2
+    assert all(left >= 0 and right <= PHONE["width"] and width > 2 and height > 0 for left, right, width, height in bars), bars
+    assert phone.locator("svg.chart-flow rect.bar-collected").count() >= 1
+    assert phone.locator("svg.chart-flow rect.bar-disbursed").count() >= 1
+    keys = phone.locator("ul.key li").evaluate_all(
+        "items => items.map(i => { const b = i.getBoundingClientRect(); return b.right; })"
+    )
+    assert all(right <= PHONE["width"] for right in keys), keys
