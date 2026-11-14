@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui %}
 {% block title %}Administrador · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
 {% block header %}
 <header class="bar">
   <div class="who">
@@ -20,11 +21,12 @@
 <main>
   <h1>Administrador</h1>
   <ul class="list">
-    <li><a class="button" href="/web/admin/solicitudes">Solicitudes en espera ({{ waiting }})</a></li>
-    <li><a class="button" href="/web/admin/libro">Libro</a></li>
-    <li><a class="button" href="/web/admin/clientes">Clientes</a></li>
-    <li><a class="button" href="/web/admin/descuadres">Descuadres del periodo</a></li>
-    <li><a class="button" href="/web/admin/cajas">Cajas cerradas</a></li>
+    <li><a class="card menu" href="/web/admin/solicitudes">{{ ui.icon("inbox") }}<span class="grow">Solicitudes en espera ({{ waiting }})</span></a></li>
+    <li><a class="card menu" href="/web/admin/libro">{{ ui.icon("book") }}<span class="grow">Libro</span></a></li>
+    <li><a class="card menu" href="/web/admin/clientes">{{ ui.icon("users") }}<span class="grow">Clientes</span></a></li>
+    <li><a class="card menu" href="/web/admin/descuadres">{{ ui.icon("chart") }}<span class="grow">Descuadres del periodo</span></a></li>
+    <li><a class="card menu" href="/web/admin/cajas">{{ ui.icon("box") }}<span class="grow">Cajas cerradas</span></a></li>
   </ul>
 </main>
+{{ ui.admin_nav("") }}
 {% endblock %}

@@ -179,3 +179,42 @@ body.login { background: linear-gradient(180deg, var(--brand) 0, var(--brand-dar
   main { padding-top: 24px; }
   .tabs { border-radius: 18px 18px 0 0; }
 }
+
+/* Inner pages (T11b) */
+.page-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.back { display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; min-height: 40px; color: var(--brand); font-weight: 600; text-decoration: none; margin-left: -6px; padding-right: 8px; }
+.back .icon { width: 24px; height: 24px; }
+.page-head h1 { margin: 0 0 8px; }
+.hint { font-weight: 400; font-size: 0.82rem; color: var(--muted); }
+.stack .card + .card, .card form { margin-top: 6px; }
+.card form.stack { margin-top: 10px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.card .row + .amount { margin-top: 8px; }
+a.card.menu { flex-direction: row; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); font-weight: 600; }
+a.card.menu .icon { width: 26px; height: 26px; color: var(--brand); }
+a.card.menu .grow { flex: 1; min-width: 0; }
+a.card.menu::after { content: "\203A"; color: var(--brand); font-weight: 700; font-size: 1.4rem; }
+.empty { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 28px 16px; color: var(--muted); background: var(--card); border: 1px dashed #c5d3cd; border-radius: var(--radius); }
+.empty .icon { width: 34px; height: 34px; color: var(--brand); }
+.empty p { margin: 0; }
+.amount-in { color: var(--ok); }
+.amount-out { color: var(--bad); }
+.card .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.tabs a span { white-space: nowrap; }
+
+/* Discrepancy chart: drawn by the server as SVG, no script (T11b) */
+.chart { display: block; width: 100%; height: auto; max-width: 100%; }
+.chart .axis { stroke: var(--muted); stroke-width: 1; }
+.chart .bar-short { fill: url(#hatch); stroke: var(--bad); stroke-width: 1.2; }
+.chart .bar-surplus { fill: var(--ok); }
+.chart .bar-none { fill: var(--muted); }
+.chart .hatch-bg { fill: var(--bad-bg); }
+.chart .hatch-line { stroke: var(--bad); stroke-width: 2.4; }
+.chart .tick { font-size: 10px; fill: var(--muted); text-anchor: middle; }
+.chart .side { font-size: 10px; font-weight: 700; fill: var(--muted); }
+.key { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
+.key li { display: flex; align-items: center; gap: 8px; }
+.key li::before { content: ""; width: 18px; height: 14px; border-radius: 3px; flex: none; }
+.key-short::before { background: repeating-linear-gradient(135deg, var(--bad) 0 2px, var(--bad-bg) 2px 5px); border: 1px solid var(--bad); }
+.key-surplus::before { background: var(--ok); }
+
+form.stack + .card, form.stack + .notice, form.stack + section { margin-top: 16px; }

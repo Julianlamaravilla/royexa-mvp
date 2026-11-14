@@ -1,28 +1,37 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui %}
 {% block title %}Registrar pago · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
 {% block body %}
 <main class="narrow">
-  <h1>Registrar pago</h1>
+  {{ ui.head("/web/ruta", "Ruta", "Registrar pago") }}
   <section class="card">
-    <strong>{{ visit.client_name }}</strong>
+    <div class="row">
+      <span class="avatar" aria-hidden="true">{{ visit.client_name | initials }}</span>
+      <div class="grow">
+        <strong>{{ visit.client_name }}</strong>
+        <span class="muted">Cuotas restantes {{ visit.remaining_installments | exact }}</span>
+      </div>
+    </div>
     <span class="amount">Saldo {{ visit.outstanding.cents | money }}</span>
-    <span class="muted">Cuotas restantes {{ visit.remaining_installments | exact }}</span>
   </section>
   <form method="post" action="/web/pago/{{ visit.loan_id }}" class="stack">
     <input type="hidden" name="ficha" value="{{ token }}">
     <input type="hidden" name="device_time" value="">
     <label>Importe cobrado
       <input type="text" name="monto" inputmode="decimal" autocomplete="off" required placeholder="0,00">
+      <span class="hint">Escríbelo como 1.234,56</span>
     </label>
     <label>Medio de pago
       <select name="medio">
         <option value="EFECTIVO">Efectivo</option>
         <option value="TRANSFERENCIA">Transferencia</option>
       </select>
+      <span class="hint">Solo el efectivo suma a tu caja.</span>
     </label>
-    <button type="submit" class="primary">Registrar pago</button>
+    <button type="submit" class="primary">{{ ui.icon("check") }} Registrar pago</button>
   </form>
   <p><a href="/web/no-pago/{{ visit.loan_id }}">El cliente no pagó</a></p>
-  <p><a href="/web/ruta">Volver a la ruta</a></p>
 </main>
+{{ ui.nav("ruta") }}
 {% endblock %}

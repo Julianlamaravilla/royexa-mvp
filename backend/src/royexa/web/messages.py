@@ -135,6 +135,14 @@ def close_summary(close: CashClose, symbol: str = "") -> str:
     return f"Esperado {expected}. Entregado {delivered}. {tail}"
 
 
+def close_badge(close: CashClose, symbol: str = "") -> str:
+    """The short verdict of a close for its badge: Faltan 49,50, Sobran 10,00 or Sin descuadre."""
+    gap = close.discrepancy.cents
+    if gap == 0:
+        return "Sin descuadre"
+    return f"{'Sobran' if gap > 0 else 'Faltan'} {money(abs(gap), symbol)}"
+
+
 def describe(error: DomainError) -> str:
     for kind in type(error).__mro__:
         if kind in _MESSAGES:
