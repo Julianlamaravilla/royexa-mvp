@@ -74,6 +74,13 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: las pruebas existentes pasan sin cambiar aserciones; ninguna página se desplaza en horizontal a 360 px; sin estilos ni scripts en línea; todo icono usado existe en el conjunto.
 - [ ] **T11b Resto de pantallas y gráfica.** Formularios del cobrador (pago, no pago, solicitud, validar código, cierre) y páginas del administrador (solicitudes, libro, clientes, cajas, descuadres) con los mismos componentes, y gráfica de barras de la evolución de descuadres.
   - Acepta: igual que T11a para esas páginas; la gráfica se ve a 360 px y se entiende sin leer números.
+- [ ] **T12 Avisos para el administrador (RF-06, CA-12, EC-04).** Página del administrador con los avisos de pagos y de códigos: enviados, pendientes y fallidos, con el cliente afectado, y un botón para reintentar el despacho (usa `GET /v1/notifications` y `POST /v1/notifications/dispatch`). Contador de fallidos en el menú del administrador.
+  - Acepta: un aviso fallido se ve como tal con su motivo; reintentar cambia el estado cuando el notificador responde; solo el administrador entra; sin estilos ni scripts en línea y sin desplazamiento horizontal a 360 px.
+- [ ] **T13 Ficha de cliente, préstamo y calendario (RF-05, CA-09, RN-01).** Página de un cliente con sus préstamos y página de un préstamo con su calendario de cuotas, el contador fraccionario («19,5 de 20») en una barra de avance y sus pagos y no pagos. Enlaces desde la lista de clientes y la ruta del día.
+  - Acepta: CA-09 se ve en la web (20 cuotas de 60, solo lunes a sábado); el cobrador solo ve clientes de su ruta; la barra se entiende sin leer números.
+- [ ] **T14 Ajustes, excepciones y panel del administrador (RF-04, CA-08, CA-10, RF-07).** Formulario de ajuste con importe con signo y motivo, y el libro mostrando el asiento original junto a su compensatorio; botón de excepción de renovación con motivo; `/admin` con tarjetas y gráficos (descuadres del mes, cobrado contra desembolsado por día, cajas sin cerrar, avisos fallidos). Gráficos en SVG generado en el servidor, sin librerías ni scripts en línea.
+  - Acepta: CA-08 y CA-10 se pueden ejecutar desde el navegador; el original nunca se modifica; los gráficos se ven a 360 px.
+  - Si no cabe en un pull request, dividir en T14a, T14b según la regla 10.
 
 ## Preguntas abiertas
 
