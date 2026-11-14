@@ -106,6 +106,7 @@ class Container:
     authenticator: Authenticator
     form_tokens: FormTokens
     currency_symbol: str
+    calendar: BusinessCalendar
     register_adjustment: RegisterAdjustment
     store: InMemoryStore
     notifier: Notifier
@@ -208,6 +209,7 @@ def build_container(
         authenticator=Authenticator(unit_of_work, clock, directory, hasher, settings.session_ttl),
         form_tokens=FormTokens(unit_of_work, clock),
         currency_symbol=settings.currency_symbol,
+        calendar=calendar,
         register_adjustment=RegisterAdjustment(unit_of_work, clock, directory, calendar),
         store=store,
         notifier=notifier,

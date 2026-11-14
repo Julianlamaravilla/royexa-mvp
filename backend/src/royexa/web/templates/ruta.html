@@ -70,7 +70,7 @@
       <li class="card">
         <div class="row">
           <span class="avatar">{{ item.client_name | initials }}</span>
-          <span class="grow"><strong>{{ item.client_name }}</strong><span class="muted">Cuotas restantes {{ item.remaining_installments | exact }}</span></span>
+          <span class="grow"><strong><a class="plain" href="/web/clientes/{{ item.client_id }}">{{ item.client_name }}</a></strong><span class="muted">Cuotas restantes {{ item.remaining_installments | exact }}</span></span>
           <span class="right"><small>Saldo</small>{{ item.outstanding.cents | money }}</span>
         </div>
         <span class="actions">
@@ -91,7 +91,7 @@
       <li class="card">
         <div class="row">
           <span class="avatar">{{ item.client_name | initials }}</span>
-          <span class="grow"><strong>{{ item.client_name }}</strong><span class="muted">{% if item.cash.cents %}Efectivo {{ item.cash.cents | money }}{% endif %}{% if item.cash.cents and item.transfer.cents %} · {% endif %}{% if item.transfer.cents %}Transferencia {{ item.transfer.cents | money }}{% endif %}</span></span>
+          <span class="grow"><strong><a class="plain" href="/web/clientes/{{ item.client_id }}">{{ item.client_name }}</a></strong><span class="muted">{% if item.cash.cents %}Efectivo {{ item.cash.cents | money }}{% endif %}{% if item.cash.cents and item.transfer.cents %} · {% endif %}{% if item.transfer.cents %}Transferencia {{ item.transfer.cents | money }}{% endif %}</span></span>
         </div>
       </li>
       {% else %}
@@ -107,7 +107,7 @@
       <li class="card">
         <div class="row">
           <span class="avatar">{{ item.client_name | initials }}</span>
-          <span class="grow"><strong>{{ item.client_name }}</strong><span>{{ item.reason }}</span><span class="muted">Compromiso {{ item.commitment_date | short_date }}</span></span>
+          <span class="grow"><strong><a class="plain" href="/web/clientes/{{ item.client_id }}">{{ item.client_name }}</a></strong><span>{{ item.reason }}</span><span class="muted">Compromiso {{ item.commitment_date | short_date }}</span></span>
         </div>
       </li>
       {% else %}

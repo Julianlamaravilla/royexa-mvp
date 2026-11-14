@@ -5,10 +5,11 @@ hangs below the axis and a surplus rises above it, on one scale for both."""
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
+from fractions import Fraction
 from math import ceil
 
 from royexa.closing.application import DayEvolution
-from royexa.web.format import short_date
+from royexa.web.format import installments_text, short_date
 
 WIDTH = 360
 MARGIN = 8
@@ -93,3 +94,23 @@ def discrepancy_chart(days: list[DayEvolution], fmt: Callable[[int], str]) -> Ch
         bars=bars,
         labels=labels,
     )
+
+
+BAR_WIDTH = 100
+MAX_TICKS = 60
+
+
+def progress_bar(remaining: Fraction, total: int) -> dict:
+    """T13: the bar of a loan, drawn by the server. It fills with the share already paid, so the
+    fraction of an installment counts (RN-01); one tick per installment while they are few."""
+    paid = Fraction(total) - remaining
+    share = paid / total if total else Fraction(0)
+    ticks = " ".join(f"M{BAR_WIDTH * i / total:.2f} 0V8" for i in range(1, total)) if 1 < total <= MAX_TICKS else ""
+    return {
+        "now": f"{float(paid):.2f}".rstrip("0").rstrip("."),
+        "max": total,
+        "width": round(float(share) * BAR_WIDTH, 2),
+        "track": BAR_WIDTH,
+        "ticks": ticks,
+        "text": f"Faltan {installments_text(remaining)} de {total} cuotas",
+    }

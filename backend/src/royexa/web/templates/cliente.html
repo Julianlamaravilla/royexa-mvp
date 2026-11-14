@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}{{ client.name }} · ROYEXA{% endblock %}
+{% block bodyclass %}has-tabs{% endblock %}
+{% block body %}
+<main>
+  {{ ui.head("/web/admin/clientes" if admin else "/web/ruta", "Clientes" if admin else "Ruta", client.name) }}
+  <section class="card">
+    <div class="row">
+      <span class="avatar" aria-hidden="true">{{ client.name | initials }}</span>
+      <span class="grow"><strong>{{ client.name }}</strong>{{ ui.badge("info", client.route_id) }}</span>
+    </div>
+    <span class="muted">{{ client.id }}</span>
+  </section>
+  <section id="prestamos">
+    <h2>{{ ui.icon("wallet") }}Préstamos ({{ loans | length }})</h2>
+    <ul class="list">
+      {% for item in loans %}
+      <li class="card">
+        <div class="row">
+          <span class="grow">
+            <strong>Capital {{ item.loan.principal.cents | money }}</strong>
+            {% if item.loan.is_settled %}{{ ui.badge("ok", "Liquidado") }}{% else %}{{ ui.badge("wait", "Activo") }}{% endif %}
+            <span class="muted">Faltan {{ item.loan.remaining_installments | counter }} de {{ item.total }} cuotas</span>
+          </span>
+          <span class="right"><small>Saldo</small>{{ item.loan.outstanding.cents | money }}</span>
+        </div>
+        <a href="/web/prestamos/{{ item.loan.id }}">Ver calendario de cuotas</a>
+      </li>
+      {% else %}
+      <li>{{ ui.empty("wallet", "Todavía no tiene préstamos.") }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+</main>
+{% if admin %}{{ ui.admin_nav("clientes", failed_notices) }}{% else %}{{ ui.nav("ruta") }}{% endif %}
+{% endblock %}

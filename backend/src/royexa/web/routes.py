@@ -21,16 +21,19 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from royexa.cash_box.domain import NoOpenCashBox
 from royexa.identity_access.domain import InvalidCredentials, SessionRequired, User
-from royexa.loans.domain import LoanTerms, exact_decimal
+from royexa.clients.domain import ClientNotFound
+from royexa.loans.domain import LoanNotFound, LoanTerms, exact_decimal
 from royexa.sales.domain import DisbursementNotFound, DisbursementStatus
 from royexa.shared.money import Money
 from royexa.shared.outbox import MAX_DELIVERY_ATTEMPTS
 from royexa.shared.payments import PaymentMethod
 from royexa.shared.errors import DomainError
 from royexa.web import messages
-from royexa.web.charts import discrepancy_chart
+from royexa.web.charts import discrepancy_chart, progress_bar
 from royexa.web.forms import ClaimState, Outcome
-from royexa.web.format import long_date, money, parse_amount, short_date
+from royexa.web.format import (
+    installments_text, long_date, money, parse_amount, short_date, weekday_name,
+)
 from royexa.web.session import SESSION_COOKIE, clear_session_cookie, set_session_cookie
 
 HERE = Path(__file__).parent
@@ -55,6 +58,9 @@ class WebContainer(Protocol):
     visit_queries: object
     queries: object
     client_queries: object
+    loan_queries: object
+    payment_queries: object
+    calendar: object
     request: object
     confirm: object
     approve: object
@@ -87,6 +93,8 @@ def _environment(symbol: str) -> Environment:
     environment.filters["short_date"] = short_date
     environment.filters["exact"] = exact_decimal
     environment.filters["initials"] = initials
+    environment.filters["counter"] = installments_text
+    environment.filters["weekday"] = weekday_name
     return environment
 
 
@@ -615,6 +623,66 @@ def install_web(app: FastAPI, container: WebContainer) -> None:
         return await render_admin(
             "clientes.html", clients=await run_in_threadpool(container.client_queries.all)
         )
+
+    async def file_access(user: User, client) -> bool:
+        """T13: an administrator reads every file; a collector only the clients of his route."""
+        if user.is_admin:
+            return True
+        panels = await run_in_threadpool(container.visit_queries.panels, user, user.id)
+        return client.route_id == panels.route_id
+
+    def file_missing(user: User, what: str) -> Response:
+        back = ADMIN_PATH if user.is_admin else ROUTE_PATH
+        return _message(
+            container, 404, "Sin ficha", f"No se encontró {what} en tu ruta.", back, "Volver"
+        )
+
+    async def file_page(request: Request, name: str, load: Callable, **extra) -> Response:
+        """The page of a client or a loan: `load` raises when it does not exist and returns
+        the client and the context of the page."""
+        _, user = await current(request)
+        try:
+            client, context = await run_in_threadpool(load)
+        except (ClientNotFound, LoanNotFound):
+            return file_missing(user, "esa ficha")
+        if not await file_access(user, client):
+            return file_missing(user, "esa ficha")
+        context.update(client=client, **extra)
+        if user.is_admin:
+            return await render_admin(name, admin=True, **context)
+        return _render(container, name, admin=False, **context)
+
+    @router.get("/clientes/{client_id}")
+    async def client_page(client_id: str, request: Request) -> Response:
+        """T13 (RF-05): a client with his loans, from the same queries as the API."""
+
+        def load():
+            client = container.client_queries.get(client_id)
+            loans = container.loan_queries.for_client(client_id)
+            return client, {"loans": [
+                {"loan": item, "total": item.installment_count} for item in loans
+            ]}
+
+        return await file_page(request, "cliente.html", load)
+
+    @router.get("/prestamos/{loan_id}")
+    async def loan_page(loan_id: str, request: Request) -> Response:
+        """T13 (RF-05, CA-09, RN-01): the schedule, the counter and the visits of a loan."""
+        zone_day = container.calendar.day_of
+
+        def load():
+            loan = container.loan_queries.get(loan_id)
+            client = container.client_queries.get(loan.client_id)
+            payments = container.payment_queries.for_loan(loan_id)
+            refusals = container.visit_queries.non_payments_of(loan_id)
+            return client, {
+                "loan": loan,
+                "bar": progress_bar(loan.remaining_installments, loan.installment_count),
+                "payments": [(p, zone_day(p.server_time)) for p in reversed(payments)],
+                "refusals": [(n, zone_day(n.server_time)) for n in reversed(refusals)],
+            }
+
+        return await file_page(request, "prestamo.html", load)
 
     @router.get("/admin/descuadres")
     async def discrepancies_page(request: Request) -> Response:
