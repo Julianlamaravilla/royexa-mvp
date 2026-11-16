@@ -298,7 +298,7 @@ Se usa el flujo de la Entrega 1 (desembolso de un préstamo).
 |---|---|---|---|---|---|
 | AD-01 | ¿Cómo garantizar que un movimiento de dinero, una vez confirmado, no pueda alterarse ni borrarse, incluso si el código de la aplicación falla? | `ASR-01`, `EC-01`, `RN-04`, `RF-04` | `INT-01`, `INT-02` | Es la razón de ser del producto. Cambiarlo con datos reales obliga a migrar el historial del libro. | Analizado (`ADR-001`) |
 | AD-02 | ¿Cómo organizar y comunicar las partes del sistema para que el dinero se confirme de forma atómica y un fallo en los avisos no lo invalide ni pase inadvertido? | `ASR-01`, `ASR-02`, `ASR-05`, `EC-04`, `RES-02`, `RES-03`, `RES-05`, `RES-06` | `INT-01`, `INT-02` | Fija la unidad de despliegue y las fronteras internas; es muy costoso de deshacer una vez que hay código. | Analizado (`ADR-002`) |
-| AD-03 | ¿Cómo asegurar que una operación de dinero confirmada por el cobrador llegue al libro una sola vez, sin duplicarse ni perderse? | `ASR-01`, `ASR-02`, `RF-03`, `RF-04`, `RN-03`, `RN-04`, `EC-01`; `DIV-02` | `INT-01`, `INT-02` | Un reintento HTTP podría duplicar un asiento y un descuento de caja, y el libro no admite correcciones que borren. | Analizado (`ADR-004`, propuesto). La formulación de la Entrega 2, sobre cobros sin señal, se conserva en la sección 3.3. |
+| AD-03 | ¿Cómo asegurar que una operación de dinero confirmada por el cobrador llegue al libro una sola vez, sin duplicarse ni perderse? | `ASR-01`, `ASR-02`, `RF-03`, `RF-04`, `RN-03`, `RN-04`, `EC-01`; `DIV-02` | `INT-01`, `INT-02` | Un reintento HTTP podría duplicar un asiento y un descuento de caja, y el libro no admite correcciones que borren. | Decidido (`ADR-004`, Aceptado; `ADR-003` Rechazado, reemplazado por `ADR-004`). La formulación de la Entrega 2, sobre cobros sin señal, se conserva en la sección 3.3. |
 | AD-04 | ¿Cómo evitar que los datos de una financiera sean visibles para otra sobre una misma instalación? | `DIV-03`; `RES-04` | `INT-02` | Un fallo expone datos personales y financieros de terceros. Cambiarlo después obliga a rehacer el esquema. | Diferido con `DIV-03`. Se trabaja con una sola empresa. |
 | AD-05 | ¿Cómo representar y calcular importes y cuotas sin error de redondeo acumulado? | `ASR-04`, `EC-03`, `RN-01` | `INT-01`, `INT-02` | El error se acumula cuota a cuota y la caja deja de cuadrar. | Decisión heredada, sin análisis comparativo: enteros de centavos y funciones puras. Se valida con `EV-10`. |
 | AD-06 | ¿Cómo hacer cumplir en el servidor, y no solo en la interfaz, que quien origina una operación no la aprueba? | `ASR-03`, `EC-02`, `RN-06` | `INT-02` | Un hueco aquí habilita el fraude que el producto combate. | Analizado en la sección 3.4 (`ALT-06B`), sin ADR propio. |
@@ -314,7 +314,7 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 
 ## 3. Evaluación de alternativas arquitectónicas
 
-> **Nota de lectura (2026-10-30).** Las alternativas y las comparaciones conservan el razonamiento y el vocabulario de la Entrega 2 (venta, llave, PIX, teléfono, módulos de TRACKEA). Las anotaciones fechadas indican qué cambió. Lo vigente son las decisiones provisionales de `AD-01`, `AD-02` y `AD-06`, y `ADR-004` para `AD-03`.
+> **Nota de lectura (2026-10-30).** Las alternativas y las comparaciones conservan el razonamiento y el vocabulario de la Entrega 2 (venta, llave, PIX, teléfono, módulos de TRACKEA). Las anotaciones fechadas indican qué cambió. Los encabezados «Decisión provisional» de esta sección son registro histórico de la Entrega 2. Estado en la Entrega 4: `ADR-001` y `ADR-002` están `Aceptado`, `ADR-004` está `Aceptado` para `AD-03` y `ADR-003` está `Rechazado (reemplazado por ADR-004)`; `AD-06` sigue la alternativa `ALT-06B` sin ADR propio.
 
 ### 3.1 AD-01 — Inalterabilidad del libro de movimientos
 
@@ -398,7 +398,7 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 | P3 Sin costo adicional | Prioritario | Cumple | Cumple | Cumple | Ninguna añade servicios de pago. El resultado se mantiene bajo `RES-06`. |
 | D1 Evidencia frente a privilegiados | Deseable | No cumple | No cumple | Cumple | Solo 01C. Puede añadirse después sobre 01B. |
 
-#### Decisión provisional
+#### Decisión provisional (registro histórico de la Entrega 2)
 
 > **Anotación (2026-10-31).** `EV-01` y `EV-02` quedaron `Validada` y `ADR-001` pasó a `Aceptado`, con los límites que declara ese registro (`HV-01`, `HV-03`, `HV-07`).
 >
@@ -501,7 +501,7 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 | P4 Canales reemplazables | Prioritario | Cumple | Cumple | Introduce un riesgo | En 02A y 02B el canal es un adaptador; ver `EV-08`. |
 | D1 Separación posterior | Deseable | Cumple | Cumple | No cumple | 02A conserva fronteras que permiten separar después. |
 
-#### Decisión provisional
+#### Decisión provisional (registro histórico de la Entrega 2)
 
 > **Anotación (2026-10-31).** `EV-03` y `EV-09` quedaron `Validada`. `EV-08` sigue prevista para la Entrega 4, así que `ADR-002` sigue `Propuesto` (`HV-05`, `HV-06`, `HV-07`).
 >
@@ -605,9 +605,9 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 | P3 Complejidad asumible | Prioritario | Cumple | Introduce un riesgo | No cumple | 03B concentra el riesgo declarado en TRACKEA (`RA-06`). |
 | D1 Bajo consumo de datos | Deseable | Cumple | Cumple | Requiere evidencia | |
 
-#### Decisión provisional
+#### Decisión provisional (registro histórico de la Entrega 2)
 
-> **Anotación (2026-10-30).** Decisión histórica de la Entrega 2. La decisión vigente propuesta para `AD-03` está en `ADR-004`.
+> **Anotación (2026-10-30).** Decisión histórica de la Entrega 2. La decisión vigente para `AD-03` está en `ADR-004`, `Aceptado` en la Entrega 4.
 
 - **Alternativa seleccionada:** ALT-03B.
 - **Justificación:** Es la única que cumple el criterio de registro firme sin señal (O2) y mantiene la integridad (O1) con el servidor como autoridad. Coincide con la decisión ya tomada en TRACKEA. **Esta decisión depende de `DIV-02`:** la Entrega 1 excluye la operación sin conexión. Si el docente confirma esa exclusión, la decisión debe revisarse hacia ALT-03A.
@@ -702,7 +702,7 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 | P3 Equipo mínimo y costo cero | Prioritario | Cumple | Cumple | Introduce un riesgo | 06C añade una pieza que operar. |
 | D1 Extensible a otras operaciones | Deseable | No cumple | Cumple bajo una condición | Cumple | 06B exige aplicar la regla en cada agregado. |
 
-#### Decisión provisional
+#### Decisión provisional (registro histórico de la Entrega 2)
 
 - **Alternativa seleccionada:** ALT-06B.
 - **Justificación:** Es la única que cumple los dos criterios obligatorios sin depender de cada punto de entrada, y mantiene la regla en un solo dueño. `EV-11` la verifica sobre la API, que es la forma de verificación de `EC-02`.
@@ -732,12 +732,12 @@ Las tres decisiones forman una sola idea: el dinero solo se escribe en un lugar,
 ### 4.2 Organización general
 
 - **Sistema objeto de estudio:** ROYEXA, registro de cobranza en calle con libro mayor inalterable y cierre de caja diario.
-- **Unidad o unidades de ejecución:** la API del servidor (`CON-03`, FastAPI con Uvicorn en local), único proceso de la Entrega 3; y, en la Entrega 4 (provisional), la web mínima renderizada en el servidor (`CON-02`), que corre en local y llama a la API. `CON-01` queda diferido. Todos los módulos del servidor forman parte de `CON-03`.
+- **Unidad o unidades de ejecución:** un solo proceso, el servidor de aplicación (`CON-03`, FastAPI con Uvicorn en local). En la Entrega 4 sirve la API JSON y la web renderizada en el servidor, que es el componente `CMP-14` dentro de `CON-03` y llama directamente a los casos de uso, no a la API por HTTP. `CON-02`, la web prevista como contenedor aparte, queda como registro histórico. `CON-01` queda diferido. Todos los módulos del servidor forman parte de `CON-03`.
 - **Almacenamientos:** PostgreSQL 17 local (`CON-04`), con el libro, los préstamos, las cajas y la bandeja de salida de eventos. Es obligatorio para demostrar el libro (`EV-01`, `EV-02`). Los adaptadores en memoria sirven para las pruebas que no dependen de esa garantía. `CON-05` queda diferido.
 - **Almacenamiento en la Entrega 3 (2026-10-31):** solo el libro está en `CON-04`. Desembolsos, préstamos, cajas y bandeja de salida viven en memoria también en ejecución, y se pierden al reiniciar (`HV-07`, `RA-10`).
 - **Ejecución y almacenamiento en la Entrega 4 (2026-11-16):** un solo proceso, `CON-03`, sirve la API JSON y la web renderizada en el servidor (componente `CMP-14`); la web no llama a la API por HTTP, sino a los mismos casos de uso. `CON-02` queda como registro histórico. Todo el estado está en `CON-04` y se confirma en la transacción del libro; los adaptadores en memoria quedan para las pruebas rápidas y el modo sin base de datos.
 - **Fronteras externas:** el notificador simulado (`EXT-05`). `EXT-01` a `EXT-04` quedan diferidos.
-- **Responsabilidades principales:** en el servidor, módulos con dueño único de sus entidades: `identity_access` (mínimo, con usuarios sembrados), `clients`, `loans`, `sales` (dueño del desembolso; conserva el nombre heredado), `ledger`, `cash_box` y `notifications`. Quedan diferidos `tenancy`, `devices`, `consent`, `sync`, `expenses`, `reporting` y `payments`, que vuelve en la Entrega 4 (provisional).
+- **Responsabilidades principales:** en el servidor (`backend/src/royexa/`), módulos con dueño único de sus entidades: `identity_access` (credenciales y sesiones, con usuarios sembrados), `clients`, `loans` (préstamos, calendario, pagos y no pagos), `sales` (dueño del desembolso; conserva el nombre heredado), `ledger`, `cash_box`, `closing` (cierre de la caja del día y descuadres), `notifications` (bandeja de salida y despacho) y `web` (páginas renderizadas en el servidor, `CMP-14`); `shared` reúne tipos comunes (dinero, reloj, identificadores, medio de pago) y `adapters` los adaptadores de PostgreSQL, en memoria y del notificador simulado. Los pagos no forman un módulo `payments` propio: viven en `loans`. Quedan diferidos `tenancy`, `devices`, `consent`, `sync`, `expenses` y `reporting`.
 - **Dirección de las dependencias:** el grafo de módulos es acíclico. Los módulos de dinero dependen de identidad y de clientes; `ledger` depende de `cash_box` para asignar cada asiento a una caja; solo `notifications` lee eventos y ningún módulo de negocio lo llama. Las aplicaciones cliente dependen de la API, nunca de la base de datos.
 - **Mecanismos generales de comunicación:** REST descrita con OpenAPI, versionada en la ruta (`/v1`), con errores en el formato estándar de detalles de problema; llamadas directas dentro del proceso para lo atómico; y eventos por un puerto con bandeja de salida y despachador invocable.
 
@@ -772,8 +772,8 @@ No forma parte de la línea base. Se conserva como registro de la Entrega 2.
 | Decisión | Contribución a la arquitectura | Elementos afectados | ADR |
 |---|---|---|---|
 | AD-01 | El libro solo admite inserciones por privilegios de la base de datos y tiene un único módulo escritor. | `CON-03`, `CON-04` | ADR-001 |
-| AD-02 | Un servicio único con módulos por regla de negocio, llamadas directas para lo atómico y eventos hacia avisos. | `CON-02`, `CON-03`, `CON-04`, `EXT-05` | ADR-002 |
-| AD-03 | Operación en línea con confirmación idempotente: máquina de estados del desembolso y unicidad del asiento por desembolso y tipo. | `CON-02`, `CON-03`, `CON-04` | ADR-004 (propuesto; ADR-003 no cambia de estado hasta la confirmación docente) |
+| AD-02 | Un servicio único con módulos por regla de negocio, llamadas directas para lo atómico y eventos hacia avisos. | `CON-03`, `CON-04`, `EXT-05` | ADR-002 (Aceptado) |
+| AD-03 | Operación en línea con confirmación idempotente: máquina de estados del desembolso y unicidad del asiento por desembolso y tipo. | `CON-03`, `CON-04` | ADR-004 (Aceptado); ADR-003 Rechazado (reemplazado por ADR-004) |
 | AD-06 | Regla en el dominio y rol en la entrada, con usuarios sembrados como limitación declarada. | `CON-03` | Sin ADR propio (sección 3.4) |
 
 ### 4.5 Decisiones diferidas
@@ -807,7 +807,7 @@ No forma parte de la línea base. Se conserva como registro de la Entrega 2.
 - **Sistema representado:** ROYEXA, como una sola unidad.
 - **Personas:** el cobrador (`INT-01`), el administrador (`INT-02`) y el cliente final (`INT-03`), que no opera el sistema: recibe el código y los comprobantes por el notificador simulado (`DIV-01`). El socio sigue en el modelo con la etiqueta `Diferido`, fuera de las vistas (`DIV-04`).
 - **Sistemas externos:** el notificador simulado (`EXT-05`; `ASR-05`, `AD-02`, `RES-03`, `RES-05`). `EXT-01` a `EXT-04` siguen en el modelo con la etiqueta `Diferido`, fuera de las vistas.
-- **Límite del sistema:** todo lo que se construye y se ejecuta en local: la web mínima, la API y la base de datos. El notificador simulado queda fuera porque es una frontera con contrato y fallo explícito.
+- **Límite del sistema:** todo lo que se construye y se ejecuta en local: el servidor de aplicación, que sirve la web y la API, y la base de datos. El notificador simulado queda fuera porque es una frontera con contrato y fallo explícito.
 - **Relaciones principales:** el cobrador solicita desembolsos, valida el código, registra pagos y cierra su caja; el administrador aprueba o rechaza y verifica; el sistema notifica al cliente final a través del notificador simulado.
 
 ### 5.3 C4 de Contenedores, nivel 2
@@ -828,7 +828,7 @@ No forma parte de la línea base. Se conserva como registro de la Entrega 2.
 
 La vista de componentes de `CON-03` se añadió al mismo `workspace.dsl` con la clave `c4-componentes` y se explica en [`../03-diseno-vertical/diseno-y-vertical.md`](../03-diseno-vertical/diseno-y-vertical.md), sección 2.
 
-El sistema que el diagrama de Contexto muestra como una unidad se descompone en `CON-02`, `CON-03` y `CON-04`. `CON-01` y `CON-05` siguen en el modelo con la etiqueta `Diferido` y no aparecen en las vistas. El cobrador y el administrador usan la API directamente en la Entrega 3 y `CON-02` en la Entrega 4. `EXT-05` se relaciona con `CON-03`, único contenedor que lo invoca, y entrega al cliente final. No aparecen capas, paquetes ni módulos: los módulos del servidor están dentro de `CON-03` y no son contenedores, porque se ejecutan juntos.
+El sistema que el diagrama de Contexto muestra como una unidad se descompone en `CON-03` y `CON-04`; `CON-02` queda en el modelo con la etiqueta `Historico`, fuera de las vistas, porque la web se construyó como el componente `CMP-14` de `CON-03`. `CON-01` y `CON-05` siguen en el modelo con la etiqueta `Diferido` y no aparecen en las vistas. El cobrador y el administrador usaban la API directamente en la Entrega 3; en la Entrega 4 usan la web de `CON-03`. `EXT-05` se relaciona con `CON-03`, único contenedor que lo invoca, y entrega al cliente final. No aparecen capas, paquetes ni módulos: los módulos del servidor están dentro de `CON-03` y no son contenedores, porque se ejecutan juntos.
 
 ---
 
@@ -890,7 +890,7 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 
 **Alcance de las evidencias frente al recorrido vertical**
 
-- `EV-10` y `CA-11` tratan de pagos, fuera del recorrido de desembolso, y pasan a la Entrega 4 (provisional).
+- `EV-10` y `CA-11` tratan de pagos, fuera del recorrido de desembolso, y se reprogramaron a la Entrega 4 (decisión de la Entrega 3, registro histórico).
 - `CA-12` sí entra, porque cubre el fallo al notificar un código de confirmación.
 - `CA-07` se redacta sobre un pago, pero sus campos se exigen al asiento del desembolso y deben aparecer en la traza.
 - El resultado de cada evidencia está en [`../03-diseno-vertical/diseno-y-vertical.md`](../03-diseno-vertical/diseno-y-vertical.md), sección 8. Esta tabla conserva lo que se pidió comprobar.
