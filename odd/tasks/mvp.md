@@ -84,6 +84,14 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
   - Acepta: los gráficos se ven a 360 px; sin estilos ni scripts en línea.
   - T14 se dividió en T14a y T14b (regla 10): juntas pasan de las 400 líneas de autor (unas 440), pero cada una cabe sola.
 
+- [ ] **T15 Entrega 4: producto final, arquitectura consolidada y sustentación.** Enunciado del curso en `docs/04-entrega-final/` (commit `95f2157` del repositorio del curso). Plazo: 5 horas desde el 2026-11-16. Rama `entrega-4-final`, desde la cadena T11b–T14 ya revisada (PR #35 a #38) más la fusión del enunciado.
+  - [ ] T15.1 Código congelado: T11b–T14 integradas; suite completa en verde (ruta: en línea).
+  - [ ] T15.2 C4 vigente desde `workspace.dsl`, SVG exportados, ADR con estado final y sin la plantilla ADR-00X (ruta: delegada, un escritor).
+  - [ ] T15.3 `entrega-final.md`, `trazabilidad-final.md`, `diagramas/README.md` y `evidencias/` completos (ruta: delegada, un escritor).
+  - [ ] T15.4 README actualizados, `backend/.env.example` y ensayo desde un clon limpio (ruta: delegada).
+  - [ ] T15.5 Entrega al repositorio del curso con etiqueta inmutable `entrega-4-final` (requiere confirmación del usuario).
+  - Acepta: las 13 casillas de la sección 7 de `docs/04-entrega-final/README.md`.
+
 ## Preguntas abiertas
 
 - Ninguna por ahora.
