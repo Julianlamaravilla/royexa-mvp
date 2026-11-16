@@ -82,7 +82,7 @@ Comando (desde backend/, con PostgreSQL en ejecución):
   uv run pytest -m "" tests/postgres/test_pr07_ledger_privileges.py tests/postgres/test_t5d_adjustments_persistence.py -v
 
 Son 26 pruebas; todas pasan dentro de la ejecución completa registrada en resultado-pruebas.txt
-(1120 pasan, 0 fallan). Pruebas incluidas:
+(1129 pasan, 0 fallan). Pruebas incluidas:
 
 tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[UPDATE]
 tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[DELETE]

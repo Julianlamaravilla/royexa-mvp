@@ -7,7 +7,7 @@ Parte 1. Pruebas automatizadas del fallo del notificador
 Comando (desde backend/):
   uv run pytest tests/vertical/test_pr06_notifier_failure.py tests/shared/test_t10a_background_dispatch.py tests/vertical/test_t4_payment_receipt.py -v
 Sin -m "" se ejecutan las variantes en memoria; las 14 variantes [postgres] de estos archivos
-se ejecutan con -m "" y forman parte de las 1120 que pasan en resultado-pruebas.txt.
+se ejecutan con -m "" y forman parte de las 1129 que pasan en resultado-pruebas.txt.
 
 ============================= test session starts ==============================
 platform darwin -- Python 3.14.6, pytest-9.2.0, pluggy-1.7.0 -- <repo>/backend/.venv/bin/python3
