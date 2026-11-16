@@ -401,6 +401,8 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 #### Decisión provisional
 
 > **Anotación (2026-10-31).** `EV-01` y `EV-02` quedaron `Validada` y `ADR-001` pasó a `Aceptado`, con los límites que declara ese registro (`HV-01`, `HV-03`, `HV-07`).
+>
+> **Anotación (2026-11-16).** `ADR-001` sigue `Aceptado` y sus dos límites se cierran en la Entrega 4: el ajuste es un asiento compensatorio (`CA-08`) y todo el estado está en `CON-04`, en la transacción del libro.
 
 - **Alternativa seleccionada:** ALT-01B.
 - **Justificación:** Es la única que cumple el criterio obligatorio de rechazo aunque falle el código y que permite demostrarlo con una prueba automatizada, que es la forma de verificación de `EC-01`. TRACKEA, que queda como referencia, tomó la misma decisión (rol de la aplicación sin actualización ni borrado, roles separados y libro con un solo escritor). PostgreSQL local es obligatorio para `EV-01` y `EV-02`: un libro en memoria equivale a ALT-01A.
@@ -502,6 +504,8 @@ Se analizan en profundidad `AD-01`, `AD-02` y `AD-03` por tres razones. Primero,
 #### Decisión provisional
 
 > **Anotación (2026-10-31).** `EV-03` y `EV-09` quedaron `Validada`. `EV-08` sigue prevista para la Entrega 4, así que `ADR-002` sigue `Propuesto` (`HV-05`, `HV-06`, `HV-07`).
+>
+> **Anotación (2026-11-16).** `EV-08` quedó `Validada` y `ADR-002` pasó a `Aceptado`. La bandeja de salida está en `CON-04` en la transacción del dinero y el despachador corre en segundo plano dentro de `CON-03`.
 
 - **Alternativa seleccionada:** ALT-02A.
 - **Justificación:** Es la única que cumple a la vez la atomicidad del dinero (O1) y la independencia del aviso respecto del dinero (O2) con la capacidad de un equipo mínimo y costo cero (`RES-06`). TRACKEA queda como referencia.
@@ -731,6 +735,7 @@ Las tres decisiones forman una sola idea: el dinero solo se escribe en un lugar,
 - **Unidad o unidades de ejecución:** la API del servidor (`CON-03`, FastAPI con Uvicorn en local), único proceso de la Entrega 3; y, en la Entrega 4 (provisional), la web mínima renderizada en el servidor (`CON-02`), que corre en local y llama a la API. `CON-01` queda diferido. Todos los módulos del servidor forman parte de `CON-03`.
 - **Almacenamientos:** PostgreSQL 17 local (`CON-04`), con el libro, los préstamos, las cajas y la bandeja de salida de eventos. Es obligatorio para demostrar el libro (`EV-01`, `EV-02`). Los adaptadores en memoria sirven para las pruebas que no dependen de esa garantía. `CON-05` queda diferido.
 - **Almacenamiento en la Entrega 3 (2026-10-31):** solo el libro está en `CON-04`. Desembolsos, préstamos, cajas y bandeja de salida viven en memoria también en ejecución, y se pierden al reiniciar (`HV-07`, `RA-10`).
+- **Ejecución y almacenamiento en la Entrega 4 (2026-11-16):** un solo proceso, `CON-03`, sirve la API JSON y la web renderizada en el servidor (componente `CMP-14`); la web no llama a la API por HTTP, sino a los mismos casos de uso. `CON-02` queda como registro histórico. Todo el estado está en `CON-04` y se confirma en la transacción del libro; los adaptadores en memoria quedan para las pruebas rápidas y el modo sin base de datos.
 - **Fronteras externas:** el notificador simulado (`EXT-05`). `EXT-01` a `EXT-04` quedan diferidos.
 - **Responsabilidades principales:** en el servidor, módulos con dueño único de sus entidades: `identity_access` (mínimo, con usuarios sembrados), `clients`, `loans`, `sales` (dueño del desembolso; conserva el nombre heredado), `ledger`, `cash_box` y `notifications`. Quedan diferidos `tenancy`, `devices`, `consent`, `sync`, `expenses`, `reporting` y `payments`, que vuelve en la Entrega 4 (provisional).
 - **Dirección de las dependencias:** el grafo de módulos es acíclico. Los módulos de dinero dependen de identidad y de clientes; `ledger` depende de `cash_box` para asignar cada asiento a una caja; solo `notifications` lee eventos y ningún módulo de negocio lo llama. Las aplicaciones cliente dependen de la API, nunca de la base de datos.
@@ -813,10 +818,10 @@ No forma parte de la línea base. Se conserva como registro de la Entrega 2.
 
 | ID | Contenedor | Responsabilidad | Tecnología candidata | Decisiones relacionadas |
 |---|---|---|---|---|
-| CON-01 | Aplicación móvil del cobrador (diferido, `DIV-02`) | Registrar cobros, no pagos y gastos sin señal en una cola local cifrada y sincronizar al volver la señal. | Candidata de la Entrega 2: React Native, TypeScript, SQLCipher; Android 10 o superior | ADR-003 |
-| CON-02 | Aplicación web mínima | Permitir al cobrador y al administrador operar desembolsos, pagos y cierre de caja. No existe en la Entrega 3; se construye en la Entrega 4 (provisional). | Plantillas renderizadas en el servidor, en local | AD-02, AD-03, ADR-002, ADR-004 |
-| CON-03 | API del servidor | Validar las reglas de negocio, calcular el dinero en centavos, escribir el libro mayor y registrar eventos para avisos. | Python 3.14, FastAPI, Uvicorn local | AD-01, AD-02, AD-03, AD-06, ADR-001, ADR-002, ADR-004 |
-| CON-04 | Base de datos | Conservar el libro de solo inserción. La línea base prevé también préstamos, cajas y la bandeja de salida de eventos, que en la Entrega 3 siguen en memoria (`HV-07`). | PostgreSQL 17 local; adaptadores en memoria para las pruebas y, en la Entrega 3, para los datos que no son el libro | AD-01, AD-02, AD-03, ADR-001, ADR-002, ADR-004 |
+| CON-01 | Aplicación móvil del cobrador (diferido, `DIV-02`) | Registrar cobros, no pagos y gastos sin señal en una cola local cifrada y sincronizar al volver la señal. | Candidata de la Entrega 2: React Native, TypeScript, SQLCipher; Android 10 o superior | ADR-003 (rechazado, reemplazado por ADR-004) |
+| CON-02 | Aplicación web mínima (histórico) | Permitir al cobrador y al administrador operar desembolsos, pagos y cierre de caja. En la Entrega 4 se construyó dentro de `CON-03`, en el mismo proceso que la API (componente `CMP-14`), así que deja de ser un contenedor aparte. | Plantillas renderizadas en el servidor | AD-02, AD-03, ADR-002, ADR-004 |
+| CON-03 | Servidor de aplicación (antes «API del servidor») | Servir la API JSON y las páginas web, validar las reglas de negocio, calcular el dinero en centavos, escribir el libro mayor, registrar eventos para avisos y despacharlos en segundo plano. | Python 3.14, FastAPI, Jinja2, Uvicorn; local o un servicio web en Docker | AD-01, AD-02, AD-03, AD-06, ADR-001, ADR-002, ADR-004 |
+| CON-04 | Base de datos | Conservar el libro de solo inserción y, desde la Entrega 4, todo el estado: desembolsos, préstamos, pagos, no pagos, cajas, cierres, clientes, credenciales, sesiones y la bandeja de salida. En la Entrega 3 solo guardaba el libro (`HV-07`). | PostgreSQL 17 local; adaptadores en memoria para las pruebas rápidas y el modo sin base de datos | AD-01, AD-02, AD-03, ADR-001, ADR-002, ADR-004 |
 | CON-05 | Almacén de fotos (diferido) | Guardar fotos de documento, residencia, comercio y comprobantes de gasto, con verificación de hash. | Candidata de la Entrega 2: Amazon S3 | Sin decisión |
 
 #### Coherencia entre vistas
@@ -842,7 +847,7 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 | RA-07 | La operación sin conexión no está en el alcance de la Entrega 1 y la trazabilidad podría no aceptarse. | AD-03, `DIV-02` | Media | Alto | Discutir `DIV-02` con el docente antes de la evaluación. | Cierra con la resolución de `DIV-02`, pendiente de confirmación docente. |
 | RA-08 | En v1 no existe un comprobante independiente hacia el cliente final, así que el control frente al prestatario que la Entrega 1 considera no negociable (`RES-05`) queda sin cubrir. | `ASR-02`, `ASR-05`, `DIV-01` | Alta | Alto | Registrar en `DIV-01`; decidir con el docente si se difiere o se reincorpora. | Cierra con la resolución de `DIV-01`, pendiente de confirmación docente. |
 | RA-09 | Un cobro llega con la hora del teléfono muy distinta de la del servidor y cae en la caja equivocada. | `RN-02`, AD-03 | Media | Medio | Regla de umbral de 24 horas con alerta (pendiente de confirmar con el cliente). | Diferido con `DIV-02`. |
-| RA-10 | El libro y los datos en memoria no comparten una transacción. Una caída entre los dos pasos del `commit`, o un reinicio, deja asientos en `CON-04` sin su desembolso ni su efecto en la caja. | AD-02, ALT-02A, `HV-07` | Media | Alto | Limitarlo a la demostración local, declararlo y llevar desembolsos, cajas y bandeja de salida a `CON-04` en la misma transacción que el libro. | Abierto |
+| RA-10 | El libro y los datos en memoria no comparten una transacción. Una caída entre los dos pasos del `commit`, o un reinicio, deja asientos en `CON-04` sin su desembolso ni su efecto en la caja. | AD-02, ALT-02A, `HV-07` | Media | Alto | Limitarlo a la demostración local, declararlo y llevar desembolsos, cajas y bandeja de salida a `CON-04` en la misma transacción que el libro. | Cerrado (2026-11-16): todo el estado está en `CON-04` en la transacción del libro (`PostgresSession`) |
 | RA-11 | La entrega de avisos es de al menos una vez. Un fallo al confirmar tras enviar repite el aviso, y una excepción distinta de `NotifierUnavailable` corta la ejecución del despachador. | AD-02, ALT-02A, `HV-06` | Media | Medio | Tratar cualquier fallo del adaptador como un intento fallido y dar al adaptador real un identificador de mensaje para descartar duplicados. | Abierto |
 
 ### 6.2 Supuestos
@@ -909,8 +914,9 @@ El sistema que el diagrama de Contexto muestra como una unidad se descompone en 
 | 2026-10-31 | `DIV-08` queda resuelta: el docente autorizó el trabajo individual | Confirmación del autor; el repositorio no guarda la constancia de esa autorización | `arquitectura.md`, `realineacion-entrega-1.md`, `docs/03-diseno-vertical/diseno-y-vertical.md` | Julian Andres Restrepo |
 | 2026-10-31 | `workspace.dsl` se valida con Structurizr, incluida la vista `c4-componentes`, y los SVG de C4 pasan a ser su exportación oficial; `CON-04` y su relación con `CON-03` se alinean con `HV-07` | Los SVG dibujados a mano mostraban el modelo de la Entrega 2. La validación comprueba sintaxis y referencias, no que el modelo sea correcto | `diagramas/workspace.dsl`, `diagramas/c4-contexto.svg`, `diagramas/c4-contenedores.svg`, `arquitectura.md`, `docs/03-diseno-vertical/diseno-y-vertical.md` | Julian Andres Restrepo |
 | 2026-10-31 | La cobertura del recorrido en `trazabilidad-arquitectonica.md` y la fila de `CON-04` en `realineacion-entrega-1.md` declaran dónde está cada dato en la Entrega 3 | La fila de Persistencia ubicaba la Caja en `CON-04`, en contra de `HV-07` | `trazabilidad-arquitectonica.md`, `realineacion-entrega-1.md` | Julian Andres Restrepo |
+| 2026-11-16 | Estados finales de los ADR: `ADR-001` y `ADR-002` `Aceptado`, `ADR-003` `Rechazado (reemplazado por ADR-004)` y `ADR-004` `Aceptado`; `EV-08` `Validada`; `RA-10` cerrado. `workspace.dsl` se alinea con el código de la Entrega 4: `CON-03` sirve la API y la web, `CON-02` queda histórico, `CON-04` guarda todo el estado y la vista de componentes cubre el MVP (`CMP-14` a `CMP-18` nuevos). Se retira la plantilla de ADR | Consolidación de la Entrega 4 (sección 5.2 y 5.3 del enunciado) | `adr/ADR-001` a `ADR-004`, `diagramas/workspace.dsl`, `diagramas/c4-contenedores.svg`, `arquitectura.md`, `trazabilidad-arquitectonica.md`, `docs/03-diseno-vertical/diagramas/` | Julian Andres Restrepo |
 
-El archivo [`adr/ADR-00X-titulo-de-la-decision.md`](adr/ADR-00X-titulo-de-la-decision.md) es la plantilla y se conserva sin cambios.
+La plantilla de ADR del curso se retiró del repositorio el 2026-11-16: los cuatro ADR ya tienen estado final y la plantilla no es una decisión.
 
 ### 7.1 Divergencias entre la Entrega 1 y TRACKEA
 

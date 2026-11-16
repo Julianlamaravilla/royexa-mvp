@@ -86,6 +86,13 @@ Este registro pasa a `Aceptado` solo si EV-01 y EV-02 quedan `Validada`.
 
 **Aceptación (2026-10-31).** EV-01 y EV-02 quedaron `Validada` sobre PostgreSQL 17 (HV-01). La aceptación cubre el rechazo de las alteraciones y el único módulo escritor. No cubre dos partes del criterio obligatorio y de ALT-01B, que siguen abiertas: el asiento compensatorio no existe todavía (HV-03) y el saldo de la caja es un campo en memoria, no la suma de los asientos (HV-07).
 
+**Confirmación (2026-11-16, Entrega 4).** La aceptación se mantiene y sus dos límites se cierran:
+
+- El asiento compensatorio existe: un ajuste es un asiento `AJUSTE` que referencia al original mediante `adjusts_entry_id`, y el original no cambia (`backend/migrations/011_adjustments.sql`; `backend/tests/vertical/test_t5d_adjustments.py`, CA-08; `backend/tests/postgres/test_t5d_adjustments_persistence.py`). Así se resuelve HV-03 sin abandonar ALT-01B.
+- Todo el estado vive en PostgreSQL y se confirma en la misma transacción que el asiento (`backend/src/royexa/adapters/postgres_state.py`, `PostgresSession`; `backend/tests/postgres/test_t1a_persistence.py`). El efectivo esperado del cierre se calcula con la suma de los asientos de la caja, no con el campo de saldo (`backend/src/royexa/closing/application.py`, T5-P1). Así se resuelve HV-07 y RA-10 deja de aplicar a este registro.
+
+EV-01 y EV-02 se siguen ejecutando con `uv run pytest -m postgres` (`backend/tests/postgres/test_pr07_ledger_privileges.py`), y el endurecimiento del piloto añade la comprobación de que las migraciones cierran cada tabla a los roles que expone la plataforma (`backend/tests/postgres/test_t10b_production_database.py`).
+
 ## 6. Consecuencias
 
 ### Positivas
@@ -98,13 +105,13 @@ Este registro pasa a `Aceptado` solo si EV-01 y EV-02 quedan `Validada`.
 - Cada operación de dinero pasa por una llamada más al módulo del libro.
 - Los privilegios exigen una prueba de ausencia en cada migración.
 - El propietario de la base de datos sigue pudiendo alterar el libro.
-- La garantía solo protege lo que está en PostgreSQL. En la Entrega 3 eso es únicamente el libro (HV-07).
+- La garantía solo protege lo que está en PostgreSQL. En la Entrega 3 eso era únicamente el libro (HV-07); desde la Entrega 4 todo el estado está en PostgreSQL, aunque la restricción de solo inserción aplica al libro y no a las tablas de estado.
 
 ### Riesgos residuales
 
 - RA-01: una migración concede privilegios de más.
 - RA-02: acceso privilegiado a la base de datos.
-- RA-10: el libro y los datos en memoria no comparten una transacción.
+- RA-10: el libro y los datos en memoria no compartían una transacción. Cerrado en la Entrega 4: el estado y el libro se confirman en la misma transacción de PostgreSQL.
 
 ## 7. Elementos arquitectónicos afectados
 
@@ -143,7 +150,7 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 ## 10. Decisiones relacionadas
 
 - ADR-002 (el libro es escrito por un módulo y comunicado con el resto por llamadas directas).
-- ADR-004 (la restricción de unicidad por desembolso y tipo evita que el libro reciba dos veces el mismo desembolso). Sustituye a ADR-003 en esta relación cuando el docente confirme la resolución de DIV-02.
+- ADR-004 (la restricción de unicidad por desembolso y tipo evita que el libro reciba dos veces el mismo desembolso). Sustituye a ADR-003, rechazado el 2026-11-16, en esta relación.
 
 ## 11. Historial
 
@@ -153,3 +160,4 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 | 2026-10-30 | Propuesto | Costo cero en lugar de presupuesto de infraestructura; PostgreSQL local obligatorio para EV-01 y EV-02; comando local en lugar de integración continua; rutas de TRACKEA retiradas; relación con ADR-004 | Realineación con la Entrega 1 (`realineacion-entrega-1.md`) |
 | 2026-10-31 | Propuesto | Redacción de EV-02: se retira «el registro de cambios», que no existe en el esquema, y se nombra el comando que la ejecuta | HV-02 |
 | 2026-10-31 | Aceptado | EV-01 y EV-02 en `Validada`; rutas reales de los artefactos; límites de la aceptación y RA-10 | HV-01, HV-03, HV-07 |
+| 2026-11-16 | Aceptado | Se confirma la aceptación con la evidencia de la Entrega 4: el asiento compensatorio `AJUSTE` (CA-08, `test_t5d_adjustments.py`, `test_t5d_adjustments_persistence.py`), todo el estado en la transacción del libro (`test_t1a_persistence.py`), el cierre calculado con la suma de los asientos y los privilegios del piloto (`test_pr07_ledger_privileges.py`, `test_t10b_production_database.py`). Se cierran los límites HV-03 y HV-07 | Entrega 4: producto final, patrones e integración |

@@ -99,7 +99,7 @@ Contiene el modelo Structurizr DSL utilizado para generar:
 
 Ambas vistas deben generarse a partir del mismo modelo.
 
-### `adr/ADR-00X-*.md`
+### `adr/ADR-NNN-*.md`
 
 Cada archivo registra una decisión arquitectónica significativa. Se entregarán normalmente entre dos y tres ADR preliminares.
 

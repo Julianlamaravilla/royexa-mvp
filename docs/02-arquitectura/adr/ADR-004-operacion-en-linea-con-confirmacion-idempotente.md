@@ -1,6 +1,6 @@
 # ADR-004: Operación en línea con confirmación idempotente del código
 
-- **Estado:** Propuesto
+- **Estado:** Aceptado
 - **Fecha:** 2026-10-30
 - **Responsables:** Julian Andres Restrepo
 - **Asunto relacionado:** AD-03
@@ -105,6 +105,12 @@ ADR-003 pasa a `Reemplazado por ADR-004` solo cuando el docente confirme la reso
 
 La decisión se considera provisional hasta obtener la evidencia indicada en este registro.
 
+**Aceptación (2026-11-16, Entrega 4).** El producto final opera en línea por la web y la API, sin aplicación móvil, y el enunciado de la Entrega 4 no exige la operación sin conexión. DIV-02 queda resuelta a favor de la Entrega 1 (la constancia de la confirmación docente no está en el repositorio) y ADR-003 pasa a `Rechazado (reemplazado por ADR-004)`. EV-12 sigue `Validada`, ahora con todo el estado en PostgreSQL:
+
+- La sesión de PostgreSQL abre cada unidad de trabajo en `REPEATABLE READ` (`PostgresLedgerSession`, heredada por `PostgresSession` en `backend/src/royexa/adapters/postgres_state.py`). Una actualización concurrente que perdió la carrera llega como `SerializationFailure` y se traduce a `StaleWrite`, un `WriteConflict`; `ConfirmDisbursement.execute` la captura y repite `_attempt` una sola vez, que lee lo ya confirmado y devuelve `ALREADY_CONFIRMED`.
+- Pruebas: `backend/tests/vertical/test_pr05_idempotent_confirmation.py` (reintento, perdedor de la carrera y dos confirmaciones simultáneas), `backend/tests/postgres/test_pr07_ledger_privileges.py` (`test_pr07_two_simultaneous_confirmations_settle_once_on_the_real_ledger` y la restricción de unicidad) y `backend/tests/postgres/test_t1b_disbursements.py` (dos transacciones sobre el mismo desembolso no se sobrescriben).
+- Los pagos no tienen un código que sirva de barrera. En la web, cada formulario lleva una ficha de un solo uso ligada a la sesión: repetir el envío devuelve el resultado ya registrado sin repetir el pago (T7-P4; `backend/tests/web/test_t7a_form_tokens.py`, `backend/tests/postgres/test_t7a_form_tokens_persistence.py`). La API JSON de pagos no tiene clave de idempotencia; se registra como riesgo residual.
+
 ## 6. Consecuencias
 
 ### Positivas
@@ -122,14 +128,15 @@ La decisión se considera provisional hasta obtener la evidencia indicada en est
 
 ### Riesgos residuales
 
-- RA-07: cierra cuando el docente confirme la resolución de DIV-02. Pendiente.
+- RA-07: se cierra con el producto final en línea y DIV-02 resuelta a favor de la Entrega 1. La constancia de la confirmación docente no está en el repositorio.
 - Una migración podría retirar la restricción de unicidad. Se registra como punto sensible en `arquitectura.md`, sección 6.3.
-- RA-10: la unicidad vive en PostgreSQL, pero la máquina de estados del desembolso vive en memoria. Tras un reinicio el desembolso desaparece y solo queda el asiento (HV-07).
+- RA-10: la unicidad vivía en PostgreSQL y la máquina de estados del desembolso en memoria (HV-07). Cerrado en la Entrega 4: el desembolso, su asiento y su efecto se confirman en la misma transacción de PostgreSQL.
+- `POST /v1/loans/{loan_id}/payments` no tiene clave de idempotencia: un cliente de la API JSON que repita la petición tras perder la respuesta podría registrar un segundo pago; ninguna prueba cubre ese caso. La web no tiene este problema por la ficha de un solo uso.
 
 ## 7. Elementos arquitectónicos afectados
 
 - **Sistemas:** ROYEXA
-- **Contenedores:** CON-02 (Entrega 4), CON-03, CON-04
+- **Contenedores:** CON-03, que en la Entrega 4 también sirve la web (CMP-14; CON-02 queda como registro histórico), y CON-04
 - **Sistemas externos:** EXT-05, que no recibe un segundo envío en el reintento
 - **Relaciones C4:** «API del servidor → Base de datos» (inserta el asiento una sola vez por desembolso y tipo)
 - **Artefactos adicionales:** `backend/src/royexa/sales/`, `backend/src/royexa/ledger/` y `backend/migrations/001_ledger.sql`, que define la restricción de unicidad `ledger_entry_one_per_disbursement_and_type`
@@ -149,13 +156,13 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 - El docente no confirma la resolución de DIV-02.
 - EV-12 demuestra que un reintento o una confirmación concurrente duplica el asiento.
 - Un requisito exige operar sin conexión; en ese caso se retoma ALT-03B.
-- Los pagos de la Entrega 4 no pueden reintentarse con seguridad con un mecanismo equivalente.
+- Los pagos de la Entrega 4 no pueden reintentarse con seguridad con un mecanismo equivalente. Estado (2026-11-16): se cumple en la web con las fichas de un solo uso; en la API JSON de pagos sigue abierto y se registra como riesgo residual.
 
 ## 10. Decisiones relacionadas
 
 - ADR-001 (el libro de solo inserción es el destino del asiento único).
 - ADR-002 (la confirmación ocurre en una transacción dentro del monolito modular).
-- ADR-003 (decisión anterior sobre AD-03; pasa a `Reemplazado por ADR-004` con la confirmación docente).
+- ADR-003 (decisión anterior sobre AD-03; `Rechazado (reemplazado por ADR-004)` desde el 2026-11-16).
 
 ## 11. Historial
 
@@ -163,3 +170,4 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 |---|---|---|---|
 | 2026-10-30 | Propuesto | Creación inicial | Realineación con la Entrega 1 sobre una demostración local de costo cero |
 | 2026-10-31 | Propuesto | Se añade la relectura del perdedor: repite `_attempt` una vez y devuelve el resultado confirmado. RN-05 se repite al asentar. Resultado de EV-12 y RA-10. Sin cambio de estado: falta la confirmación docente | HV-04, HV-07 |
+| 2026-11-16 | Aceptado | EV-12 se mantiene `Validada` con todo el estado en PostgreSQL en `REPEATABLE READ` (`PostgresSession`; `test_pr05_idempotent_confirmation.py`, `test_pr07_ledger_privileges.py`, `test_t1b_disbursements.py`). Fichas de un solo uso para los pagos en la web (`test_t7a_form_tokens.py`); la API JSON de pagos queda sin clave de idempotencia como riesgo residual. ADR-003 pasa a `Rechazado`. RA-07 y RA-10 cerrados | Entrega 4: producto final en línea; DIV-02 resuelta a favor de la Entrega 1 |

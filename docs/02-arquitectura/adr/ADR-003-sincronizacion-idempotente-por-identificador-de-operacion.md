@@ -1,6 +1,6 @@
 # ADR-003: Sincronización de cobros sin señal por identificador único de operación
 
-- **Estado:** Propuesto
+- **Estado:** Rechazado (reemplazado por ADR-004)
 - **Fecha:** 2026-09-20
 - **Responsables:** Julian Andres Restrepo
 - **Asunto relacionado:** AD-03
@@ -80,6 +80,8 @@ Se selecciona **ALT-03B** porque es la única que cumple el registro firme sin s
 
 La decisión se considera provisional hasta obtener la evidencia indicada en este registro.
 
+**Rechazo (2026-11-16).** Se cumplió la primera condición de revisión: DIV-02 se resolvió a favor del alcance de la Entrega 1, que excluye la operación sin conexión, y el enunciado de la Entrega 4 no la exige. La constancia de la confirmación docente no está en el repositorio. ADR-004 seleccionó ALT-03A, operación en línea con confirmación idempotente, y el producto final se construyó así: la web mínima renderizada en el servidor y la API, sin aplicación móvil (CON-01 sigue `Diferido`), sin cola local y sin el módulo `sync/`. EV-05 y EV-06 no se ejecutaron porque ALT-03B no se implementó. El razonamiento de este registro se conserva como historia; si un requisito futuro exige operar sin conexión, ALT-03B se retomaría desde ADR-004.
+
 ## 6. Consecuencias
 
 ### Positivas
@@ -106,7 +108,7 @@ La decisión se considera provisional hasta obtener la evidencia indicada en est
 - **Contenedores:** CON-01, CON-03, CON-04
 - **Sistemas externos:** No aplica
 - **Relaciones C4:** «Aplicación móvil → API del servidor» (envía operaciones por lote con identificador único y descarga cambios por cursor)
-- **Artefactos adicionales:** módulo de sincronización (`backend/src/royexa/sync/`), rutas `/sync/operations` y `/sync/changes` en `contracts/openapi.json` y pruebas de integración (`backend/tests/integration/sync/`)
+- **Artefactos adicionales:** módulo de sincronización (`backend/src/royexa/sync/`), rutas `/sync/operations` y `/sync/changes` en `contracts/openapi.json` y pruebas de integración (`backend/tests/integration/sync/`). Ninguno se construyó: la decisión se rechazó antes de implementarse.
 
 ## 8. Evidencia y validación
 
@@ -134,3 +136,4 @@ Esta decisión deberá revisarse si ocurre alguna de las siguientes condiciones:
 | Fecha | Estado | Cambio | Motivo |
 |---|---|---|---|
 | 2026-09-20 | Propuesto | Creación inicial | Sincronización con el estado de TRACKEA |
+| 2026-11-16 | Rechazado (reemplazado por ADR-004) | Se rechaza ALT-03B y la decisión pasa a ADR-004, que selecciona ALT-03A. EV-05 y EV-06 no se ejecutan | DIV-02 resuelta a favor de la Entrega 1, que excluye la operación sin conexión; el producto final opera en línea por la web y la API (Entrega 4) |

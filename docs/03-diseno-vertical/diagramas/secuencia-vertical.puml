@@ -9,8 +9,8 @@ control "CMP-02: Casos de uso\nsales/application.py" as CasoUso
 entity "CMP-03: Disbursement\nsales/domain.py" as Dominio
 entity "CMP-04: Préstamos\nloans/domain.py" as Prestamos
 control "CMP-05: LedgerPosting\nledger/posting.py" as Posting
-entity "CMP-06: CashBox\ncash_box/domain.py" as Caja
-collections "CTR-04: SalesUnitOfWork\nCMP-09: InMemoryUnitOfWork" as UoW
+entity "CMP-06: CashDesk, CashBox\ncash_box/" as Caja
+collections "CTR-04: SalesUnitOfWork\nCMP-09: InMemoryUnitOfWork\nCMP-10: PostgresSession" as UoW
 database "CTR-05: LedgerRepository\nCMP-10: PostgresLedgerRepository" as Libro
 control "CMP-08: NotificationDispatcher\nnotifications/dispatcher.py" as Despachador
 participant "CTR-10: Notifier\nCMP-11: SimulatedNotifier" as Notificador
@@ -24,7 +24,7 @@ end note
 
 == UC-01: solicitud (RF-03, RN-05) ==
 
-Cobrador -> Entrada: POST /v1/disbursements\nX-Actor-Id, client_id, amount_cents, term_days, installment_count
+Cobrador -> Entrada: POST /v1/disbursements\nAuthorization: Bearer, client_id, amount_cents, term_days, installment_count
 Entrada -> CasoUso: RequestDisbursement.execute(actor, client_id, terms)
 CasoUso -> UoW: loans.unsettled_for_client(client.id)
 UoW --> CasoUso: None
@@ -53,6 +53,7 @@ Entrada --> Admin: 200 DisbursementOut, status=APROBADO, sin el código
 == UC-05: despacho del código (RF-06, ADR-002) ==
 
 Admin -> Entrada: POST /v1/notifications/dispatch
+note right of Entrada: En ejecución, background.dispatch_forever\ninvoca dispatch() cada ROYEXA_DISPATCH_SECONDS\nsin que nadie llame a la API (T10a).
 Entrada -> Despachador: dispatch()
 Despachador -> UoW: outbox.pending()
 UoW --> Despachador: [OutboxMessage]
@@ -82,17 +83,19 @@ Prestamos --> CasoUso: Loan con su calendario
 CasoUso -> UoW: loans.add(loan)
 CasoUso -> Dominio: attach_loan(loan.id)
 CasoUso -> Posting: post_disbursement(id, collector_id, principal, actor.id, device_time, now)
-Posting -> UoW: cash.open_box_of(collector_id)
-UoW --> Posting: CashBox
-Posting -> Caja: deduct(amount)
-Posting -> UoW: cash.save(box)
+Posting -> Caja: CashDesk.box_of(collector_id, now)
+Caja -> UoW: cash.box_of_day(collector_id, day)
+UoW --> Caja: CashBox, o la abre con el fondo del cobrador
+Caja --> Posting: CashBox
+Posting -> Caja: deduct(amount); CashDesk.save(box)
+Caja -> UoW: cash.save(box)
 Posting -> Libro: append(LedgerEntry DESEMBOLSO)
 note right of Libro: INSERT como royexa_app.\nÚnico por desembolso y tipo
 Posting --> CasoUso: LedgerEntry
 CasoUso -> UoW: outbox.add(OutboxMessage COMPROBANTE_DESEMBOLSO)
 CasoUso -> UoW: disbursements.save(disbursement); commit()
-UoW -> Libro: LedgerSession.commit()
-note right of UoW: Comprueba escrituras obsoletas,\nconfirma el libro y publica la memoria.\nNo es una transacción atómica única.
+UoW -> Libro: PostgresSession.commit()
+note right of UoW: Con ROYEXA_LEDGER_URL todos los repositorios\nson de PostgresSession: asiento, caja, préstamo,\ndesembolso y aviso se confirman en una sola\ntransacción REPEATABLE READ (ADR-002, ADR-004).
 CasoUso --> Entrada: Disbursement
 Entrada -> CasoUso: SalesQueries.detail(disbursement_id)
 CasoUso --> Entrada: DisbursementDetail

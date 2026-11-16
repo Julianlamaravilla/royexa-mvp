@@ -7,7 +7,7 @@ boundary "CMP-01: Entrada HTTP\napi.py" as Entrada
 control "CMP-02: Casos de uso\nsales/application.py" as CasoUso
 entity "CMP-03: Disbursement\nsales/domain.py" as Dominio
 control "CMP-05: LedgerPosting\nledger/posting.py" as Posting
-collections "CTR-04: SalesUnitOfWork\nCMP-09: InMemoryUnitOfWork" as UoW
+collections "CTR-04: SalesUnitOfWork\nCMP-09: InMemoryUnitOfWork\nCMP-10: PostgresSession" as UoW
 database "CTR-05: LedgerRepository\nCMP-10: PostgresLedgerRepository" as Libro
 
 note over Cobrador, Libro
@@ -28,7 +28,7 @@ CasoUso -> Dominio: confirm(plain_code, actor, now)
 note right of Dominio: El código se comprueba primero:\nun código errado no aprende nada.\nConfirmationCode.is_expired(now)
 Dominio --> CasoUso: ConfirmationOutcome.EXPIRED, status=CADUCADO
 CasoUso -> Posting: post_expired_attempt(id, collector_id, principal, actor.id, device_time, now)
-Posting -> UoW: cash.open_box_of(collector_id)
+Posting -> UoW: CashDesk.box_of(collector_id, now) → cash.box_of_day(...)
 UoW --> Posting: CashBox, sin descuento
 Posting -> Libro: append(LedgerEntry DESEMBOLSO_CADUCADO, reason=codigo_caducado)
 Posting --> CasoUso: LedgerEntry
