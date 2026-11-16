@@ -91,9 +91,9 @@ PostgreSQL: el repositorio usa `docker compose up -d --wait postgres`. Si la ses
     - Evidencia: commits `487fa0f` y `12c2f1e`; `bash docs/03-diseno-vertical/diagramas/exportar-diagramas.sh` terminó con código 0.
   - [x] T15.3 `entrega-final.md`, `trazabilidad-final.md`, `diagramas/README.md` y `evidencias/` completos (ruta: delegada, un escritor).
     - Evidencia: cuatro evidencias en `docs/04-entrega-final/evidencias/` (suite, escenario principal por HTTP, notificador caído por HTTP y por pruebas, EA-01 con inspección del catálogo); patrones PAT-01 a PAT-06, EA-01, EA-02 y deuda DT-01 a DT-10 en `entrega-final.md`; notas «Estado en la Entrega 4» en `trazabilidad-implementacion.md`, `diseno-y-vertical.md` y `realineacion-entrega-1.md`. Rutas entre comillas invertidas comprobadas con `test -e`.
-    - Pendiente: repetir la suite completa con Chromium instalado (la repetición del 2026-11-16 se interrumpió porque otra ejecución usaba la misma base al mismo tiempo).
-  - [ ] T15.4 README actualizados, `backend/.env.example` y ensayo desde un clon limpio (ruta: delegada).
-  - [ ] T15.5 Entrega al repositorio del curso con etiqueta inmutable `entrega-4-final` (requiere confirmación del usuario).
+    - Hecho (2026-11-16): suite completa repetida con Chromium instalado en `c64db4e`: 1131 recolectadas, 1129 pasan, 0 fallan, 2 omitidas a propósito (variante en `tests/postgres`); las 9 de navegador pasan (`docs/04-entrega-final/evidencias/resultado-pruebas.txt`).
+  - [ ] T15.4 README actualizados, configuración documentada en `backend/README.md` (sección «Configuración», líneas `export`; no hay `backend/.env.example` porque la aplicación solo lee variables del proceso con `Settings.from_env()`) y ensayo desde un clon limpio (ruta: delegada).
+  - [ ] T15.5 Entrega al repositorio del curso con etiqueta inmutable `entrega-4` sobre el commit de fusión (nombre distinto de la rama `entrega-4-final` para evitar referencias ambiguas; la crea el usuario al entregar).
   - Acepta: las 13 casillas de la sección 7 de `docs/04-entrega-final/README.md`.
 
 ## Preguntas abiertas
