@@ -7,7 +7,7 @@
 - **Grupo:** 10
 - **Fecha:** 2026-11-16
 - **Repositorio:** <https://github.com/jyeanaqs262/repogrp10>
-- **Commit o etiqueta evaluable:** etiqueta `entrega-4-final`, creada sobre la rama `entrega-4-final` al cierre de la entrega.
+- **Commit o etiqueta evaluable:** etiqueta `entrega-4`, que el autor crea al entregar sobre el commit de fusión en el repositorio del curso. El trabajo se desarrolla en la rama `entrega-4-final`; la etiqueta lleva otro nombre para que la referencia no sea ambigua entre rama y etiqueta.
 
 ## 1. Resultado del proyecto
 
@@ -250,7 +250,7 @@ Los identificadores PR-01 a PR-11 están definidos en `docs/03-diseno-vertical/d
 | ID | Tipo | Escenario | Referencias | Ruta | Resultado |
 |---|---|---|---|---|---|
 | PR-01 | Componente sobre la API | Escenario principal: desembolso confirmado con asiento, calendario y descuento | UC-01, UC-02, UC-03, UC-05; CA-05, CA-07, CA-09 | `backend/tests/vertical/test_pr01_valid_confirmation.py` | Pasa |
-| PR-12 | Navegador real (Playwright, Chromium a 360 px) | Escenario principal en la web: inicio de sesión, pago y cierre | CA-01, CA-03; RF-01, RF-02 | `backend/tests/e2e/test_t7d_phone_flow.py` | Pasa con Chromium instalado; sin él se omite con su motivo |
+| PR-12 | Navegador real (Playwright, Chromium a 360 px) | Escenario principal en la web: inicio de sesión, pago y cierre | CA-01, CA-03; RF-01, RF-02 | `backend/tests/e2e/test_t7d_phone_flow.py` | Pasa (ejecutada con Chromium en la suite completa del 2026-11-16, `evidencias/resultado-pruebas.txt`); sin Chromium se omite con su motivo |
 | PR-13 | Unidad (dominio puro) | Regla 1: contador fraccionario, 25 sobre una cuota de 50 deja 19,5 de 20 | RN-01; CA-01; EC-03; EV-10 | `backend/tests/loans/test_t3a_payment_allocation.py` | Pasa |
 | PR-14 | Componente sobre la API | Regla 2: cierre solo sin pendientes, irreversible y con descuadre | RN-02; CA-03, CA-04 | `backend/tests/vertical/test_t5b_cash_close.py` | Pasa |
 | PR-02 | Componente sobre la API | Regla 3: quien origina no aprueba | RN-06; CA-06; EC-02; EV-11 | `backend/tests/vertical/test_pr02_self_approval_rejected.py` | Pasa |
@@ -263,9 +263,9 @@ Los identificadores PR-01 a PR-11 están definidos en `docs/03-diseno-vertical/d
 - **Fecha de ejecución:** 2026-11-16
 - **Comando:** `uv run pytest -m "" -rs` (desde `backend/`, con PostgreSQL 17 de `docker compose up -d --wait postgres`)
 - **Total:** 1131
-- **Exitosas:** 1120
+- **Exitosas:** 1129
 - **Fallidas:** 0
-- **Omitidas:** 11, cada una con su motivo: 9 pruebas de navegador porque esa máquina no tenía Chromium instalado (se instala con `uv run playwright install chromium`) y 2 que tienen su variante con base de datos en `backend/tests/postgres/`.
+- **Omitidas:** 2, a propósito, porque tienen su variante con base de datos en `backend/tests/postgres/`. Las 9 pruebas de navegador se ejecutaron con Chromium de Playwright instalado y pasaron.
 - **Evidencia:** [`evidencias/resultado-pruebas.txt`](evidencias/resultado-pruebas.txt)
 
 ## 8. Ejecución reproducible
@@ -282,7 +282,7 @@ Los identificadores PR-01 a PR-11 están definidos en `docs/03-diseno-vertical/d
 ```bash
 git clone https://github.com/jyeanaqs262/repogrp10.git
 cd repogrp10
-git checkout entrega-4-final
+git checkout entrega-4
 docker compose up -d --wait postgres
 cd backend
 uv sync
@@ -290,7 +290,7 @@ uv sync
 
 ### 8.3 Configurar
 
-La aplicación lee la configuración del entorno del proceso; no carga archivos `.env`. `backend/.env.example` documenta todas las variables con sus valores por defecto. Para la demostración local basta con la dirección de la base, que usa la contraseña pública de demostración del rol `royexa_app` creada por la migración (no es un secreto):
+La aplicación lee la configuración del entorno del proceso; no carga archivos `.env` (`Settings.from_env()` en `backend/src/royexa/bootstrap.py`). Todas las variables, con sus valores por defecto, están documentadas con líneas `export` en `backend/README.md`, sección «Configuración». Para la demostración local basta con la dirección de la base, que usa la contraseña pública de demostración del rol `royexa_app` creada por la migración (no es un secreto):
 
 ```bash
 export ROYEXA_LEDGER_URL=postgresql://royexa_app:royexa_app@localhost:55432/royexa
