@@ -1,0 +1,253 @@
+Notificador caído (EXT-05) — EA-02, EC-04, CA-12 — ROYEXA, Entrega 4
+======================================================================
+Fecha: 2026-11-16. Rama entrega-4-final @ 12c2f1e. uv 0.11.7, Python 3.14.6.
+
+Parte 1. Pruebas automatizadas del fallo del notificador
+--------------------------------------------------------
+Comando (desde backend/):
+  uv run pytest tests/vertical/test_pr06_notifier_failure.py tests/shared/test_t10a_background_dispatch.py tests/vertical/test_t4_payment_receipt.py -v
+Sin -m "" se ejecutan las variantes en memoria; las 14 variantes [postgres] de estos archivos
+se ejecutan con -m "" y forman parte de las 1120 que pasan en resultado-pruebas.txt.
+
+============================= test session starts ==============================
+platform darwin -- Python 3.14.6, pytest-9.2.0, pluggy-1.7.0 -- <repo>/backend/.venv/bin/python3
+rootdir: <repo>/backend
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 33 items / 14 deselected / 19 selected
+
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_failed_receipt_keeps_the_money_confirmed_and_stays_visible[memory] PASSED [  5%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_fifth_failure_marks_the_notice_failed[memory] PASSED [ 10%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_retry_delivers_once_the_channel_recovers[memory] PASSED [ 15%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_undelivered_code_moves_no_money[memory] PASSED [ 21%]
+tests/vertical/test_pr06_notifier_failure.py::test_pr06_code_notice_fails_after_five_dispatches_through_a_replaced_adapter PASSED [ 26%]
+tests/shared/test_t10a_background_dispatch.py::test_t10a_the_loop_dispatches_every_round_and_survives_a_failure PASSED [ 31%]
+tests/shared/test_t10a_background_dispatch.py::test_t10a_a_pending_notice_is_sent_without_anyone_calling_the_api PASSED [ 36%]
+tests/shared/test_t10a_background_dispatch.py::test_t10a_a_notice_that_failed_goes_out_when_the_channel_recovers PASSED [ 42%]
+tests/shared/test_t10a_background_dispatch.py::test_t10a_without_the_loop_nothing_is_sent_by_itself[memory] PASSED [ 47%]
+tests/shared/test_t10a_background_dispatch.py::test_t10a_the_interval_comes_from_the_environment PASSED [ 52%]
+tests/vertical/test_t4_payment_receipt.py::test_ca11_a_payment_issues_a_receipt_with_amount_balance_and_next_due_date[memory] PASSED [ 57%]
+tests/vertical/test_t4_payment_receipt.py::test_ca11_the_next_due_date_moves_on_when_an_installment_is_settled[memory] PASSED [ 63%]
+tests/vertical/test_t4_payment_receipt.py::test_ca11_a_transfer_issues_its_receipt_too[memory] PASSED [ 68%]
+tests/vertical/test_t4_payment_receipt.py::test_ca11_a_settled_loan_has_no_next_due_date[memory] PASSED [ 73%]
+tests/vertical/test_t4_payment_receipt.py::test_t4_each_payment_has_exactly_one_receipt_and_a_refused_payment_none[memory] PASSED [ 78%]
+tests/vertical/test_t4_payment_receipt.py::test_t4_the_notice_api_never_exposes_the_payload[memory] PASSED [ 84%]
+tests/vertical/test_t4_payment_receipt.py::test_ca12_a_failed_receipt_keeps_the_payment_and_stays_visible_to_the_administrator[memory] PASSED [ 89%]
+tests/vertical/test_t4_payment_receipt.py::test_ca12_the_receipt_is_not_lost_it_is_retried_and_ends_failed_after_five_attempts[memory] PASSED [ 94%]
+tests/vertical/test_t4_payment_receipt.py::test_ca12_a_receipt_pending_a_retry_is_delivered_when_the_channel_recovers[memory] PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/fastapi/testclient.py:1
+  <repo>/backend/.venv/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 19 passed, 14 deselected, 1 warning in 1.15s =================
+
+Parte 2. Experimento por HTTP con el servidor en ejecución
+-----------------------------------------------------------
+Arranque (desde backend/; modo sin base de datos para no depender de PostgreSQL; bucle de
+despacho apagado para que cada ronda sea explícita y el resultado no dependa del reloj):
+  ROYEXA_NOTIFIER_FAILING=1 ROYEXA_DISPATCH_SECONDS=0 uv run uvicorn royexa.main:app --port 8765
+Usuarios de demostración: cobrador-1 y admin-1 (contraseñas públicas demo-<usuario>-royexa).
+Los tokens de sesión se omiten. El servidor se detuvo al terminar.
+Con el bucle encendido (valor por defecto, 30 s) el resultado es el mismo: cada ronda cuenta
+un intento y el aviso llega a FALLIDO tras cinco rondas.
+
+Resultado observado:
+- El pago se confirma (201): asiento PAGO en el libro, caja +250,00, saldo del préstamo 450,00.
+- El comprobante queda PENDIENTE con 0 intentos; cada despacho lo intenta y no lo envía (sent: 0).
+- Tras el quinto despacho: FALLIDO, attempts 5, last_error con el motivo; el sexto despacho ya no
+  lo intenta (attempted: 0). Nunca aparece como ENVIADO (EC-04).
+
+$ GET /health
+  HTTP 200
+  {
+   "status": "ok"
+  }
+
+$ POST /v1/auth/login
+  body: {"user_id":"cobrador-1","password":"<contraseña pública de demostración>"}
+  HTTP 200
+  {
+   "token": "<token de sesión omitido>",
+   "token_type": "Bearer",
+   "user_id": "cobrador-1",
+   "role": "COBRADOR",
+   "expires_at": "2026-11-17T11:07:50.101955Z"
+  }
+
+$ POST /v1/loans/prestamo-impago/payments
+  body: {"amount_cents":25000,"method":"EFECTIVO","device_time":"2026-11-16T23:07:50Z"}
+  HTTP 201
+  {
+   "payment": {
+    "id": "2229db13-bc4b-4e7d-a61f-d3899edae4a3",
+    "loan_id": "prestamo-impago",
+    "client_id": "cliente-2",
+    "collector_id": "cobrador-1",
+    "amount_cents": 25000,
+    "method": "EFECTIVO",
+    "device_time": "2026-11-16T23:07:50Z",
+    "server_time": "2026-11-16T23:07:50.288736Z",
+    "allocations": [
+     {
+      "sequence": 1,
+      "amount_cents": 25000
+     }
+    ]
+   },
+   "loan": {
+    "id": "prestamo-impago",
+    "client_id": "cliente-2",
+    "status": "ACTIVO",
+    "principal_cents": 100000,
+    "interest_cents": 20000,
+    "outstanding_cents": 45000,
+    "installment_count": 1,
+    "remaining_installments": "0.375",
+    "installments": [
+     {
+      "sequence": 1,
+      "due_date": "2026-09-01",
+      "amount_cents": 120000,
+      "paid_cents": 75000
+     }
+    ]
+   }
+  }
+
+$ GET /v1/notifications
+  HTTP 200
+  [
+   {
+    "id": "ff1f7d09-7a59-4ccb-85d5-172cfa5f9259",
+    "kind": "COMPROBANTE_PAGO",
+    "client_id": "cliente-2",
+    "disbursement_id": null,
+    "payment_id": "2229db13-bc4b-4e7d-a61f-d3899edae4a3",
+    "status": "PENDIENTE",
+    "attempts": 0,
+    "last_error": null,
+    "created_at": "2026-11-16T23:07:50.288736Z",
+    "sent_at": null
+   }
+  ]
+
+# Despacho 1 de 5 con el notificador caído
+$ POST /v1/notifications/dispatch
+  HTTP 200
+  {
+   "attempted": 1,
+   "sent": 0
+  }
+
+# Despacho 2 de 5 con el notificador caído
+$ POST /v1/notifications/dispatch
+  HTTP 200
+  {
+   "attempted": 1,
+   "sent": 0
+  }
+
+# Despacho 3 de 5 con el notificador caído
+$ POST /v1/notifications/dispatch
+  HTTP 200
+  {
+   "attempted": 1,
+   "sent": 0
+  }
+
+# Despacho 4 de 5 con el notificador caído
+$ POST /v1/notifications/dispatch
+  HTTP 200
+  {
+   "attempted": 1,
+   "sent": 0
+  }
+
+# Despacho 5 de 5 con el notificador caído
+$ POST /v1/notifications/dispatch
+  HTTP 200
+  {
+   "attempted": 1,
+   "sent": 0
+  }
+
+$ GET /v1/notifications
+  HTTP 200
+  [
+   {
+    "id": "ff1f7d09-7a59-4ccb-85d5-172cfa5f9259",
+    "kind": "COMPROBANTE_PAGO",
+    "client_id": "cliente-2",
+    "disbursement_id": null,
+    "payment_id": "2229db13-bc4b-4e7d-a61f-d3899edae4a3",
+    "status": "FALLIDO",
+    "attempts": 5,
+    "last_error": "simulated channel did not confirm the delivery",
+    "created_at": "2026-11-16T23:07:50.288736Z",
+    "sent_at": null
+   }
+  ]
+
+$ GET /v1/cash-boxes/cobrador-1
+  HTTP 200
+  {
+   "id": "caja-cobrador-1-2026-11-16",
+   "collector_id": "cobrador-1",
+   "day": "2026-11-16",
+   "opening_balance_cents": 100000000,
+   "balance_cents": 100025000,
+   "closed": false
+  }
+
+$ GET /v1/ledger
+  HTTP 200
+  [
+   {
+    "id": "c44df49a-02f7-438f-8e58-048aaec6d9a5",
+    "disbursement_id": null,
+    "payment_id": "2229db13-bc4b-4e7d-a61f-d3899edae4a3",
+    "payment_method": "EFECTIVO",
+    "adjusts_entry_id": null,
+    "entry_type": "PAGO",
+    "amount_cents": 25000,
+    "cash_effect_cents": 25000,
+    "cash_box_id": "caja-cobrador-1-2026-11-16",
+    "actor_id": "cobrador-1",
+    "device_time": "2026-11-16T23:07:50Z",
+    "server_time": "2026-11-16T23:07:50.288736Z",
+    "reason": null
+   }
+  ]
+
+$ GET /v1/loans/prestamo-impago
+  HTTP 200
+  {
+   "id": "prestamo-impago",
+   "client_id": "cliente-2",
+   "status": "ACTIVO",
+   "principal_cents": 100000,
+   "interest_cents": 20000,
+   "outstanding_cents": 45000,
+   "installment_count": 1,
+   "remaining_installments": "0.375",
+   "installments": [
+    {
+     "sequence": 1,
+     "due_date": "2026-09-01",
+     "amount_cents": 120000,
+     "paid_cents": 75000
+    }
+   ]
+  }
+
+# Un sexto despacho ya no intenta el aviso FALLIDO
+$ POST /v1/notifications/dispatch
+  HTTP 200
+  {
+   "attempted": 0,
+   "sent": 0
+  }
+

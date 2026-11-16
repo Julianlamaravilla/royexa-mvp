@@ -1,0 +1,109 @@
+Escenario principal y alternativas por HTTP — ROYEXA, Entrega 4
+================================================================
+Fecha: 2026-11-16 (lunes, día de cobranza en UTC). Rama entrega-4-final @ 12c2f1e.
+Arranque (desde backend/; modo sin base de datos, datos de demostración sembrados al arrancar,
+despacho manual para que el orden de los pasos sea explícito):
+  ROYEXA_DISPATCH_SECONDS=0 uv run uvicorn royexa.main:app --port 8766
+Con ROYEXA_LEDGER_URL los mismos casos de uso escriben en PostgreSQL; ese camino lo cubren las
+variantes [postgres] de las pruebas verticales (resultado-pruebas.txt).
+Cada petición lleva 'Authorization: Bearer <token>' de POST /v1/auth/login con cobrador-1, admin-1
+(contraseñas públicas demo-<usuario>-royexa); los tokens se omiten y de cada respuesta se
+muestran solo los campos relevantes. El código de confirmación se enmascara.
+
+Resumen: desembolso de 100,00 confirmado con el código (20 cuotas de 6,00, caja 1.000.000,00 ->
+999.900,00); pago parcial de 3,00 -> 19,5 cuotas restantes de 20 (RN-01); cierre con 578,00
+entregados frente a 603,00 esperados -> descuadre -25,00 visible para el administrador (RN-02,
+CA-03, CA-13). Alternativas: cierre con visitas pendientes rechazado (CA-04), pago tras el cierre
+rechazado (RN-02) y autoaprobación rechazada con el intento registrado (RN-06, EC-02).
+
+## 1. El cobrador solicita un desembolso de 100,00 a 20 cuotas para cliente-1 (RF-03, RN-05)
+$ POST /v1/disbursements
+  body: {"client_id":"cliente-1","amount_cents":10000,"term_days":20,"installment_count":20}
+  HTTP 201
+  {"id": "7d32cd3a-5aa1-45c4-b8f5-4215c8e6a8ad", "status": "SOLICITADO", "client_id": "cliente-1", "requested_by": "cobrador-1", "amount_cents": 10000}
+
+## 2. El administrador admin-1 aprueba; el dinero aún no se mueve (RN-03, RN-06)
+$ POST /v1/disbursements/7d32cd3a-5aa1-45c4-b8f5-4215c8e6a8ad/approve
+  body: {}
+  HTTP 200
+  {"id": "7d32cd3a-5aa1-45c4-b8f5-4215c8e6a8ad", "status": "APROBADO", "requested_by": "cobrador-1", "approved_by": "admin-1"}
+
+$ GET /v1/cash-boxes/cobrador-1
+  HTTP 200
+  {"balance_cents": 100000000}
+
+## 3. Despacho de avisos: el notificador simulado (EXT-05) entrega el código al cliente
+$ POST /v1/notifications/dispatch
+  HTTP 200
+  {"attempted": 1, "sent": 1}
+
+  Salida del servidor: [EXT-05] to=cliente-1 kind=CODIGO_CONFIRMACION disbursement=7d32cd3a-5aa1-45c4-b8f5-4215c8e6a8ad payment=None payload={'code': '<código dictado por el cliente>'}
+
+## 4. El cliente dicta el código y el cobrador lo valida: asiento, calendario y descuento (CA-05)
+$ POST /v1/disbursements/7d32cd3a-5aa1-45c4-b8f5-4215c8e6a8ad/confirm
+  body: {"code":"<código dictado por el cliente>","device_time":"2026-11-16T23:10:08Z"}
+  HTTP 200
+  {"id": "7d32cd3a-5aa1-45c4-b8f5-4215c8e6a8ad", "status": "CONFIRMADO", "requested_by": "cobrador-1", "approved_by": "admin-1", "confirmed_by": "cobrador-1"}
+
+$ GET /v1/loans/2eaa18da-5d3c-46a4-a099-3405bb75b2dd
+  HTTP 200
+  {"status": "ACTIVO", "principal_cents": 10000, "interest_cents": 2000, "outstanding_cents": 12000, "installment_count": 20, "remaining_installments": "20"}
+
+$ GET /v1/cash-boxes/cobrador-1
+  HTTP 200
+  {"balance_cents": 99990000}
+
+## 5. Alternativa: cerrar la caja con visitas pendientes se rechaza (CA-04, RN-02)
+$ POST /v1/cash-boxes/cobrador-1/close
+  body: {"delivered_cents":0,"device_time":"2026-11-16T23:10:08Z"}
+  HTTP 409
+  {"type": "https://royexa.local/problemas/visitas-pendientes", "title": "Existen visitas pendientes", "status": 409, "detail": "cliente-1, cliente-2"}
+
+## 6. Pago parcial de 3,00 sobre una cuota de 6,00: 19,5 cuotas restantes de 20 (RN-01, CA-01)
+$ POST /v1/loans/2eaa18da-5d3c-46a4-a099-3405bb75b2dd/payments
+  body: {"amount_cents":300,"method":"EFECTIVO","device_time":"2026-11-16T23:10:08Z"}
+  HTTP 201
+  {"payment": {"id": "e2de36a3-b37a-4751-b23a-1bb27003e3cc", "loan_id": "2eaa18da-5d3c-46a4-a099-3405bb75b2dd", "client_id": "cliente-1", "collector_id": "cobrador-1", "amount_cents": 300, "method": "EFECTIVO", "device_time": "2026-11-16T23:10:08Z", "server_time": "2026-11-16T23:10:09.689309Z", "allocations": [{"sequence": 1, "amount_cents": 300}]}}
+
+  Resumen: remaining_installments=19.5 de 20, outstanding_cents=11700
+
+## 7. Pago en efectivo que liquida el préstamo previo de cliente-2
+$ POST /v1/loans/prestamo-impago/payments
+  body: {"amount_cents":70000,"method":"EFECTIVO","device_time":"2026-11-16T23:10:08Z"}
+  HTTP 201
+  {"loan": {"id": "prestamo-impago", "client_id": "cliente-2", "status": "LIQUIDADO", "principal_cents": 100000, "interest_cents": 20000, "outstanding_cents": 0, "installment_count": 1, "remaining_installments": "0", "installments": [{"sequence": 1, "due_date": "2026-09-01", "amount_cents": 120000, "paid_cents": 120000}]}}
+
+  Resumen: status=LIQUIDADO, outstanding_cents=0
+
+## 8. Cierre con 578,00 entregados: esperado = 3,00 + 700,00 - 100,00 = 603,00; descuadre -25,00 (CA-03, RN-02)
+$ POST /v1/cash-boxes/cobrador-1/close
+  body: {"delivered_cents":57800,"device_time":"2026-11-16T23:10:08Z"}
+  HTTP 201
+  {"id": "2c81c22d-eaad-4824-86d2-fafd990a6937", "cash_box_id": "caja-cobrador-1-2026-11-16", "collector_id": "cobrador-1", "day": "2026-11-16", "expected_cents": 60300, "delivered_cents": 57800, "discrepancy_cents": -2500, "closed_by": "cobrador-1", "device_time": "2026-11-16T23:10:08Z", "server_time": "2026-11-16T23:10:09.813291Z"}
+
+## 9. La caja cerrada es irreversible: otro pago se rechaza (RN-02)
+$ POST /v1/loans/2eaa18da-5d3c-46a4-a099-3405bb75b2dd/payments
+  body: {"amount_cents":100,"method":"EFECTIVO","device_time":"2026-11-16T23:10:08Z"}
+  HTTP 409
+  {"type": "https://royexa.local/problemas/caja-cerrada", "title": "La caja esta cerrada", "status": 409, "detail": "caja-cobrador-1-2026-11-16"}
+
+## 10. El administrador consulta los descuadres del periodo (RF-07, CA-13)
+$ GET /v1/cash-discrepancies
+  HTTP 200
+  {"desde": "2026-11-01", "hasta": "2026-11-16", "count": 1, "shortage_cents": 2500, "surplus_cents": 0, "items": [{"id": "2c81c22d-eaad-4824-86d2-fafd990a6937", "cash_box_id": "caja-cobrador-1-2026-11-16", "collector_id": "cobrador-1", "day": "2026-11-16", "expected_cents": 60300, "delivered_cents": 57800, "discrepancy_cents": -2500, "closed_by": "cobrador-1", "device_time": "2026-11-16T23:10:08Z", "server_time": "2026-11-16T23:10:09.813291Z"}]}
+
+## 11. Alternativa: un administrador no aprueba lo que él mismo solicitó (RN-06, EC-02)
+$ POST /v1/disbursements
+  body: {"client_id":"cliente-4","amount_cents":10000,"term_days":20,"installment_count":20}
+  HTTP 201
+  {"id": "681a2b78-82ee-41db-92f1-398367c3d811", "status": "SOLICITADO", "requested_by": "admin-1"}
+
+$ POST /v1/disbursements/681a2b78-82ee-41db-92f1-398367c3d811/approve
+  body: {}
+  HTTP 403
+  {"type": "https://royexa.local/problemas/autoaprobacion-prohibida", "title": "Quien origina no puede aprobar", "status": 403, "detail": "admin-1"}
+
+$ GET /v1/disbursements/681a2b78-82ee-41db-92f1-398367c3d811
+  HTTP 200
+  {"id": "681a2b78-82ee-41db-92f1-398367c3d811", "status": "SOLICITADO", "rejected_approval_attempts": [{"actor_id": "admin-1", "actor_role": "ADMINISTRADOR", "at": "2026-11-16T23:10:09.990517Z", "reason": "quien_origina_no_aprueba"}]}
+

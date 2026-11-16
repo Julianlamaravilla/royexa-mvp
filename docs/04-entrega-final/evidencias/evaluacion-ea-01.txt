@@ -1,0 +1,116 @@
+Evaluación EA-01 — libro inalterable (EC-01, RN-04, CA-08) y cálculo exacto (EC-03, RN-01)
+==========================================================================================
+Fecha: 2026-11-16. Rama entrega-4-final @ 12c2f1e. PostgreSQL 17.11 en Docker (puerto 55432).
+
+Parte 1. Inspección del catálogo y alteración directa con el rol de la aplicación
+---------------------------------------------------------------------------------
+Comandos (desde la raíz del repositorio, con la base migrada):
+
+  docker compose exec -T postgres psql -U royexa_migrator -d royexa -c "SELECT privilege_type,
+    has_table_privilege('royexa_app','ledger_entry',privilege_type) AS concedido
+    FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) AS privilege_type;"
+
+ privilege_type | concedido
+----------------+-----------
+ SELECT         | t
+ INSERT         | t
+ UPDATE         | f
+ DELETE         | f
+ TRUNCATE       | f
+
+  ... -c "SELECT grantee, privilege_type FROM information_schema.role_table_grants
+          WHERE table_name='ledger_entry' AND grantee IN ('royexa_app','PUBLIC') ORDER BY 1,2;"
+
+  grantee   | privilege_type
+------------+----------------
+ royexa_app | INSERT
+ royexa_app | SELECT
+
+  ... -c "SELECT rolname, rolsuper, rolcreaterole, rolbypassrls FROM pg_roles WHERE rolname='royexa_app';"
+
+  rolname   | rolsuper | rolcreaterole | rolbypassrls
+------------+----------+---------------+--------------
+ royexa_app | f        | f             | f
+
+  docker compose exec -T postgres psql "postgresql://royexa_app:royexa_app@localhost:5432/royexa" \
+    -c "BEGIN" -c "TRUNCATE ledger_entry" -c "ROLLBACK"
+
+ERROR:  permission denied for table ledger_entry
+
+Los intentos de UPDATE y DELETE sobre un asiento confirmado, con relectura de la fila, los
+ejecuta la prueba PR-07 test_pr07_app_role_cannot_change_a_committed_entry[UPDATE|DELETE|TRUNCATE]
+(Parte 3): los tres fallan con InsufficientPrivilege y la fila queda intacta.
+
+Parte 2. Corrección por asiento compensatorio (CA-08) y cálculo exacto (EC-03), sin base de datos
+-------------------------------------------------------------------------------------------------
+Comando (desde backend/):
+  uv run pytest tests/loans/test_t3a_payment_allocation.py tests/vertical/test_t5d_adjustments.py -v
+
+tests/loans/test_t3a_payment_allocation.py::test_ec03_25_over_a_20_installment_loan_of_50_leaves_19_5_remaining PASSED [  4%]
+tests/loans/test_t3a_payment_allocation.py::test_ec03_the_same_case_gives_the_same_result_every_time PASSED [  9%]
+tests/loans/test_t3a_payment_allocation.py::test_ec03_an_exact_payment_settles_one_installment PASSED [ 14%]
+tests/loans/test_t3a_payment_allocation.py::test_ec03_an_excess_goes_to_the_next_installment PASSED [ 19%]
+tests/loans/test_t3a_payment_allocation.py::test_rn01_payments_accumulate_on_the_oldest_pending_installment PASSED [ 23%]
+tests/loans/test_t3a_payment_allocation.py::test_rn01_the_whole_balance_settles_the_loan PASSED [ 28%]
+tests/loans/test_t3a_payment_allocation.py::test_rn01_a_payment_never_exceeds_the_balance_and_changes_nothing_when_refused PASSED [ 33%]
+tests/loans/test_t3a_payment_allocation.py::test_rn01_a_payment_must_be_positive[0] PASSED [ 38%]
+tests/loans/test_t3a_payment_allocation.py::test_rn01_a_payment_must_be_positive[-1] PASSED [ 42%]
+tests/loans/test_t3a_payment_allocation.py::test_ec03_the_counter_is_exact_even_when_it_has_no_finite_decimal PASSED [ 47%]
+tests/loans/test_t3a_payment_allocation.py::test_ec03_unequal_installments_count_each_one_by_its_own_amount PASSED [ 52%]
+tests/vertical/test_t5d_adjustments.py::test_ca08_the_correction_leaves_the_original_and_a_visible_compensating_entry[memory] PASSED [ 57%]
+tests/vertical/test_t5d_adjustments.py::test_ca08_the_adjustment_moves_the_box_of_the_day_by_its_signed_amount[memory] PASSED [ 61%]
+tests/vertical/test_t5d_adjustments.py::test_ca08_an_original_can_be_corrected_more_than_once_and_so_can_a_correction[memory] PASSED [ 66%]
+tests/vertical/test_t5d_adjustments.py::test_rn02_after_the_close_the_correction_waits_for_the_next_day_and_is_a_new_entry[memory] PASSED [ 71%]
+tests/vertical/test_t5d_adjustments.py::test_t5p1_the_adjustment_counts_in_the_expected_cash_of_the_day_it_lands[memory] PASSED [ 76%]
+tests/vertical/test_t5d_adjustments.py::test_t5d_the_entry_lands_in_the_box_of_the_collector_who_owns_the_original[memory] PASSED [ 80%]
+tests/vertical/test_t5d_adjustments.py::test_t5d_only_an_administrator_registers_a_correction[memory] PASSED [ 85%]
+tests/vertical/test_t5d_adjustments.py::test_t5d_the_motive_is_required_and_the_amount_is_never_zero[memory] PASSED [ 90%]
+tests/vertical/test_t5d_adjustments.py::test_t5d_an_unknown_entry_is_not_found[memory] PASSED [ 95%]
+tests/vertical/test_t5d_adjustments.py::test_t5d_sunday_has_no_box_to_receive_the_correction[memory] PASSED [100%]
+================= 21 passed, 10 deselected, 1 warning in 0.65s =================
+
+Lectura: test_ec03_25_over_a_20_installment_loan_of_50_leaves_19_5_remaining afirma que un pago
+de 25 sobre un préstamo de 20 cuotas de 50 deja exactamente 19,5 cuotas restantes (Fraction, sin
+redondeo), y test_ec03_the_same_case_gives_the_same_result_every_time lo repite. Las pruebas
+test_ca08_* comprueban que la corrección crea un asiento AJUSTE nuevo, deja el original sin cambios
+y ambos visibles en el libro. El mismo caso por HTTP está en escenario-principal.txt, paso 6
+(pago de 3,00 sobre una cuota de 6,00 -> "remaining_installments": "19.5").
+
+Parte 3. Pruebas de integración con PostgreSQL 17 (PR-07 y persistencia del ajuste)
+----------------------------------------------------------------------------------
+Comando (desde backend/, con PostgreSQL en ejecución):
+  uv run pytest -m "" tests/postgres/test_pr07_ledger_privileges.py tests/postgres/test_t5d_adjustments_persistence.py -v
+
+Son 26 pruebas; todas pasan dentro de la ejecución completa registrada en resultado-pruebas.txt
+(1120 pasan, 0 fallan). Pruebas incluidas:
+
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[UPDATE]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[DELETE]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_cannot_change_a_committed_entry[TRUNCATE]
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_catalog_grants_only_select_and_insert
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_catalog_lists_no_other_grant_on_any_table
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_catalog_shows_no_column_level_change_privilege
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_app_role_has_no_way_around_the_grants
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_migrations_are_repeatable
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_constraint_refuses_a_second_entry_of_the_same_type
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_disbursement_flow_writes_one_entry_on_the_real_ledger
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_expired_attempt_keeps_its_reason_on_the_real_ledger
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_two_simultaneous_confirmations_settle_once_on_the_real_ledger
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_stale_commit_leaves_no_entry_on_the_real_ledger
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_failed_ledger_commit_changes_nothing_and_surfaces_its_error
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_session_closes_once_when_its_commit_fails
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_session_rollback_after_commit_is_harmless
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_unit_of_work_reused_after_commit_still_releases_its_connection
+tests/postgres/test_pr07_ledger_privileges.py::test_pr07_every_path_of_the_flow_returns_its_connection
+tests/postgres/test_t5d_adjustments_persistence.py::test_t5d_the_adjustment_and_its_untouched_original_survive_a_restart
+tests/postgres/test_t5d_adjustments_persistence.py::test_t5d_the_migrations_apply_again_while_an_adjustment_exists
+tests/postgres/test_t5d_adjustments_persistence.py::test_t5d_the_database_refuses_a_malformed_adjustment[columns0]
+tests/postgres/test_t5d_adjustments_persistence.py::test_t5d_the_database_refuses_a_malformed_adjustment[columns1]
+tests/postgres/test_t5d_adjustments_persistence.py::test_t5d_the_database_refuses_a_malformed_adjustment[columns2]
+tests/postgres/test_t5d_adjustments_persistence.py::test_t5d_the_database_refuses_a_malformed_adjustment[columns3]
+tests/postgres/test_t5d_adjustments_persistence.py::test_t5d_the_database_refuses_a_malformed_adjustment[columns4]
+tests/postgres/test_t5d_adjustments_persistence.py::test_t5d_a_negative_amount_is_only_for_an_adjustment
+
+Resultado frente a la medida de EC-01: 3 de 3 operaciones de alteración rechazadas (100 %), el
+catálogo solo concede SELECT e INSERT sobre ledger_entry al rol de la aplicación, el rol no es
+superusuario ni puede crear roles, y toda corrección deja visibles el original y el compensatorio.

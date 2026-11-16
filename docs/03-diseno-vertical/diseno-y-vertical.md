@@ -9,6 +9,8 @@
 - **Commit o etiqueta:** rama `entrega-3-linea-base`. Código del recorrido en `f07f7ae` y `8aa1104`; PR-09 a PR-11 y la corrección de HV-10 en `a91aa43`. La etiqueta de entrega aún no se ha creado.
 - **Entrega 2 usada como línea base:** [`../02-arquitectura/arquitectura.md`](../02-arquitectura/arquitectura.md), realineada con la Entrega 1 en [`../02-arquitectura/realineacion-entrega-1.md`](../02-arquitectura/realineacion-entrega-1.md). Esa realineación está pendiente de confirmación docente.
 
+> **Estado en la Entrega 4 (2026-11-16).** Este documento describe el diseño y el vertical de la Entrega 3 y se conserva como registro. Lo que cambió después (web dentro de `CON-03`, todo el estado en PostgreSQL, sesiones en lugar de `X-Actor-Id`, despacho en segundo plano, pagos, cierre y ajustes, y los componentes `CMP-14` a `CMP-18`) está en `../02-arquitectura/diagramas/workspace.dsl` y se resume en `../04-entrega-final/entrega-final.md`. Las notas «Estado en la Entrega 4» de las secciones 8 y 10 señalan las afirmaciones que dejaron de ser ciertas.
+
 ---
 
 ## 1. Delimitación del recorrido vertical
@@ -617,6 +619,8 @@ El script usa las imágenes fijadas `structurizr/cli:2024.03.03` y `plantuml/pla
 
 EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 
+**Estado en la Entrega 4 (2026-11-16).** EV-08 quedó `Validada` (PR-06 sustituye el adaptador del puerto `Notifier` sin tocar los módulos de negocio, y PR-08 lo vigila) y EV-10 quedó `Validada` con `backend/tests/loans/test_t3a_payment_allocation.py`. Ver `docs/04-entrega-final/entrega-final.md`, sección 6.
+
 ### HV-01 — El libro resiste la alteración aunque el código falle
 
 - **Evidencia de origen:** EV-01, EV-02, PR-07.
@@ -731,6 +735,8 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 ---
 
 ## 10. Limitaciones y trabajo pendiente
+
+**Estado en la Entrega 4 (2026-11-16).** Esta sección describe el vertical de la Entrega 3 y se conserva como registro. Varias limitaciones ya no son ciertas en el producto final: todo el estado vive en PostgreSQL en la transacción del libro (HV-07 y RA-10 cerrados) y el efectivo esperado del cierre se calcula con los asientos de la caja; la cabecera `X-Actor-Id` se retiró y la identidad se obtiene de una sesión con contraseña `scrypt`; existen la web, los pagos, el cierre de caja y el asiento compensatorio (CA-08); el código limita los intentos fallidos a 5; el despachador corre en un bucle en segundo plano; `CashBoxClosed` tiene prueba; y EV-08 y EV-10 están validadas. Siguen vigentes la entrega de avisos de al menos una vez (HV-06, RA-11), la caducidad sin intento (HV-08), la reaplicación de todas las migraciones en cada arranque y la pregunta sobre el motivo al aprobar. El estado final está en `docs/04-entrega-final/entrega-final.md` (secciones 1.3 y 9).
 
 **Limitaciones del vertical**
 

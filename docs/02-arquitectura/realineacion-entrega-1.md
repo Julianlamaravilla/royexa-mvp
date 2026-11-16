@@ -31,6 +31,7 @@ No es un recorte improvisado: es volver a lo comprometido. La propia Entrega 2 l
 
 - **Entrega 3:** desembolso de un préstamo por API, sin interfaz (`RF-03`, `RF-04`, `RF-06`; `RN-03` a `RN-06`).
 - **Entrega 4 (provisional, el repositorio no contiene su enunciado):** web mínima renderizada en el servidor, pagos, cierre de caja, `EV-08` y `EV-10`. Sin aplicación móvil.
+  - **Estado en la Entrega 4 (2026-11-16):** el enunciado ya está en `docs/04-entrega-final/README.md` y lo previsto se entregó: web dentro de `CON-03`, pagos, cierre de caja y descuadres, con `EV-08` y `EV-10` validadas. Resumen en `docs/04-entrega-final/entrega-final.md`.
 
 PostgreSQL no es opcional. Un libro en memoria equivale a `ALT-01A`, ya descartada, y `propuesta.md` (sección L) exige que la inmutabilidad no dependa solo de que la aplicación se comporte bien.
 
@@ -95,9 +96,9 @@ El significado de estos identificadores no cambia. La matriz solo indica dónde 
 | Identificador | Clase | Efecto |
 |---|---|---|
 | `CON-01` | Diferir | Sigue en el modelo con la etiqueta `Diferido`, fuera de las vistas. |
-| `CON-02` | Reencuadrar | Web mínima renderizada en el servidor para cobrador y administrador, en la Entrega 4. |
+| `CON-02` | Reencuadrar | Web mínima renderizada en el servidor para cobrador y administrador, en la Entrega 4. Estado en la Entrega 4 (2026-11-16): la web se construyó dentro de `CON-03` (componente `CMP-14`) y `CON-02` queda como registro histórico en `diagramas/workspace.dsl`. |
 | `CON-03` | Reencuadrar | Python 3.14, FastAPI y Uvicorn en local. |
-| `CON-04` | Reencuadrar | PostgreSQL 17 local, con adaptadores en memoria para las pruebas. En la Entrega 3 solo guarda el libro; lo demás sigue en memoria también en ejecución (`HV-07`). |
+| `CON-04` | Reencuadrar | PostgreSQL 17 local, con adaptadores en memoria para las pruebas. En la Entrega 3 solo guarda el libro; lo demás sigue en memoria también en ejecución (`HV-07`). Estado en la Entrega 4 (2026-11-16): guarda todo el estado (desembolsos, préstamos, pagos, no pagos, cajas, cierres, clientes, credenciales, sesiones y bandeja de salida) en la transacción del libro; `RA-10` cerrado. |
 | `CON-05` | Diferir | Sigue en el modelo con la etiqueta `Diferido`, fuera de las vistas. |
 | `EXT-01`, `EXT-02`, `EXT-03`, `EXT-04` | Diferir | Siguen en el modelo con la etiqueta `Diferido`, fuera de las vistas. |
 
@@ -201,9 +202,9 @@ Corte del 2026-10-31. Los resultados, hallazgos y limitaciones completos están 
 | `EV-01`, `EV-02` | Validada |
 | `EV-03` | Validada (`HV-05`) |
 | `EV-04`, `EV-05`, `EV-06`, `EV-07` | Reprogramada, sin destino en el curso |
-| `EV-08` | Prevista para la Entrega 4 |
+| `EV-08` | Prevista para la Entrega 4. Estado en la Entrega 4 (2026-11-16): Validada |
 | `EV-09`, `EV-11`, `EV-12` | Validada |
-| `EV-10` | Reprogramada a la Entrega 4 |
+| `EV-10` | Reprogramada a la Entrega 4. Estado en la Entrega 4 (2026-11-16): Validada con `backend/tests/loans/test_t3a_payment_allocation.py` |
 
 | Decisión | Estado | Motivo |
 |---|---|---|
