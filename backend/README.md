@@ -1,115 +1,136 @@
 # ROYEXA — Backend
 
-Recorrido vertical de la Entrega 3: desembolso de un préstamo por API. El diseño está en [`../docs/03-diseno-vertical/diseno-y-vertical.md`](../docs/03-diseno-vertical/diseno-y-vertical.md).
+Monolito modular en FastAPI (Python 3.14) para la cobranza diaria de microcréditos: desembolsos con doble control, pagos y no pagos, caja diaria con cierre y descuadres, ajustes sobre un libro de solo inserción y avisos al cliente por una bandeja de salida. El estado vive en PostgreSQL 17 o, sin base de datos, en memoria.
+
+La entrega final, con la demostración guiada y la trazabilidad, está en [`../docs/04-entrega-final/entrega-final.md`](../docs/04-entrega-final/entrega-final.md).
 
 ## Requisitos
 
 - [`uv`](https://docs.astral.sh/uv/) 0.11. Descarga Python 3.14 si no está instalado.
-- Docker con Compose, solo para las pruebas y la ejecución con PostgreSQL.
+- Docker con Compose, para PostgreSQL. Sin Docker la aplicación corre en memoria y solo se ejecutan las pruebas que no usan base de datos.
+- Chromium de Playwright, solo para las pruebas de navegador (se instala con `uv` más abajo).
 
 ## Desde un clon limpio
 
 ```bash
 git clone <url-del-repositorio> repogrp10
 cd repogrp10
-git switch entrega-3-linea-base
+git switch entrega-4-final
+docker compose up -d --wait postgres     # PostgreSQL 17 en localhost:55432
 cd backend
-uv sync
+uv sync                                  # dependencias, incluidas las de pruebas
+uv run python -m royexa.migrate          # aplica las migraciones; imprime los archivos aplicados
 ```
 
-## Pruebas
+La migración se conecta por defecto como el rol propietario `royexa_migrator` en `localhost:55432` (el de `docker-compose.yml`) y crea el rol de la aplicación `royexa_app`. Se puede repetir sin efecto.
 
-Desde `backend/`. El comando por defecto no necesita Docker:
+## Configuración
+
+No hay archivo `.env` ni secretos: la aplicación lee variables del proceso, no carga archivos `.env`, y todos los valores por defecto sirven para la demostración local. Las variables se pasan en la línea de comandos o se exportan en la sesión (los archivos `.env` están ignorados por git):
 
 ```bash
-uv run pytest                # 262 pruebas, sin PostgreSQL
+export ROYEXA_LEDGER_URL=postgresql://royexa_app:royexa_app@localhost:55432/royexa
+export ROYEXA_TIMEZONE=America/Bogota
 ```
 
-Las pruebas de privilegios del libro necesitan PostgreSQL. Levántelo desde la raíz del repositorio:
+| Variable | Valor por defecto | Efecto |
+|---|---|---|
+| `ROYEXA_LEDGER_URL` | Sin definir: estado en memoria | Conexión del rol de la aplicación (`royexa_app`) |
+| `ROYEXA_MIGRATOR_URL` | `postgresql://royexa_migrator:royexa_migrator@localhost:55432/royexa` | Conexión del rol propietario que usa `royexa.migrate` |
+| `ROYEXA_APP_PASSWORD` | Sin definir: queda la contraseña de demostración `royexa_app` | Si se define (20 caracteres o más), `royexa.migrate` la pone al rol `royexa_app` |
+| `ROYEXA_SEED` | `demo` | `demo` siembra usuarios, clientes, préstamos y contraseñas de demostración. `pilot` lee usuarios y rutas de `pilot/directory.json` y no siembra datos ni contraseñas |
+| `ROYEXA_DIRECTORY_FILE` | `pilot/directory.json` | Archivo de usuarios y rutas con `ROYEXA_SEED=pilot` |
+| `ROYEXA_DISPATCH_SECONDS` | `30` | Cada cuántos segundos el proceso envía los avisos pendientes y reintenta los fallidos. `0` apaga el ciclo; queda el envío manual del administrador |
+| `ROYEXA_NOTIFIER_FAILING` | Sin definir | Con `1`, el notificador simulado falla siempre (modo «proveedor caído») |
+| `ROYEXA_TIMEZONE` | `UTC` | Zona horaria del día de la caja y de los pendientes (por ejemplo `America/Bogota`). Un nombre desconocido impide arrancar |
+| `ROYEXA_CURRENCY_SYMBOL` | Vacío | Símbolo antes de los importes en las páginas (`$ 1.234,56`) |
+| `ROYEXA_CODE_TTL_MINUTES` | `60` | Vigencia del código de confirmación de un desembolso |
+| `ROYEXA_SESSION_HOURS` | `12` | Duración de una sesión, sin renovación |
+| `ROYEXA_REQUIRE_CHANGED_PASSWORDS` | Sin definir | Con `1` (modo estricto): exige base de datos, no siembra contraseñas de demostración y no arranca si queda alguna o si `royexa_app` conserva su contraseña conocida |
+| `ROYEXA_SCRYPT_N` | `16384` | Coste del hash de contraseñas. Solo las pruebas lo bajan |
+| `ROYEXA_CHROMIUM` | Sin definir | Pruebas de navegador: ruta de un Chromium distinto al de Playwright |
+| `ROYEXA_REQUIRE_E2E` | Sin definir | Pruebas de navegador: con `1`, la falta de Chromium hace fallar en lugar de omitir (lo usa la CI) |
+
+Las credenciales de `docker-compose.yml`, de la migración y de los usuarios sembrados son valores públicos de demostración local, no secretos.
+
+## Ejecutar la aplicación
+
+Desde `backend/`, con PostgreSQL levantado y migrado:
 
 ```bash
-docker compose up -d --wait postgres
-```
-
-Después, desde `backend/`:
-
-```bash
-uv run pytest -m postgres    # las 279 pruebas con PostgreSQL (2 se omiten a propósito)
-uv run pytest -m ""          # las 541 pruebas
-```
-
-Las pruebas aplican la migración por sí mismas.
-
-## Ejecutar la API
-
-Con el libro en PostgreSQL, desde `backend/`:
-
-```bash
-uv run python -m royexa.migrate
 ROYEXA_LEDGER_URL=postgresql://royexa_app:royexa_app@localhost:55432/royexa \
   uv run uvicorn royexa.main:app --port 8000
 ```
 
-Sin PostgreSQL, el libro queda en memoria:
+Sin `ROYEXA_LEDGER_URL` todo queda en memoria y se pierde al apagar:
 
 ```bash
 uv run uvicorn royexa.main:app --port 8000
 ```
 
-La documentación OpenAPI queda en <http://localhost:8000/docs>. El recorrido completo con `curl` está en la sección 7.6 del documento de diseño.
+- Páginas del cobrador: <http://localhost:8000/web/> (ruta del día, pagos, no pagos, solicitudes de desembolso, cierre de caja).
+- Panel del administrador: <http://localhost:8000/web/admin> (solicitudes, clientes, cajas, descuadres, libro y ajustes, avisos).
+- Estado: <http://localhost:8000/health>. API y OpenAPI: <http://localhost:8000/docs>.
 
-| Variable | Valor por defecto | Efecto |
+### Datos y usuarios de demostración
+
+Con `ROYEXA_SEED=demo` (el valor por defecto) el arranque siembra, sin pasos adicionales, dos cobradores con su ruta, dos administradores, cuatro clientes y dos préstamos previos. Repetir el arranque no duplica nada. Las contraseñas son públicas y solo valen para la demostración: `demo-<usuario>-royexa`.
+
+| Usuario | Rol | Contraseña |
 |---|---|---|
-| `ROYEXA_LEDGER_URL` | Sin definir: libro en memoria | Conexión del rol de la aplicación |
-| `ROYEXA_CODE_TTL_MINUTES` | `60` | Vigencia del código de confirmación |
-| `ROYEXA_NOTIFIER_FAILING` | Sin definir | Con `1`, el notificador simulado falla |
-| `ROYEXA_TIMEZONE` | `UTC` | Zona horaria del piloto (por ejemplo `America/Bogota`): fija el día de la caja y de los pendientes de visita. Un nombre desconocido impide arrancar |
-| `ROYEXA_CURRENCY_SYMBOL` | Vacío | Símbolo que antecede a los importes de las páginas (`$ 1.234,56`). Los documentos no nombran la moneda, así que por defecto no hay símbolo |
-| `ROYEXA_REQUIRE_CHANGED_PASSWORDS` | Sin definir | Con `1`, no se siembra ninguna contraseña de demostración y el servidor se niega a arrancar si queda alguna, o si no hay base de datos. Se aprovisionan con `python -m royexa.set_password` |
-| `ROYEXA_SESSION_HOURS` | `12` | Duración de una sesión desde el inicio de sesión, sin renovación |
-| `ROYEXA_SCRYPT_N` | `16384` | Coste del hash de contraseñas. Solo las pruebas lo bajan; el hash guarda su coste, así que cambiarlo no invalida los existentes |
-| `ROYEXA_MIGRATOR_URL` | Rol `royexa_migrator` en `localhost:55432` | Conexión del rol propietario |
+| `cobrador-1` | Cobrador de `ruta-1` | `demo-cobrador-1-royexa` |
+| `cobrador-2` | Cobrador de `ruta-2` | `demo-cobrador-2-royexa` |
+| `admin-1` | Administrador | `demo-admin-1-royexa` |
+| `admin-2` | Administrador | `demo-admin-2-royexa` |
 
-Las credenciales de `docker-compose.yml` y de la migración son valores de demostración local.
+### Proveedor de avisos caído
 
-## Sesiones y contraseñas
-
-La cabecera `X-Actor-Id` ya no identifica a nadie. Se inicia sesión con usuario y contraseña y se usa el token que devuelve:
+Los comprobantes de pago salen por una bandeja de salida y un notificador simulado que escribe en la consola. Para demostrar la falla del proveedor:
 
 ```bash
-curl -s -X POST localhost:8000/v1/auth/login -H 'Content-Type: application/json' \
-  -d '{"user_id": "admin-1", "password": "demo-admin-1-royexa"}'
-curl localhost:8000/v1/clients -H "Authorization: Bearer $TOKEN"
-curl -X POST localhost:8000/v1/auth/logout -H "Authorization: Bearer $TOKEN"
+ROYEXA_NOTIFIER_FAILING=1 \
+ROYEXA_LEDGER_URL=postgresql://royexa_app:royexa_app@localhost:55432/royexa \
+  uv run uvicorn royexa.main:app --port 8000
 ```
 
-- El token es opaco y aleatorio (256 bits) y solo se guarda su huella SHA-256. Viaja en `Authorization: Bearer`; el mismo token se entrega también en la cookie `royexa_session` (`HttpOnly`, `SameSite=Lax`, y `Secure` bajo HTTPS) para las páginas del servidor. Si hay cabecera `Authorization` manda ella y nunca se mezcla con la cookie.
-- Dura 12 horas sin renovación, sobrevive a un reinicio, un usuario puede tener varias sesiones y `POST /v1/auth/logout` revoca solo la que se usa. Sin sesión válida (ausente, inválida, vencida o revocada) el API responde 401 `sesion-requerida`.
-- Usuario inexistente y contraseña errónea dan la misma respuesta 401 `credenciales-invalidas`.
-- Las contraseñas se guardan con `scrypt` y sal propia; nunca en claro. Los cuatro usuarios sembrados traen contraseñas de **demostración**, válidas solo para desarrollo y pruebas: `demo-<usuario>-royexa` (por ejemplo `demo-cobrador-1-royexa`). 
-- **Cambio de contraseña:** `POST /v1/auth/password` con la actual y la nueva (de 12 a 256 caracteres y distinta de la actual). Termina las demás sesiones de ese usuario y deja la que se usa. Una contraseña actual errónea responde 403 y cuenta como un intento fallido.
-- **Bloqueo:** 5 intentos fallidos seguidos bloquean al usuario 15 minutos, también para la contraseña correcta, con la misma respuesta 401 que un usuario inexistente o una contraseña errónea (no se revela cuál fue). El bloqueo no cierra las sesiones que ya tenga abiertas. Un usuario bloqueado por error espera los 15 minutos o recibe una contraseña nueva con `set_password`. Riesgo aceptado: un tercero puede bloquear temporalmente a un cobrador conociendo su usuario.
-- **Despliegue:** con `ROYEXA_REQUIRE_CHANGED_PASSWORDS=1` el servidor no arranca mientras algún usuario conserve la contraseña de demostración. Como tampoco se siembran, las reales se ponen antes de arrancar:
+El pago se registra igual; el aviso queda pendiente, se reintenta en cada ciclo y al quinto intento queda fallido. El administrador lo ve y lo reintenta en `/web/admin/avisos`.
+
+## Pruebas
+
+Desde `backend/`:
 
 ```bash
-ROYEXA_LEDGER_URL=postgresql://royexa_app:...@host/royexa python -m royexa.set_password admin-1
+uv run pytest                # pruebas sin base de datos (no necesitan Docker)
+uv run pytest -m postgres    # solo las de PostgreSQL (docker compose up -d --wait postgres)
+uv run pytest -m ""          # todas
 ```
 
-## Páginas web
+Las pruebas de PostgreSQL aplican la migración por sí mismas. Las de navegador (Playwright, pantalla de 360 px) necesitan Chromium; sin él se omiten:
 
-Páginas en español generadas en el servidor, pensadas para un celular de 360 px. Con el servidor en marcha, abre <http://localhost:8000/web/> e ingresa con un usuario sembrado (`cobrador-1` y `demo-cobrador-1-royexa`, por ejemplo).
+```bash
+uv run playwright install chromium
+```
 
-- `/web/login`, `/web/ruta` (la ruta del día del cobrador: caja, pendientes, pagaron y no pagaron), `/web/admin` (de momento solo la entrada del administrador) y `/web/resultado/<ficha>`.
-- Usan la cookie `royexa_session` de la sesión (HttpOnly, SameSite=Lax). Sin sesión, redirigen al inicio de sesión.
-- **Fichas de un solo uso:** cada formulario lleva una ficha ligada a la sesión que lo pidió. El servidor la acepta una vez; repetirla (doble toque, reenvío del navegador) muestra el resultado ya registrado y no repite el efecto. Una ficha ausente, desconocida o de otra sesión no hace nada, y eso sirve también contra CSRF.
-- **Política de contenido estricta:** CSS y JavaScript se sirven desde `/web/static/` del mismo origen; las páginas no llevan scripts ni estilos en línea. Respuestas con `Cache-Control: no-store`, `X-Content-Type-Options` y `Referrer-Policy`.
-- Todo texto que viene de la base se escapa. Importes con dos decimales y miles en el estilo español (`1.234,56`).
+El último resultado registrado, con fecha, está en [`../docs/04-entrega-final/evidencias/resultado-pruebas.txt`](../docs/04-entrega-final/evidencias/resultado-pruebas.txt).
 
-## Limitaciones
+## Módulos
 
-Con `ROYEXA_LEDGER_URL`, todo el estado se guarda en PostgreSQL y sobrevive a un reinicio: libro, cajas, clientes, préstamos con su calendario, excepciones de renovación, avisos y desembolsos. Sin esa variable todo vive en memoria y se pierde al apagar el servidor. Los usuarios y las rutas siguen sembrados en código, sin registro ni recuperación de cuentas; los clientes se dan de alta con `POST /v1/clients` (solo el administrador) y se leen con `GET /v1/clients` y `GET /v1/clients/{id}`. Los préstamos, con su calendario de cuotas, se leen con `GET /v1/loans/{id}` y `GET /v1/clients/{id}/loans`; nacen al confirmar un desembolso (RN-03). El cobrador de la ruta registra un pago con `POST /v1/loans/{id}/payments` (efectivo o transferencia; se imputa a las cuotas más antiguas y no puede exceder el saldo) y se leen con `GET /v1/loans/{id}/payments`. El contador `remaining_installments` es exacto: `19.5`, o una fracción como `113/6` cuando no tiene decimal finito. Cada cobrador tiene una caja por día (`GET /v1/cash-boxes/{cobrador}?date=`): se abre sola con el primer movimiento de cada día de cobranza (lunes a sábado) con el fondo del cobrador como saldo inicial; el domingo no hay caja y pagos y confirmaciones de desembolso se rechazan. La caja de ayer no hace falta cerrarla para abrir la de hoy. El cobrador cierra la de hoy con `POST /v1/cash-boxes/{cobrador}/close` indicando el efectivo entregado: solo sin pendientes de visita (409 `visitas-pendientes`), una sola vez y sin vuelta atrás; tras el cierre la caja rechaza pagos y desembolsos (409 `caja-cerrada`). El cierre guarda el efectivo esperado (cobros en efectivo del día menos desembolsos confirmados; las transferencias no entran), lo entregado y el descuadre con signo (`entregado − esperado`; cero no es descuadre). El administrador los consulta con `GET /v1/cash-closes?collector_id=&date=`. Un error se corrige sin tocar el asiento original: el administrador registra un ajuste con `POST /v1/ledger/{asiento}/adjustments` (importe con signo distinto de cero, motivo obligatorio). Queda como un asiento `AJUSTE` nuevo que nombra al original, en la caja del cobrador dueño del original del día en que se registra: una caja cerrada se corrige al día siguiente y ni ella ni su cierre cambian. Suma o resta efectivo como cualquier asiento y entra en el efectivo esperado del día en que cae. Los tres paneles del día de la caja (`GET /v1/cash-boxes/{cobrador}/panels`, para el cobrador o un administrador, solo el día de hoy) son: pendientes (T3-P1), pagaron (con algún pago ese día, con efectivo y transferencia por separado y en total) y no pagaron (con no pago y sin pago ese día, con motivo y compromiso). Un cliente está en un panel como máximo. Cada pago deja su asiento `PAGO` en el libro; solo el efectivo suma a la caja. Cada pago también encola su comprobante (`COMPROBANTE_PAGO`) en la bandeja de salida, en la misma transacción, con el importe recibido, el saldo restante y la fecha del próximo vencimiento (vacía si el préstamo queda liquidado). El administrador lo envía con `POST /v1/notifications/dispatch` y consulta su estado con `GET /v1/notifications?payment_id=`; un fallo del canal deja el aviso pendiente y, al quinto intento, fallido. Si el cliente no paga, el cobrador lo registra con `POST /v1/loans/{id}/non-payments` (motivo y fecha de compromiso posterior al día del registro; no cambia el saldo) y se lee con `GET /v1/loans/{id}/non-payments`. `GET /v1/routes/{id}/pending-visits?date=AAAA-MM-DD` lista los clientes pendientes de visita: de lunes a sábado, todo cliente de la ruta con un préstamo activo sin pago ni no pago ese día; el domingo no hay pendientes. Lo lee el cobrador de la ruta o un administrador. El día se cuenta en UTC. La lista completa está en la sección 10 del documento de diseño.
+| Paquete | Responsabilidad |
+|---|---|
+| `identity_access` | Usuarios, rutas, sesiones y contraseñas (scrypt, bloqueo por intentos) |
+| `sales` | Solicitud, aprobación, rechazo y confirmación de desembolsos; excepciones de renovación |
+| `loans` | Préstamos, calendario de cuotas, pagos, no pagos y pendientes de visita |
+| `clients` | Alta y consulta de clientes |
+| `cash_box`, `closing` | Caja diaria, cierre, descuadres y ajustes |
+| `ledger` | Libro de solo inserción |
+| `notifications` | Bandeja de salida y despachador de avisos |
+| `adapters` | Memoria, PostgreSQL y notificador simulado |
+| `web` | Páginas del servidor (cobrador y administrador) |
+| `bootstrap.py`, `main.py` | Composición y punto de entrada ASGI |
 
-Cada unidad de trabajo usa el aislamiento `REPEATABLE READ`: lee una copia consistente y, si otra transacción cambió antes la misma fila, pierde con un conflicto de escritura y reintenta (ADR-004).
+## Despliegue del piloto (opcional)
+
+No hace falta para la demostración del curso. El despliegue de un piloto con contenedor, `ROYEXA_SEED=pilot`, modo estricto y contraseñas reales (`python -m royexa.set_password <usuario>`) está en [`../docs/04-operacion/guia-de-despliegue.md`](../docs/04-operacion/guia-de-despliegue.md).
 
 ## Al terminar
 

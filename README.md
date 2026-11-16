@@ -16,11 +16,28 @@ Grupo: 10
 - [docs/01-requisitos/requisitos.md](docs/01-requisitos/requisitos.md)
 - [docs/02-arquitectura/arquitectura.md](docs/02-arquitectura/arquitectura.md)
 - [docs/02-arquitectura/trazabilidad-arquitectonica.md](docs/02-arquitectura/trazabilidad-arquitectonica.md)
+- [docs/04-entrega-final/entrega-final.md](docs/04-entrega-final/entrega-final.md)
+- [backend/README.md](backend/README.md)
 
 ## Estado actual
 
-- Entrega actual: Entrega 3
-- Estado: Arquitectura realineada con la Entrega 1 sobre una demostración local de costo cero, pendiente de confirmación docente. El detalle está en [docs/02-arquitectura/realineacion-entrega-1.md](docs/02-arquitectura/realineacion-entrega-1.md). La implementación de la Entrega 3 está en curso.
+- Entrega actual: Entrega 4 (entrega final), rama `entrega-4-final`.
+- Estado: producto final de la demostración local de costo cero. Informe final, demostración guiada y trazabilidad en [docs/04-entrega-final/entrega-final.md](docs/04-entrega-final/entrega-final.md). Instrucciones completas del backend en [backend/README.md](backend/README.md).
+
+## Cómo ejecutar
+
+Requisitos: `uv` 0.11 y Docker con Compose. Desde la raíz del repositorio:
+
+```bash
+docker compose up -d --wait postgres
+cd backend
+uv sync
+uv run python -m royexa.migrate
+ROYEXA_LEDGER_URL=postgresql://royexa_app:royexa_app@localhost:55432/royexa \
+  uv run uvicorn royexa.main:app --port 8000
+```
+
+Abra <http://localhost:8000/web/> (cobrador) o <http://localhost:8000/web/admin> (administrador) con un usuario de demostración, por ejemplo `cobrador-1` / `demo-cobrador-1-royexa`. Las pruebas se ejecutan desde `backend/` con `uv run pytest -m ""`.
 
 ## Instruccion oficial de entrega
 
