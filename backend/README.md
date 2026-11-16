@@ -15,7 +15,7 @@ La entrega final, con la demostración guiada y la trazabilidad, está en [`../d
 ```bash
 git clone <url-del-repositorio> repogrp10
 cd repogrp10
-git switch entrega-4-final
+git checkout entrega-4                   # etiqueta evaluable de la Entrega 4
 docker compose up -d --wait postgres     # PostgreSQL 17 en localhost:55432
 cd backend
 uv sync                                  # dependencias, incluidas las de pruebas
