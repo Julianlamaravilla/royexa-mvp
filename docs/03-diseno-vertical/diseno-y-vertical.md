@@ -52,7 +52,7 @@
 - **Pagos, no pagos y cierre de caja** (RF-01, RF-02, RF-07). Están fuera del recorrido de desembolso y pasan a la Entrega 4.
 - **Asiento compensatorio** (segunda parte de CA-08). No es necesario para el desembolso. El recorrido demuestra que el original no puede alterarse, no cómo se corrige (HV-03).
 - **Persistencia en PostgreSQL de desembolsos, préstamos, cajas y bandeja de salida.** Solo el libro necesita una garantía que la memoria no puede dar (HV-07).
-- **Autenticación real.** El actor llega en `X-Actor-Id` y se resuelve contra usuarios sembrados, limitación declarada en `ALT-06B`.
+- **Autenticación real.** El actor llega en `X-Actor-Id` y se resuelve contra usuarios sembrados, limitación declarada en `ALT-06B`. *Estado en la Entrega 4: reemplazado por sesión Bearer/cookie (CMP-01, T6a): `POST /v1/auth/login` emite un token de sesión que se envía como `Authorization: Bearer` o como cookie `HttpOnly`.*
 - **Proveedor real de notificaciones** (RES-03) y trabajador en segundo plano: el despachador se invoca de forma explícita.
 - **Caducidad sin intento.** Ningún proceso recorre los códigos vencidos (HV-08).
 
@@ -105,7 +105,7 @@ El núcleo compartido `backend/src/royexa/shared/` (dinero, errores, identificad
 
 | ID | Entrada | Salida | Reglas que protege | Errores o resultados alternativos |
 |---|---|---|---|---|
-| CMP-01 | HTTP con `X-Actor-Id` y JSON | JSON o `application/problem+json` | Rol de administrador en rechazo, libro, despacho y avisos (ALT-06B) | `AdminRoleRequired`, `UnknownActor`; `422 solicitud-invalida` si falta un campo |
+| CMP-01 | HTTP con `X-Actor-Id` y JSON (*Estado en la Entrega 4: reemplazado por sesión Bearer/cookie (CMP-01, T6a)*) | JSON o `application/problem+json` | Rol de administrador en rechazo, libro, despacho y avisos (ALT-06B) | `AdminRoleRequired`, `UnknownActor`; `422 solicitud-invalida` si falta un campo |
 | CMP-02 | `User`, identificadores, `LoanTerms`, código, `device_time` | `Disbursement`, `RenewalException`, `DisbursementDetail` | Coordina RN-05 al solicitar y al asentar; conserva el rechazo de RN-06 | `DisbursementNotFound`; repite una vez ante `WriteConflict`; `ConfirmationCodeExpired` tras asentar el intento |
 | CMP-03 | Cliente, ruta, actor, condiciones, código en claro | Estado nuevo; `ConfirmationOutcome` | RN-03, RN-06, EC-02, transiciones de ADR-004 | `ClientOutsideRoute`, `AmountExceedsRouteLimit`, `SelfApprovalForbidden`, `ApproverRoleRequired`, `DeciderRoleRequired`, `ValidatorNotAllowed`, `InvalidConfirmationCode`, `InvalidTransition`, `ReasonRequired` |
 | CMP-04 | Condiciones, interés, fecha, préstamo previo, excepción | `Loan` con calendario; `RenewalException` | RN-05, CA-09, CA-10 | `PriorLoanNotSettled`, `ExceptionNotAllowed`, `InvalidLoanTerms`, `ReasonRequired` |
@@ -171,9 +171,9 @@ Los contratos `CTR-04` a `CTR-12` son protocolos de Python: el código que los c
 
 - **Tipo:** Entrada.
 - **Responsable:** CMP-01.
-- **Consumido por:** INT-01 e INT-02 por HTTP. CON-02 en la Entrega 4 (provisional).
+- **Consumido por:** INT-01 e INT-02 por HTTP. CON-02 en la Entrega 4 (previsión de la Entrega 3; en la Entrega 4 la web es el componente CMP-14 dentro de CON-03 y llama a los casos de uso, no a la API).
 - **Operación o mensaje:** `POST /v1/disbursements`; `POST /v1/disbursements/{id}/approve`, `/reject` y `/confirm`; `GET /v1/disbursements/{id}`; `GET /v1/ledger`; `GET /v1/cash-boxes/{collector_id}`; `POST /v1/clients/{client_id}/renewal-exceptions`; `POST /v1/notifications/dispatch`; `GET /v1/notifications`.
-- **Precondiciones:** cabecera `X-Actor-Id` de un usuario sembrado. Rol de administrador en `reject`, `ledger`, `dispatch` y `notifications`.
+- **Precondiciones:** cabecera `X-Actor-Id` de un usuario sembrado (*Estado en la Entrega 4: reemplazado por sesión Bearer/cookie (CMP-01, T6a); sin sesión válida la API responde 401 `sesion-requerida`*). Rol de administrador en `reject`, `ledger`, `dispatch` y `notifications`.
 - **Resultado exitoso:** `DisbursementOut` y demás modelos JSON. Ninguna respuesta incluye el código ni la carga de un aviso (RN-03).
 - **Errores o resultados alternativos:** `application/problem+json` según la tabla `_PROBLEMS`: 401 actor desconocido; 403 autoaprobación, rol, ruta o validador; 404 no encontrado; 409 préstamo anterior, código caducado, transición inválida, caja o conflicto de escritura; 422 código, monto, condiciones, motivo o solicitud inválida.
 - **Reglas relacionadas:** RN-03, RN-05, RN-06.
@@ -556,7 +556,9 @@ uv run pytest tests/vertical
 
 Usuarios sembrados: `cobrador-1`, `cobrador-2`, `admin-1` y `admin-2`. Clientes: `cliente-1` sin préstamos, `cliente-2` con saldo pendiente, `cliente-3` con préstamo liquidado y `cliente-4` de otra ruta. La caja de `cobrador-1` abre con 100 000 000 centavos.
 
-Con el servidor en ejecución, el recorrido se reproduce así:
+Con el servidor en ejecución, el recorrido se reproducía así en la Entrega 3.
+
+> *Estado en la Entrega 4: reemplazado por sesión Bearer/cookie (CMP-01, T6a).* Estos comandos usan la cabecera `X-Actor-Id`, que ya no existe: en el producto final cada llamada lleva el token que devuelve `POST /v1/auth/login` (`Authorization: Bearer <token>`). El recorrido vigente está en `docs/04-entrega-final/entrega-final.md`.
 
 ```bash
 API=http://localhost:8000/v1
@@ -743,7 +745,7 @@ EV-08 no está prevista para esta entrega: sigue en la Entrega 4.
 - Solo el libro vive en PostgreSQL. Desembolsos, préstamos, cajas y avisos están en memoria, así que tras un reinicio el saldo sembrado no coincide con el libro persistido (HV-07).
 - La memoria y PostgreSQL no forman una transacción atómica. Una caída entre los dos pasos del `commit` deja el asiento sin su efecto (RA-10).
 - El saldo de la caja es un campo, no la suma de los asientos (HV-07).
-- La identidad son usuarios sembrados y la cabecera `X-Actor-Id`, sin autenticación. Quien conozca un identificador puede actuar como ese usuario.
+- La identidad son usuarios sembrados y la cabecera `X-Actor-Id`, sin autenticación. Quien conozca un identificador puede actuar como ese usuario. *Estado en la Entrega 4: reemplazado por sesión Bearer/cookie (CMP-01, T6a).*
 - `migrate.py` no tiene tabla de control: reaplica cada archivo en cada ejecución. Hoy funciona porque `001_ledger.sql` es repetible, y PR-07 lo comprueba. Una migración que no lo sea fallaría.
 - La entrega de avisos es de al menos una vez: una excepción distinta de `NotifierUnavailable` aborta la ejecución del despachador, y un fallo del `commit` después de enviar puede repetir el aviso (HV-06, RA-11).
 - No hay interfaz en la Entrega 3. La web mínima está prevista para la Entrega 4 (`propuesta.md`, sección L).
