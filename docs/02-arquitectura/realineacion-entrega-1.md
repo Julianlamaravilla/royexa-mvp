@@ -5,6 +5,7 @@
 - **Responsable:** Julian Andres Restrepo
 - **Afecta a:** [`arquitectura.md`](arquitectura.md), [`trazabilidad-arquitectonica.md`](trazabilidad-arquitectonica.md), [`adr/`](adr/) y [`diagramas/`](diagramas/)
 - **Estado:** Propuesta. Pendiente de confirmación docente (sección 8).
+  - Estado en la Entrega 4 (2026-11-16): `ADR-002` Aceptado, `ADR-003` Rechazado (reemplazado por `ADR-004`), `ADR-004` Aceptado; ver [`adr/`](adr/).
 
 La arquitectura vuelve al alcance de la Entrega 1 sobre una demostración local de costo cero. Ningún identificador se borra, se renumera ni se reutiliza. Este documento es el rastro único del cambio: qué se conserva, qué se difiere y qué falta confirmar.
 
@@ -85,8 +86,8 @@ El significado de estos identificadores no cambia. La matriz solo indica dónde 
 | `ALT-03B` | Diferir | Era la selección de `ADR-003`. |
 | `ALT-03C` | Conservar | Descartada en la Entrega 2. |
 | `ADR-001` | Reencuadrar | Costo cero, PostgreSQL local obligatorio y comando local. `Aceptado` desde el 2026-10-31 (sección 9). |
-| `ADR-002` | Reencuadrar | Puerto de cola, notificador simulado y evidencia ajustada. Sigue `Propuesto`. |
-| `ADR-003` | Diferir | Pasa a `Reemplazado por ADR-004` solo con la confirmación docente. |
+| `ADR-002` | Reencuadrar | Puerto de cola, notificador simulado y evidencia ajustada. Sigue `Propuesto`. Estado en la Entrega 4 (2026-11-16): `Aceptado`. |
+| `ADR-003` | Diferir | Pasa a `Reemplazado por ADR-004` solo con la confirmación docente. Estado en la Entrega 4 (2026-11-16): `Rechazado (reemplazado por ADR-004)`. |
 | `INV-01` | Reencuadrar | El saldo lo calcula el servidor, sin referencia al teléfono. |
 | `INV-02` | Reencuadrar | Una operación de dinero se asienta una sola vez, por desembolso y tipo. |
 | `INV-03` | Diferir | Sigue a `DIV-03`. |
@@ -189,7 +190,7 @@ La Entrega 0 y la Entrega 1 no se editan en esta realineación. Después de la e
 | Asunto | Estado | Efecto mientras siga pendiente |
 |---|---|---|
 | Resolución de `DIV-01` a `DIV-07` | Pendiente | La línea base se usa como propuesta de trabajo. Si el docente la rechaza, esta realineación se revisa antes de continuar. |
-| `ADR-004` y `ADR-003` | Pendiente | `ADR-004` sigue `Propuesto` y `ADR-003` no cambia de estado. |
+| `ADR-004` y `ADR-003` | Pendiente | `ADR-004` sigue `Propuesto` y `ADR-003` no cambia de estado. Estado en la Entrega 4 (2026-11-16): `ADR-002` Aceptado, `ADR-003` Rechazado (reemplazado por `ADR-004`), `ADR-004` Aceptado; ver [`adr/`](adr/). |
 | `DIV-08`, un integrante | Confirmada | El autor confirmó el 2026-10-31 que el docente autorizó el trabajo individual. El repositorio no guarda la constancia. |
 | Retroalimentación de Canvas sobre la Entrega 2 | Pendiente de incorporar | Si contradice este documento, prevalece la retroalimentación. |
 
@@ -212,6 +213,8 @@ Corte del 2026-10-31. Los resultados, hallazgos y limitaciones completos están 
 | `ADR-002` | `Propuesto` | Falta `EV-08`. Se ajustó con `HV-05`, `HV-06` y `HV-07`. |
 | `ADR-003` | `Propuesto`, sin cambios | Depende de la confirmación docente de `DIV-02`. |
 | `ADR-004` | `Propuesto` | Depende de la misma confirmación. Se ajustó con `HV-04` y `HV-07`. |
+
+Estado en la Entrega 4 (2026-11-16): `ADR-002` Aceptado, `ADR-003` Rechazado (reemplazado por `ADR-004`), `ADR-004` Aceptado; ver [`adr/`](adr/).
 
 **Lo que este resultado no cierra.** Las confirmaciones de la sección 8 que siguen como `Pendiente` no se obtuvieron durante la Entrega 3.
 
