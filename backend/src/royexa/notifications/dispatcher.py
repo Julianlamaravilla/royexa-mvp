@@ -1,4 +1,6 @@
-"""Invocable outbox dispatcher (ADR-002). Sole reader of events; no background worker."""
+"""Outbox dispatcher (ADR-002). Sole reader of events. It runs inside the server process: the
+production entry point loops over it with `royexa.background.dispatch_forever`, and the
+administrator can also invoke a round through `POST /v1/notifications/dispatch`."""
 
 from __future__ import annotations
 
